@@ -53,18 +53,17 @@ import ua.komora.ui.theme.Ornament
 /** One organisation: its name, what it does, and its official site (no tracking marks in the link). */
 private class Cause(@StringRes val name: Int, @StringRes val what: Int, @StringRes val url: Int)
 
+// Only official, public channels: no single foundation or person is singled out
 private val DEFENCE = listOf(
-    Cause(R.string.org_united24, R.string.org_united24_what, R.string.org_united24_url),
-    Cause(R.string.org_savelife, R.string.org_savelife_what, R.string.org_savelife_url),
-    Cause(R.string.org_prytula, R.string.org_prytula_what, R.string.org_prytula_url),
+    Cause(R.string.org_united24, R.string.org_united24_defence, R.string.org_united24_url),
+    Cause(R.string.org_nbu, R.string.org_nbu_what, R.string.org_nbu_url),
     // Not a fundraiser: the state's defence-tech cluster, to learn about it
     Cause(R.string.org_brave1, R.string.org_brave1_what, R.string.org_brave1_url),
 )
 
 private val HUMANITARIAN = listOf(
+    Cause(R.string.org_united24, R.string.org_united24_humanitarian, R.string.org_united24_url),
     Cause(R.string.org_redcross, R.string.org_redcross_what, R.string.org_redcross_url),
-    Cause(R.string.org_voices, R.string.org_voices_what, R.string.org_voices_url),
-    Cause(R.string.org_superhumans, R.string.org_superhumans_what, R.string.org_superhumans_url),
 )
 
 private val LETTER = listOf(
@@ -133,6 +132,8 @@ internal fun AboutPage(onBack: () -> Unit) {
                 CauseGroup(R.string.support_defence, DEFENCE, open)
                 Spacer(Modifier.height(16.dp))
                 CauseGroup(R.string.support_humanitarian, HUMANITARIAN, open)
+                Spacer(Modifier.height(12.dp))
+                Text(stringResource(R.string.support_any), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
 
                 Spacer(Modifier.height(24.dp))
                 Text(stringResource(R.string.about_title), style = CardTitle, color = scheme.onSurface,
