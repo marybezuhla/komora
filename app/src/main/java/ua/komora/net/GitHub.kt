@@ -45,7 +45,7 @@ object GitHub {
     fun latestApks(repo: String): Pair<String, List<Rules.Asset>> {
         val r = latest(repo)
         val name = r.repo ?: repo
-        return name to r.assets.filter { it.name.endsWith(".apk", ignoreCase = true) && Rules.inRepo(it.url, name) }
+        return name to r.assets.filter { it.name.endsWith(".apk") && Rules.inRepo(it.url, name) }
     }
 
     /** The newest published (not draft, not pre-release) release of [repo], with its one APK. */

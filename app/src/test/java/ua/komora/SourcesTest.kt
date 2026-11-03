@@ -98,6 +98,11 @@ class SourcesTest {
             assertEquals(name, listOf(name), all.filter { r.matches(it) })
             assertTrue(name, r.matches(name.replace("1.2.3", "1.3.0")))
         }
+        // The version after the part that tells them apart
+        val after = listOf("app-v7a-1.2.apk", "app-v8a-1.2.apk")
+        val r = Regex(Rules.patternFor(after[0], after))
+        assertTrue(r.matches("app-v7a-1.3.apk"))
+        assertFalse(r.matches("app-v8a-1.3.apk"))
     }
 
     @Test

@@ -74,19 +74,20 @@ object Rules {
     fun patternFor(assetName: String, siblings: List<String> = listOf(assetName)): String {
         val parts = assetName.split(DIGITS)
         val numbers = DIGITS.findAll(assetName).map { it.value }.toList()
-        val loose = BooleanArray(numbers.size) { true }
+        // Files of the same shape in this release ("app-1.2-v7a.apk" beside "app-1.2-v8a.apk"): the numbers in
+        // which they differ tell them apart and stay as they are; the rest (the version) may change
+        val sameShape = siblings.filter { it != assetName && it.split(DIGITS) == parts }
+            .map { s -> DIGITS.findAll(s).map { it.value }.toList() }
+        val loose = BooleanArray(numbers.size) { i -> sameShape.none { it[i] != numbers[i] } }
         fun build() = buildString {
             for ((i, part) in parts.withIndex()) {
                 append(escape(part))
                 if (i < numbers.size) append(if (loose[i]) "[0-9]+" else numbers[i])
             }
         }
-        // From the last number back: keep it literal while more than one file would match
-        for (i in numbers.indices.reversed()) {
-            val r = Regex(build())
-            if (siblings.count { r.matches(it) } <= 1) break
-            loose[i] = false
-        }
+        val r = Regex(build())
+        // Should never happen; if it does, only this very name
+        if (siblings.count { r.matches(it) } > 1) loose.fill(false)
         return build()
     }
 

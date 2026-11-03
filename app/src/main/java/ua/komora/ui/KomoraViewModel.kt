@@ -103,7 +103,14 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         Catalog.parse(app.assets.open("catalog.json").bufferedReader().use { it.readText() })
 
     /** The sources the owner added; shown only while the switch in Settings is on. */
-    private var sources: List<Source> = Sources.load(app)
+    private var sources: List<Source> = Sources.load(app).let { all ->
+        // A source pinned to a package that is now in Komora's own list (or is Komora) is dropped:
+        // Komora's own key always wins, and a hidden source would hold a place nobody could free
+        val taken = verified.map { it.packageName }.toSet() + app.packageName
+        val kept = all.filter { it.packageName !in taken }
+        if (kept.size != all.size) Sources.save(app, kept)
+        kept
+    }
     private val _sourcesEnabled = MutableStateFlow(Sources.enabled(app))
     val sourcesEnabled: StateFlow<Boolean> = _sourcesEnabled
 
@@ -245,9 +252,10 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         _sourcesEnabled.value = on
         rebuildRows()
         if (on) {
-            // Through the one check at a time; a check already running is left to finish
-            if (checkJob?.isActive == true) return
+            // One check at a time: after one already running, which did not include the added apps
+            val previous = checkJob
             checkJob = viewModelScope.launch {
+                previous?.join()
                 for (app in apps().filter { it.added }) {
                     if (apps().none { it.key == app.key }) continue
                     if (!check(app)) break
