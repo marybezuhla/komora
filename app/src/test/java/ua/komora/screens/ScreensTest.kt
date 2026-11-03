@@ -91,16 +91,19 @@ class ScreensTest {
             // A text field keeps the screen busy for ever: then time is moved on by hand
             if (manualClock) compose.mainClock.autoAdvance = false
             scenario.onActivity { it.setContent { KomoraTheme(theme) { content() } } }
-            if (manualClock) compose.mainClock.advanceTimeBy(2000)
-            repeat(6) {
-                shadowOf(Looper.getMainLooper()).idle()
-                compose.waitForIdle()
+            // Frames played by hand, without waiting for a quiet moment that never comes
+            fun settle(times: Int) = repeat(times) {
+                if (manualClock) {
+                    repeat(30) { compose.mainClock.advanceTimeByFrame() }
+                    shadowOf(Looper.getMainLooper()).idle()
+                } else {
+                    shadowOf(Looper.getMainLooper()).idle()
+                    compose.waitForIdle()
+                }
             }
+            settle(6)
             afterIdle()
-            repeat(4) {
-                shadowOf(Looper.getMainLooper()).idle()
-                compose.waitForIdle()
-            }
+            settle(4)
             var bitmap: Bitmap? = null
             scenario.onActivity { activity ->
                 val view = activity.window.decorView
