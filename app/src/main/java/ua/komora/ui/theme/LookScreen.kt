@@ -145,13 +145,14 @@ private fun <T> Segments(options: List<Pair<T, Int>>, chosen: T, onChoose: (T) -
                     // A frame too, so the choice is clear without telling colours apart
                     .border(1.dp, if (selected) scheme.outline else Color.Transparent, RoundedCornerShape(50))
                     .selectable(selected, role = Role.RadioButton) { onChoose(value) }
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 2.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     stringResource(label),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
+                    softWrap = false,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

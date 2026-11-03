@@ -352,13 +352,17 @@ internal fun KomoraList(
                 Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         stringResource(R.string.apps_header, rows.size),
+                        maxLines = 1,
+                        softWrap = false,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f).semantics { heading() },
                     )
-                    TextButton(onClick = onCheck) {
-                        Text(stringResource(R.string.refresh), fontWeight = FontWeight.SemiBold)
+                    // A short label, so it fits beside the heading; TalkBack reads the full one
+                    val full = stringResource(R.string.refresh)
+                    TextButton(onClick = onCheck, modifier = Modifier.semantics { contentDescription = full }) {
+                        Text(stringResource(R.string.check), fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
             }
