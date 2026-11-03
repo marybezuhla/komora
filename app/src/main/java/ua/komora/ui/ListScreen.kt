@@ -492,7 +492,8 @@ private fun AppCard(
                     row.app.summary(lang),
                     style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onSurfaceVariant,
-                    maxLines = 2,
+                    // An added app's line is its repository: one line, cut at the end, never broken at "/"
+                    maxLines = if (row.app.added) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(6.dp))

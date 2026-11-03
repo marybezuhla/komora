@@ -30,7 +30,7 @@ data class Source(
             certSha256 = certSha256,
             badge = badgeFor(repo),
             names = mapOf("en" to shown),
-            summaries = mapOf("en" to "github.com/$repo"),
+            summaries = mapOf("en" to repo),
             added = true,
             apkPattern = apkPattern,
         )

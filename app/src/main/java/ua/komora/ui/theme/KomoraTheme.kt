@@ -61,12 +61,28 @@ fun colorScheme(theme: Theme, context: Context): ColorScheme {
 
 @Composable
 fun KomoraTheme(theme: Theme, content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = colorScheme(theme, LocalContext.current), content = content)
+    MaterialTheme(colorScheme = colorScheme(theme, LocalContext.current), typography = KomoraType, content = content)
+}
+
+/**
+ * Text a size larger than Android's defaults, so nothing on a card is tiny; Android's own font size
+ * setting still scales all of it.
+ */
+private val KomoraType = androidx.compose.material3.Typography().run {
+    copy(
+        bodyLarge = bodyLarge.copy(fontSize = 17.sp, lineHeight = 24.sp),
+        bodyMedium = bodyMedium.copy(fontSize = 16.sp, lineHeight = 22.sp),
+        bodySmall = bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp),
+        labelLarge = labelLarge.copy(fontSize = 15.sp, lineHeight = 20.sp),
+        labelMedium = labelMedium.copy(fontSize = 14.sp, lineHeight = 18.sp),
+        labelSmall = labelSmall.copy(fontSize = 13.sp, lineHeight = 16.sp),
+        titleMedium = titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp),
+    )
 }
 
 /** An app's name in its card header: larger and bolder than anything inside, as in Pysanka. */
 val CardTitle: TextStyle
-    @Composable get() = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+    @Composable get() = MaterialTheme.typography.titleMedium.copy(fontSize = 19.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
 
 /**
  * A narrow embroidered band, like the edge of a rushnyk: rhombuses in the theme's accent with a dot of
