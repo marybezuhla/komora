@@ -61,7 +61,11 @@ fun colorScheme(theme: Theme, context: Context): ColorScheme {
 
 @Composable
 fun KomoraTheme(theme: Theme, content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = colorScheme(theme, LocalContext.current), typography = KomoraType, content = content)
+    val scheme = colorScheme(theme, LocalContext.current).let {
+        // Descriptions and small print darker (or lighter at night) than Android's grey: easier to read
+        it.copy(onSurfaceVariant = androidx.compose.ui.graphics.lerp(it.onSurfaceVariant, it.onSurface, 0.45f))
+    }
+    MaterialTheme(colorScheme = scheme, typography = KomoraType, content = content)
 }
 
 /**
@@ -70,19 +74,20 @@ fun KomoraTheme(theme: Theme, content: @Composable () -> Unit) {
  */
 private val KomoraType = androidx.compose.material3.Typography().run {
     copy(
-        bodyLarge = bodyLarge.copy(fontSize = 17.sp, lineHeight = 24.sp),
-        bodyMedium = bodyMedium.copy(fontSize = 16.sp, lineHeight = 22.sp),
-        bodySmall = bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp),
-        labelLarge = labelLarge.copy(fontSize = 15.sp, lineHeight = 20.sp),
-        labelMedium = labelMedium.copy(fontSize = 14.sp, lineHeight = 18.sp),
-        labelSmall = labelSmall.copy(fontSize = 13.sp, lineHeight = 16.sp),
-        titleMedium = titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp),
+        bodyLarge = bodyLarge.copy(fontSize = 18.sp, lineHeight = 26.sp),
+        bodyMedium = bodyMedium.copy(fontSize = 17.sp, lineHeight = 24.sp, letterSpacing = 0.15.sp),
+        bodySmall = bodySmall.copy(fontSize = 15.sp, lineHeight = 21.sp),
+        labelLarge = labelLarge.copy(fontSize = 16.sp, lineHeight = 22.sp),
+        labelMedium = labelMedium.copy(fontSize = 15.sp, lineHeight = 20.sp),
+        labelSmall = labelSmall.copy(fontSize = 14.sp, lineHeight = 18.sp),
+        titleMedium = titleMedium.copy(fontSize = 19.sp, lineHeight = 26.sp),
+        titleLarge = titleLarge.copy(fontSize = 24.sp, lineHeight = 30.sp),
     )
 }
 
 /** An app's name in its card header: larger and bolder than anything inside, as in Pysanka. */
 val CardTitle: TextStyle
-    @Composable get() = MaterialTheme.typography.titleMedium.copy(fontSize = 19.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
+    @Composable get() = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold)
 
 /**
  * A narrow embroidered band, like the edge of a rushnyk: rhombuses in the theme's accent with a dot of
