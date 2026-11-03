@@ -85,7 +85,7 @@
     <string name="pill_available">%1$s · %2$s</string>
     <string name="sources_title">Other sources</string>
     <string name="sources_switch">Apps from other GitHub repositories</string>
-    <string name="sources_summary">Adds a second tab where you can add any public GitHub repository. Komora did not check those apps: you decide whom to trust. Their key is pinned at the first install, and every update must have the same key.</string>
+    <string name="sources_summary">Adds a second tab where you can add any public GitHub repository. Komora did not check those apps: you decide whom to trust. Their key is remembered when you agree to the first install, and every update must have the same key. Turning this off hides the tab but keeps the list.</string>
     <string name="tab_verified">Verified · %1$d</string>
     <string name="tab_added">Added by you · %1$d</string>
     <string name="added_intro_title">Apps you added</string>
@@ -100,7 +100,7 @@
     <string name="add_source_looking">Looking at the latest release…</string>
     <string name="add">Add</string>
     <string name="choose_apk">Which file?</string>
-    <string name="choose_apk_text">The release has several APK files. Pick the one for this phone (usually \"universal\" or \"arm64\"). Komora will take the file with the same name in later releases.</string>
+    <string name="choose_apk_text">The release has several APK files. Pick the one for this phone (usually \"universal\" or \"arm64\"). In later releases Komora will take the file named the same way.</string>
     <string name="add_err_link">That does not look like a GitHub repository. Example: github.com/owner/name</string>
     <string name="add_err_exists">This repository is already added.</string>
     <string name="add_err_in_komora">This app is already in Komora\'s own list.</string>
@@ -119,7 +119,8 @@
     <string name="field_key">Signing key (SHA-256)</string>
     <string name="field_installed">Installed</string>
     <string name="field_latest">Latest</string>
-    <string name="key_unknown_yet">Not known yet: it is shown and remembered at the first install.</string>
+    <string name="key_unknown_yet">Not known yet: it is shown before the first install and remembered when you agree.</string>
     <string name="open_repository">Open on GitHub</string>
     <string name="remove_source">Remove</string>
+    <string name="add_err_storage">Could not save on this phone. Try again.</string>
 </resources>

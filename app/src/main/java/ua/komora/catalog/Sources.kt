@@ -107,14 +107,22 @@ object Sources {
     }
 
     fun valid(s: Source): Boolean =
-        REPO.matches(s.repo) &&
+        REPO.matches(s.repo) && !s.repo.substringAfter('/').startsWith(".") &&
             s.apkPattern.length in 5..300 && s.apkPattern.endsWith("\\.apk") && runCatching { Regex(s.apkPattern) }.isSuccess &&
             (s.packageName.isEmpty() || PACKAGE.matches(s.packageName)) &&
             (s.certSha256.isEmpty() || SHA256.matches(s.certSha256)) &&
             // Either both known (trusted) or neither (not installed yet)
             (s.packageName.isEmpty() == s.certSha256.isEmpty())
 
-    fun save(context: Context, list: List<Source>) {
+    /** Saves the list; false if it could not be written (the old list then stays as it was). */
+    fun save(context: Context, list: List<Source>): Boolean = try {
+        write(context, list)
+        true
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun write(context: Context, list: List<Source>) {
         val array = JSONArray()
         for (s in list.filter { valid(it) }.take(MAX)) {
             array.put(
@@ -127,7 +135,14 @@ object Sources {
         // Written whole to a new file, then swapped in: never a half-written list
         val dir = context.noBackupFilesDir
         val tmp = File(dir, "$FILE.tmp")
-        tmp.writeText(array.toString())
-        if (!tmp.renameTo(File(dir, FILE))) tmp.delete()
+        java.io.FileOutputStream(tmp).use { out ->
+            out.write(array.toString().toByteArray(Charsets.UTF_8))
+            // On the disk before it replaces the old list, so a sudden power cut cannot leave an empty one
+            out.fd.sync()
+        }
+        if (!tmp.renameTo(File(dir, FILE))) {
+            tmp.delete()
+            throw java.io.IOException("Could not save the sources")
+        }
     }
 }

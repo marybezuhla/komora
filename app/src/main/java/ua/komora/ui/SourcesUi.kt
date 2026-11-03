@@ -137,6 +137,7 @@ private fun addErrorText(e: AddError): String = stringResource(
         AddError.NoApk -> R.string.add_err_no_apk
         AddError.Network -> R.string.err_network
         AddError.RateLimit -> R.string.err_rate_limit
+        AddError.Storage -> R.string.add_err_storage
     },
 )
 
@@ -157,8 +158,8 @@ fun TrustDialog(request: TrustRequest, onAnswer: (Boolean) -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Field(stringResource(R.string.field_source), "github.com/${request.repo}")
                 Field(stringResource(R.string.field_package), id.packageName)
-                id.versionName?.let { Field(stringResource(R.string.field_version), it) }
                 Field(stringResource(R.string.field_key), formatKey(id.certSha256), mono = true)
+                id.versionName?.let { Field(stringResource(R.string.field_version), it) }
                 Spacer(Modifier.height(8.dp))
                 Text(stringResource(R.string.trust_after), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

@@ -83,7 +83,7 @@
     <string name="pill_available">%1$s · %2$s</string>
     <string name="sources_title">Інші джерела</string>
     <string name="sources_switch">Застосунки з інших репозиторіїв GitHub</string>
-    <string name="sources_summary">Додає другу вкладку, де можна додати будь-який публічний репозиторій GitHub. Комора ці застосунки не перевіряла: кому довіряти, вирішуєте ви. Ключ запам\'ятовується під час першого встановлення, і кожне оновлення мусить мати той самий ключ.</string>
+    <string name="sources_summary">Додає другу вкладку, де можна додати будь-який публічний репозиторій GitHub. Комора ці застосунки не перевіряла: кому довіряти, вирішуєте ви. Ключ запам\'ятовується, коли ви погоджуєтеся на перше встановлення, і кожне оновлення мусить мати той самий ключ. Якщо вимкнути, вкладка зникне, але список збережеться.</string>
     <string name="tab_verified">Перевірені · %1$d</string>
     <string name="tab_added">Додані вами · %1$d</string>
     <string name="added_intro_title">Застосунки, які ви додали</string>
@@ -98,7 +98,7 @@
     <string name="add_source_looking">Дивлюся останній випуск…</string>
     <string name="add">Додати</string>
     <string name="choose_apk">Який файл?</string>
-    <string name="choose_apk_text">У випуску кілька APK-файлів. Оберіть той, що для цього телефона (зазвичай «universal» або «arm64»). У наступних випусках Комора братиме файл із такою самою назвою.</string>
+    <string name="choose_apk_text">У випуску кілька APK-файлів. Оберіть той, що для цього телефона (зазвичай «universal» або «arm64»). У наступних випусках Комора братиме файл, названий так само.</string>
     <string name="add_err_link">Це не схоже на репозиторій GitHub. Приклад: github.com/owner/name</string>
     <string name="add_err_exists">Цей репозиторій уже додано.</string>
     <string name="add_err_in_komora">Цей застосунок уже є у власному списку Комори.</string>
@@ -117,7 +117,8 @@
     <string name="field_key">Ключ підпису (SHA-256)</string>
     <string name="field_installed">Встановлено</string>
     <string name="field_latest">Найновіша</string>
-    <string name="key_unknown_yet">Ще невідомий: його буде показано й запам\'ятовано під час першого встановлення.</string>
+    <string name="key_unknown_yet">Ще невідомий: його буде показано перед першим встановленням і запам\'ятовано, коли погодитеся.</string>
     <string name="open_repository">Відкрити на GitHub</string>
     <string name="remove_source">Видалити</string>
+    <string name="add_err_storage">Не вдалося зберегти на телефоні. Спробуйте ще раз.</string>
 </resources>

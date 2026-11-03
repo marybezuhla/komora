@@ -89,4 +89,33 @@ class SourcesTest {
         }
         assertThrows(BadReleaseException::class.java) { Rules.pickByPattern(emptyList(), p, repo) }
     }
+
+    @Test
+    fun patternKeepsSiblingsApart() {
+        val all = listOf("app-1.2.3-armeabi-v7a.apk", "app-1.2.3-arm64-v8a.apk", "app-1.2.3-x86_64.apk")
+        for (name in all) {
+            val r = Regex(Rules.patternFor(name, all))
+            assertEquals(name, listOf(name), all.filter { r.matches(it) })
+            assertTrue(name, r.matches(name.replace("1.2.3", "1.3.0")))
+        }
+    }
+
+    @Test
+    fun repositoryCaseDoesNotMatter() {
+        assertTrue(Rules.inRepo("https://github.com/Owner/Name/releases/download/v1/a.apk", "owner/name"))
+        assertFalse(Rules.inRepo("https://github.com/owner/name-evil/releases/download/v1/a.apk", "owner/name"))
+        assertFalse(Rules.inRepo("https://github.com/owner/name/raw/a.apk", "owner/name"))
+    }
+
+    @Test
+    fun dotNamesAreNotValid() {
+        assertFalse(Sources.valid(Source("owner/..", "x\\.apk")))
+        assertFalse(Sources.valid(Source("owner/.git", "x\\.apk")))
+    }
+
+    @Test
+    fun tagsAreOnePlainLine() {
+        assertEquals("v1.2evil", Rules.plainTag("v1.2\n\u202Eevil"))
+        assertEquals(40, Rules.plainTag("v" + "1".repeat(100)).length)
+    }
 }

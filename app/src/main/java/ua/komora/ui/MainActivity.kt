@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import ua.komora.install.ApkVerifier
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -190,6 +191,8 @@ class MainActivity : ComponentActivity() {
             BackHandler(enabled = showLook) { showLook = false }
             // Kept while Settings is open, so the list comes back exactly where it was
             val listState = rememberLazyListState()
+            val addedListState = rememberLazyListState()
+            val addedTab = rememberSaveable { mutableStateOf(false) }
             KomoraTheme(theme) {
                 // A short fade between the list and Settings, instead of a flash
                 Crossfade(targetState = showLook, animationSpec = tween(120), label = "page") { settings ->
@@ -216,6 +219,8 @@ class MainActivity : ComponentActivity() {
                         vm = vm,
                         canInstall = canInstall.value,
                         listState = listState,
+                        addedListState = addedListState,
+                        addedTab = addedTab,
                         onLook = { showLook = true },
                         actions = Actions(
                             allowInstalls = {
@@ -259,7 +264,15 @@ internal class Actions(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: LazyListState, onLook: () -> Unit, actions: Actions) {
+private fun KomoraScreen(
+    vm: KomoraViewModel,
+    canInstall: Boolean,
+    listState: LazyListState,
+    addedListState: LazyListState,
+    addedTab: MutableState<Boolean>,
+    onLook: () -> Unit,
+    actions: Actions,
+) {
     val rows by vm.rows.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val confirm by Installer.confirm.collectAsStateWithLifecycle()
@@ -284,6 +297,9 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: La
         sourcesEnabled = sourcesOn,
         onAddSource = { vm.dismissAdding(); showAdd = true },
         onDetails = { detailsKey = it.app.key },
+        addedTab = addedTab.value,
+        onTab = { addedTab.value = it },
+        addedListState = addedListState,
     )
     if (showAdd) {
         AddSourceDialog(adding, onAdd = vm::addSource, onChoose = vm::chooseApk) {
@@ -292,7 +308,7 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: La
             showAdd = false
         }
     }
-    trust?.let { TrustDialog(it, vm::answerTrust) }
+    trust?.let { request -> TrustDialog(request) { yes -> vm.answerTrust(request, yes) } }
     val context = LocalContext.current
     val lang = stringResource(R.string.catalog_lang)
     rows.firstOrNull { it.app.key == detailsKey }?.let { row ->
@@ -301,7 +317,8 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: La
         }
         DetailsSheet(
             row, lang, key,
-            onRemove = if (row.app.added) ({ vm.removeSource(row.app.repo); detailsKey = null }) else null,
+            // Not while it is downloading or installing
+            onRemove = if (row.app.added && !row.isBusy) ({ vm.removeSource(row.app.repo); detailsKey = null }) else null,
             onDismiss = { detailsKey = null },
         )
     }

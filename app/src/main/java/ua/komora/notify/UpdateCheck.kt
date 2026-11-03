@@ -27,8 +27,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Update notices, off unless the owner turns them on: once a day, in the background, Komora asks
- * GitHub about every app in its list and the trusted sources the owner added (the same questions as
- * when it is opened, so they say nothing about what is installed) and says when an app on this phone has a newer version. It only tells;
+ * GitHub about every app in its own list (the same questions as when it is opened, so they say nothing
+ * about what is installed) and about added sources whose app is on this phone and says when an app on this phone has a newer version. It only tells;
  * installing still happens in Komora, with every check.
  */
 object UpdateCheck {
@@ -103,9 +103,13 @@ object UpdateCheck {
         // Notices turned off in Android: no point asking GitHub at all
         if (!canNotify(context)) return true
         val builtIn = Catalog.parse(context.assets.open("catalog.json").bufferedReader().use { it.readText() })
-        // Added sources only when shown, and only once trusted (their package and key are known)
-        val added = if (Sources.enabled(context)) Sources.load(context).filter { it.trusted }.map { it.toApp() } else emptyList()
-        val catalog = builtIn + added.filter { a -> builtIn.none { it.packageName == a.packageName } }
+        // Added sources only when shown, and only those trusted and on this phone: a repository the owner
+        // chose is personal, so it is not asked about in the background unless the app is actually installed
+        val added = if (!Sources.enabled(context)) emptyList() else Sources.load(context)
+            .filter { it.trusted && builtIn.none { b -> b.packageName == it.packageName } && it.packageName != context.packageName }
+            .filter { ApkVerifier.installedInfo(context.packageManager, it.packageName) != null }
+            .map { it.toApp() }
+        val catalog = builtIn + added
         val lang = context.getString(R.string.catalog_lang)
         val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         val updates = mutableListOf<Triple<String, String, String>>() // key, version, "Name 1.2.3"
@@ -118,6 +122,8 @@ object UpdateCheck {
             } catch (_: NoReleaseException) {
                 continue
             } catch (e: IOException) {
+                // One added repository that answers oddly does not hold up the rest
+                if (app.added) continue
                 return false
             } catch (_: Exception) {
                 continue
@@ -137,6 +143,15 @@ object UpdateCheck {
             edit.apply()
         }
         return true
+    }
+
+    /** Forgets what was last told about [packageName] (when its source is removed). */
+    fun forget(context: Context, packageName: String) {
+        try {
+            context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().remove("told_$packageName").apply()
+        } catch (_: Exception) {
+            // Only a note
+        }
     }
 
     /** The channel, named in the current language; refreshed whenever Komora opens. */

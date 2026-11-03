@@ -119,14 +119,16 @@ internal fun KomoraList(
     onInstall: (AppRow) -> Unit,
     onCancel: () -> Unit,
     listState: LazyListState = rememberLazyListState(),
-    onUpdateAll: () -> Unit = {},
+    onUpdateAll: (List<String>) -> Unit = {},
     sourcesEnabled: Boolean = false,
     onAddSource: () -> Unit = {},
     onDetails: (AppRow) -> Unit = {},
-    startOnAdded: Boolean = false,
+    // Two tabs once other sources are turned on: Komora's own list, and what the owner added.
+    // Kept by the caller, so the tab and each tab's place in the list survive a visit to Settings.
+    addedTab: Boolean = false,
+    onTab: (Boolean) -> Unit = {},
+    addedListState: LazyListState = rememberLazyListState(),
 ) {
-    // Two tabs once other sources are turned on: Komora's own list, and what the owner added
-    var addedTab by rememberSaveable { mutableStateOf(startOnAdded) }
     val showAdded = sourcesEnabled && addedTab
     val verifiedRows = rows.filter { !it.app.added }
     val addedRows = rows.filter { it.app.added }
@@ -169,20 +171,20 @@ internal fun KomoraList(
         // Pull the list down to check for updates
         PullToRefreshBox(isRefreshing = checking, onRefresh = onCheck, modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
-                state = listState,
+                state = if (showAdded) addedListState else listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (sourcesEnabled) {
-                    item { Tabs(verifiedRows.size, addedRows.size, addedTab) { addedTab = it } }
+                    item { Tabs(verifiedRows.size, addedRows.size, addedTab, onTab) }
                 }
                 if (!canInstall) item { AllowCard(actions.allowInstalls) }
                 val shown = if (showAdded) addedRows else verifiedRows
-                if (showAdded) {
-                    item { AddedIntro(onAddSource) }
-                } else {
-                    item { Summary(rows, checking, busy, canInstall, onCheck, onUpdateAll) }
+                if (showAdded) item { AddedIntro(onAddSource) }
+                // How this tab's apps stand; "Update all" covers only what is shown
+                if (!showAdded || shown.isNotEmpty()) {
+                    item { Summary(shown, checking, busy, canInstall, onCheck) { onUpdateAll(shown.map { it.app.key }) } }
                 }
                 for (group in Group.entries) {
                     val inGroup = shown.filter { Group.of(it) == group }

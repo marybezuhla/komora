@@ -19,7 +19,7 @@ class CatalogTest {
     }
 
     @Test
-    fun manifestSeesExactlyTheCatalogApps() {
+    fun manifestNamesExactlyTheCatalogApps() {
         val inCatalog = Catalog.parse(catalogJson).filterNot { it.isSelf }.map { it.packageName }.toSet()
         val inManifest = Regex("<package android:name=\"([^\"]+)\"").findAll(manifest).map { it.groupValues[1] }.toSet()
         assertEquals(inCatalog, inManifest)

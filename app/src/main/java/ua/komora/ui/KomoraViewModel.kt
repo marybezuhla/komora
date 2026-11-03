@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -30,7 +31,9 @@ import ua.komora.net.NoReleaseException
 import ua.komora.net.RateLimitException
 import ua.komora.net.Release
 import ua.komora.net.Rules
+import ua.komora.notify.UpdateCheck
 import java.io.File
+import java.io.IOException
 
 enum class Problem {
     Network, RateLimit, NoRelease, BadRelease, Download, NoSpace,
@@ -44,11 +47,12 @@ sealed class AddState {
     object Idle : AddState()
     object Working : AddState()
     /** The release has several APKs: the owner picks one, once. */
-    data class Choose(val repo: String, val names: List<String>) : AddState()
+    /** [names] are shown; [all] are every APK in the release, so the pattern can be checked against them. */
+    data class Choose(val repo: String, val names: List<String>, val all: List<String> = names) : AddState()
     data class Failed(val reason: AddError) : AddState()
 }
 
-enum class AddError { BadLink, Exists, InKomora, TooMany, NoRelease, NoApk, Network, RateLimit }
+enum class AddError { BadLink, Exists, InKomora, TooMany, NoRelease, NoApk, Network, RateLimit, Storage }
 
 /** Shown before the first install from an added source: what the file is, and whether to trust it. */
 data class TrustRequest(val repo: String, val identity: ApkVerifier.Identity)
@@ -103,8 +107,15 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     private val _sourcesEnabled = MutableStateFlow(Sources.enabled(app))
     val sourcesEnabled: StateFlow<Boolean> = _sourcesEnabled
 
-    private fun apps(): List<CatalogApp> =
-        verified + if (_sourcesEnabled.value) sources.map { it.toApp() } else emptyList()
+    /**
+     * Komora's own list, then the added sources. A source whose pinned package is (now) in Komora's own
+     * list, or is Komora itself, is left out: Komora's own key always wins.
+     */
+    private fun apps(): List<CatalogApp> {
+        if (!_sourcesEnabled.value) return verified
+        val taken = verified.map { it.packageName }.toSet() + ctx.packageName
+        return verified + sources.filter { it.packageName !in taken }.map { it.toApp() }
+    }
 
     private val _rows = MutableStateFlow(apps().map { AppRow(it) })
     val rows: StateFlow<List<AppRow>> = _rows
@@ -119,6 +130,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     private val _trust = MutableStateFlow<TrustRequest?>(null)
     val trust: StateFlow<TrustRequest?> = _trust
     private var trustAnswer: CompletableDeferred<Boolean>? = null
+    private var addJob: Job? = null
 
     /** The one install in progress. Touched only on the main thread. */
     private var active: Active? = null
@@ -188,6 +200,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         checkJob = viewModelScope.launch {
             val list = apps()
             for ((index, app) in list.withIndex()) {
+                // Sources switched off or removed meanwhile: not asked about any more
+                if (apps().none { it.key == app.key }) continue
                 if (!check(app)) {
                     // Without a connection or after the rate limit, the rest would fail the same way: say so for all
                     val p = _rows.value.firstOrNull { it.app.key == app.key }?.problem ?: break
@@ -230,7 +244,16 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         Sources.setEnabled(ctx, on)
         _sourcesEnabled.value = on
         rebuildRows()
-        if (on) viewModelScope.launch { for (s in sources) if (!check(s.toApp())) break }
+        if (on) {
+            // Through the one check at a time; a check already running is left to finish
+            if (checkJob?.isActive == true) return
+            checkJob = viewModelScope.launch {
+                for (app in apps().filter { it.added }) {
+                    if (apps().none { it.key == app.key }) continue
+                    if (!check(app)) break
+                }
+            }
+        }
     }
 
     /** Step 1: a link or "owner/name"; finds the APKs in its newest release. */
@@ -242,14 +265,21 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             verified.any { it.repo.equals(repo, ignoreCase = true) } -> return run { _adding.value = AddState.Failed(AddError.InKomora) }
         }
         _adding.value = AddState.Working
-        viewModelScope.launch {
+        addJob?.cancel()
+        addJob = viewModelScope.launch {
             val found = withContext(Dispatchers.IO) { catching { GitHub.latestApks(repo) } }
+            // Closed or started again meanwhile: this answer is no longer wanted
+            ensureActive()
             _adding.value = found.fold(
-                onSuccess = { apks ->
-                    when (apks.size) {
-                        0 -> AddState.Failed(AddError.NoApk)
-                        1 -> { saveSource(repo, apks.single().name); AddState.Idle }
-                        else -> AddState.Choose(repo, apks.map { it.name }.take(12))
+                onSuccess = { (canonical, apks) ->
+                    val names = apks.map { it.name }
+                    when {
+                        names.isEmpty() -> AddState.Failed(AddError.NoApk)
+                        // As GitHub spells it (owner and name may differ in case, or the repository was renamed)
+                        sources.any { it.repo.equals(canonical, ignoreCase = true) } -> AddState.Failed(AddError.Exists)
+                        verified.any { it.repo.equals(canonical, ignoreCase = true) } -> AddState.Failed(AddError.InKomora)
+                        names.size == 1 -> saveSource(canonical, names.single(), names)
+                        else -> AddState.Choose(canonical, names.take(12), names)
                     }
                 },
                 onFailure = { e ->
@@ -267,33 +297,44 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Step 2, when there were several APKs: the one to take from now on. */
     fun chooseApk(repo: String, name: String) {
-        saveSource(repo, name)
-        _adding.value = AddState.Idle
+        val all = (_adding.value as? AddState.Choose)?.all ?: listOf(name)
+        _adding.value = saveSource(repo, name, all)
     }
 
     fun dismissAdding() {
+        addJob?.cancel()
+        addJob = null
         _adding.value = AddState.Idle
     }
 
-    private fun saveSource(repo: String, apkName: String) {
-        val source = Source(repo = repo, apkPattern = Rules.patternFor(apkName), addedAt = System.currentTimeMillis())
-        if (!Sources.valid(source)) return
-        sources = sources + source
-        runCatching { Sources.save(ctx, sources) }
+    /** Saves the source; Idle when done (the dialog closes), or why not. */
+    private fun saveSource(repo: String, apkName: String, allNames: List<String>): AddState {
+        if (sources.size >= Sources.MAX) return AddState.Failed(AddError.TooMany)
+        val source = Source(repo = repo, apkPattern = Rules.patternFor(apkName, allNames), addedAt = System.currentTimeMillis())
+        if (!Sources.valid(source)) return AddState.Failed(AddError.NoApk)
+        val next = sources + source
+        if (!Sources.save(ctx, next)) return AddState.Failed(AddError.Storage)
+        sources = next
         rebuildRows()
         viewModelScope.launch { check(source.toApp()) }
+        return AddState.Idle
     }
 
     /** Removes an added source from Komora (the app itself, if installed, stays on the phone). */
     fun removeSource(repo: String) {
         if (active?.key?.let { k -> _rows.value.any { it.app.key == k && it.app.repo == repo } } == true) return
-        sources = sources.filterNot { it.repo == repo }
-        runCatching { Sources.save(ctx, sources) }
+        val gone = sources.filter { it.repo == repo }
+        val next = sources - gone.toSet()
+        if (!Sources.save(ctx, next)) return
+        sources = next
+        // Nothing about it is left behind, not even the last version told about
+        for (s in gone) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
         rebuildRows()
     }
 
-    fun answerTrust(yes: Boolean) {
-        trustAnswer?.complete(yes)
+    /** The owner's answer, counted only for the question it was given to. */
+    fun answerTrust(request: TrustRequest?, yes: Boolean) {
+        if (request == null || request === _trust.value) trustAnswer?.complete(yes)
     }
 
     private class TrustDeclined : Exception()
@@ -317,14 +358,19 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             _trust.value = TrustRequest(app.repo, id)
         }
         val yes = try { answer.await() } finally {
-            withContext(Dispatchers.Main) { _trust.value = null; trustAnswer = null }
+            // Also when the install is cancelled meanwhile: the question never stays on screen
+            withContext(NonCancellable + Dispatchers.Main) {
+                if (trustAnswer === answer) { _trust.value = null; trustAnswer = null }
+            }
         }
         if (!yes) throw TrustDeclined()
         return withContext(Dispatchers.Main) {
-            val pinned = sources.first { it.repo == app.repo }
-                .copy(packageName = id.packageName, certSha256 = id.certSha256, name = id.label)
-            sources = sources.map { if (it.repo == app.repo) pinned else it }
-            Sources.save(ctx, sources)
+            // Removed while the question was open: nothing to pin
+            val source = sources.firstOrNull { it.repo == app.repo } ?: throw TrustDeclined()
+            val pinned = source.copy(packageName = id.packageName, certSha256 = id.certSha256, name = id.label)
+            val next = sources.map { if (it.repo == app.repo) pinned else it }
+            if (!Sources.save(ctx, next)) throw IOException("Could not save the source")
+            sources = next
             val newApp = pinned.toApp()
             _rows.update { rows -> rows.map { if (it.app.key == app.key) it.copy(app = newApp) else it } }
             newApp
@@ -403,7 +449,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         // A cancelled download returns the row to where it was, with no error
         current.job?.invokeOnCompletion { cause ->
             if (cause is CancellationException) viewModelScope.launch {
-                answerTrust(false)
+                answerTrust(null, false)
                 if (active === current) {
                     finish(current)
                     set(current.key) { it.copy(phase = Phase.Idle) }
@@ -416,9 +462,9 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     private val queue = ArrayDeque<String>()
 
     /** Updates every app with a newer release, one at a time (Android may ask about each). */
-    fun updateAll() {
+    fun updateAll(keys: List<String>) {
         queue.clear()
-        _rows.value.filter { it.hasUpdate && !it.foreignKey && it.latest != null }
+        _rows.value.filter { it.app.key in keys && it.hasUpdate && !it.foreignKey && it.latest != null }
             // Komora itself last: updating it closes it
             .sortedBy { it.app.isSelf }
             .forEach { queue.addLast(it.app.key) }
@@ -437,7 +483,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     fun cancelInstall() {
         queue.clear()
         val a = active ?: return
-        answerTrust(false)
+        answerTrust(null, false)
         val id = a.sessionId
         if (id == null) a.job?.cancel() else Installer.cancel(ctx, id)
     }

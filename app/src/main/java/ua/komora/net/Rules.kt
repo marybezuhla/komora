@@ -46,7 +46,7 @@ object Rules {
         val matching = assets.filter { name.matches(it.name) }
         if (matching.size != 1) throw BadReleaseException("Expected exactly one $prefix APK, found ${matching.size}")
         val asset = matching.single()
-        if (!asset.url.startsWith("https://github.com/$repo/releases/download/")) throw BadReleaseException("APK link outside the repository")
+        if (!inRepo(asset.url, repo)) throw BadReleaseException("APK link outside the repository")
         if (asset.size !in 1..MAX_APK_BYTES) throw BadReleaseException("APK size out of range")
         return asset
     }
@@ -57,16 +57,45 @@ object Rules {
         val matching = assets.filter { name.matches(it.name) }
         if (matching.size != 1) throw BadReleaseException("Expected exactly one matching APK, found ${matching.size}")
         val asset = matching.single()
-        if (!asset.url.startsWith("https://github.com/$repo/releases/download/")) throw BadReleaseException("APK link outside the repository")
+        if (!inRepo(asset.url, repo)) throw BadReleaseException("APK link outside the repository")
         if (asset.size !in 1..MAX_APK_BYTES) throw BadReleaseException("APK size out of range")
         return asset
     }
 
-    /** "app-1.2.3-universal.apk" -> a pattern that also matches the next versions' names. */
-    fun patternFor(assetName: String): String =
-        assetName.split(Regex("[0-9]+")).joinToString("[0-9]+") { part ->
-            part.map { c -> if (c in "\\.^$|?*+()[]{}-") "\\$c" else c.toString() }.joinToString("")
+    /** A release file of [repo]; GitHub's names ignore case, so the check does too. */
+    fun inRepo(url: String, repo: String): Boolean =
+        url.startsWith("https://github.com/$repo/releases/download/", ignoreCase = true)
+
+    /**
+     * "app-1.2.3-universal.apk" -> a pattern that also matches the next versions' names. Numbers that
+     * tell apart files of the same release ("v7a" and "v8a") stay as they are, so exactly one of
+     * [siblings] (all the APKs of that release) matches.
+     */
+    fun patternFor(assetName: String, siblings: List<String> = listOf(assetName)): String {
+        val parts = assetName.split(DIGITS)
+        val numbers = DIGITS.findAll(assetName).map { it.value }.toList()
+        val loose = BooleanArray(numbers.size) { true }
+        fun build() = buildString {
+            for ((i, part) in parts.withIndex()) {
+                append(escape(part))
+                if (i < numbers.size) append(if (loose[i]) "[0-9]+" else numbers[i])
+            }
         }
+        // From the last number back: keep it literal while more than one file would match
+        for (i in numbers.indices.reversed()) {
+            val r = Regex(build())
+            if (siblings.count { r.matches(it) } <= 1) break
+            loose[i] = false
+        }
+        return build()
+    }
+
+    private val DIGITS = Regex("[0-9]+")
+
+    private fun escape(part: String) = part.map { c -> if (c in "\\.^$|?*+()[]{}-") "\\$c" else c.toString() }.joinToString("")
+
+    /** A tag or version from a release, as one short plain line. */
+    fun plainTag(tag: String): String = tag.replace(Regex("[\\p{C}\\s]"), "").take(40)
 
     /** GitHub gives a file's checksum as "sha256:<hex>"; anything else is treated as not given. */
     fun parseDigest(digest: String?): String? {

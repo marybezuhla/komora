@@ -86,9 +86,12 @@ class ScreensTest {
         shadowOf(app.packageManager).addActivityIfNotPresent(ComponentName(app, ComponentActivity::class.java))
     }
 
-    private fun shot(name: String, theme: Theme, afterIdle: () -> Unit = {}, content: @Composable () -> Unit) =
+    private fun shot(name: String, theme: Theme, manualClock: Boolean = false, afterIdle: () -> Unit = {}, content: @Composable () -> Unit) =
         ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
+            // A text field keeps the screen busy for ever: then time is moved on by hand
+            if (manualClock) compose.mainClock.autoAdvance = false
             scenario.onActivity { it.setContent { KomoraTheme(theme) { content() } } }
+            if (manualClock) compose.mainClock.advanceTimeBy(2000)
             repeat(6) {
                 shadowOf(Looper.getMainLooper()).idle()
                 compose.waitForIdle()
@@ -125,7 +128,7 @@ class ScreensTest {
     ) = shot(name, theme) {
         KomoraList(rows, busy = rows.any { it.isBusy }, confirm = confirm, canInstall = canInstall, onLook = {},
             actions = noActions, onCheck = {}, onInstall = {}, onCancel = {},
-            sourcesEnabled = sources, startOnAdded = addedTab)
+            sourcesEnabled = sources, addedTab = addedTab)
     }
 
     @Test fun listPhone() = list("01-list-phone-colours", Theme.SYSTEM)
@@ -233,11 +236,11 @@ class ScreensTest {
 
     @Test fun trustQuestion() = shot("25-trust-question", Theme.SYSTEM) {
         KomoraList(rows + addedRows, busy = false, confirm = null, canInstall = true, onLook = {}, actions = noActions,
-            onCheck = {}, onInstall = {}, onCancel = {}, sourcesEnabled = true, startOnAdded = true)
+            onCheck = {}, onInstall = {}, onCancel = {}, sourcesEnabled = true, addedTab = true)
         TrustDialog(TrustRequest("other-dev/weather", ApkVerifier.Identity("org.example.weather", key, "Weather", "1.0"))) {}
     }
 
-    @Test fun addSourceFailed() = shot("26-add-source-error", Theme.SYSTEM) {
+    @Test fun addSourceFailed() = shot("26-add-source-error", Theme.SYSTEM, manualClock = true) {
         AddSourceDialog(AddState.Failed(AddError.NoApk), onAdd = {}, onChoose = { _, _ -> }) {}
     }
 

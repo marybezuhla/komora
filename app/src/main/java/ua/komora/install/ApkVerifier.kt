@@ -60,9 +60,14 @@ object ApkVerifier {
             info.sourceDir = apk.path
             info.publicSourceDir = apk.path
             runCatching { info.loadLabel(pm).toString() }.getOrNull()
-        }.orEmpty().replace(Regex("[\\p{C}]"), "").trim().take(60)
-        return Identity(archive.packageName, signer, label, archive.versionName)
+        }.orEmpty().let(::plain).take(60)
+        // Shown in the trust question too: one plain line, never something that looks like another field
+        val version = archive.versionName?.let(::plain)?.take(40)?.ifEmpty { null }
+        return Identity(archive.packageName, signer, label, version)
     }
+
+    /** Text from a file, as one plain line: no control, format or direction characters. */
+    fun plain(text: String): String = text.replace(Regex("[\\p{C}\\p{Zl}\\p{Zp}]"), " ").replace(Regex("\\s+"), " ").trim()
 
     /** The installed copy's signing key, or null if not installed (or not visible). */
     fun installedSigner(context: Context, packageName: String): String? =
