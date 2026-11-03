@@ -28,6 +28,8 @@ object AppLanguage {
     }
 
     fun set(activity: Activity, choice: Choice) {
+        // The same choice again: nothing to change, no restart of the screen
+        if (choice == current(activity)) return
         if (Build.VERSION.SDK_INT >= 33) {
             // Android restarts the screen in the new language by itself
             activity.getSystemService(LocaleManager::class.java)?.applicationLocales =

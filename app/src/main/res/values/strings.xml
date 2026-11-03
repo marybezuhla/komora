@@ -41,10 +41,10 @@
     <string name="err_not_newer">You already have this version or a newer one.</string>
     <string name="err_other_key">This app is already on your phone from another source, so Komora cannot update it. To switch: save its data, remove it (this deletes its data), then install it here.</string>
     <string name="err_install">Android did not install the app. Try again; if it repeats, restart the phone.</string>
-    <string name="look">Look and language</string>
+    <string name="look">Settings</string>
     <string name="back">Back</string>
     <string name="look_mode">Light or dark</string>
-    <string name="mode_auto">As the phone</string>
+    <string name="mode_auto">Auto</string>
     <string name="mode_light">Light</string>
     <string name="mode_dark">Dark</string>
     <string name="day_theme">Theme by day</string>
@@ -58,10 +58,21 @@
     <string name="theme_system">Phone colours</string>
     <string name="theme_system_dark">Phone colours</string>
     <string name="apps_header">Apps · %1$d</string>
-    <string name="footer_permissions">Only two permissions: the internet (GitHub only) and installing apps. No accounts, no ads, no tracking.</string>
+    <string name="footer_permissions">It needs the internet (GitHub only) and permission to install apps; notifications only if you turn on update notices. No accounts, no ads, no tracking.</string>
     <string name="theme_glyna">Clay</string>
     <string name="theme_zhar">Embers</string>
     <string name="app_language">Language</string>
     <string name="lang_uk" translatable="false">Українська</string>
     <string name="lang_en" translatable="false">English</string>
+    <string name="whats_new">What\'s new</string>
+    <string name="hide_whats_new">Hide</string>
+    <string name="updates_title">Updates</string>
+    <string name="notify_updates">Tell me about updates</string>
+    <string name="notify_updates_summary">Once a day Komora asks GitHub in the background and tells you when an app on this phone has a new version. Installing still happens here.</string>
+    <string name="wifi_only">Only over Wi-Fi</string>
+    <string name="notify_denied">Android does not allow Komora\'s notifications. They can be allowed in the phone\'s settings.</string>
+    <string name="notification_channel">App updates</string>
+    <string name="notification_title">Updates are ready</string>
+    <string name="notify_settings">Notification settings</string>
+    <string name="check">Check</string>
 </resources>

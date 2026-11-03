@@ -89,6 +89,7 @@ fun LookSettings(
     language: AppLanguage.Choice,
     onLanguage: (AppLanguage.Choice) -> Unit,
     modifier: Modifier = Modifier,
+    afterLanguage: @Composable () -> Unit = {},
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(stringResource(R.string.app_language))
@@ -101,6 +102,7 @@ fun LookSettings(
             chosen = language,
             onChoose = onLanguage,
         )
+        afterLanguage()
         Spacer(Modifier.height(8.dp))
         SectionTitle(stringResource(R.string.look_mode))
         Segments(
@@ -118,7 +120,7 @@ fun LookSettings(
 
 /** A light card with a thin frame, holding one group of settings. */
 @Composable
-private fun Group(content: @Composable () -> Unit) {
+internal fun Group(content: @Composable () -> Unit) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
@@ -143,12 +145,14 @@ private fun <T> Segments(options: List<Pair<T, Int>>, chosen: T, onChoose: (T) -
                     // A frame too, so the choice is clear without telling colours apart
                     .border(1.dp, if (selected) scheme.outline else Color.Transparent, RoundedCornerShape(50))
                     .selectable(selected, role = Role.RadioButton) { onChoose(value) }
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 2.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     stringResource(label),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    softWrap = false,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -159,10 +163,10 @@ private fun <T> Segments(options: List<Pair<T, Int>>, chosen: T, onChoose: (T) -
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 4.dp).semantics { heading() },
@@ -175,7 +179,8 @@ private fun SectionTitle(text: String) {
 private fun ThemeRow(themes: List<Theme>, chosen: Theme, onChoose: (Theme) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val gap = 10.dp
-        val width = (maxWidth - gap * 2) / 3
+        // Rounded down to whole dp, so three always fit in a row on any screen
+        val width = ((maxWidth - gap * 2) / 3).value.toInt().dp
         FlowRow(
             Modifier.fillMaxWidth().selectableGroup().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(gap),

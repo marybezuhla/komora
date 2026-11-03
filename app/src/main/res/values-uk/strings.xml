@@ -41,10 +41,10 @@
     <string name="err_not_newer">У вас уже ця або новіша версія.</string>
     <string name="err_other_key">Цей застосунок уже встановлено з іншого джерела, тому Комора не може його оновити. Щоб перейти: збережіть його дані, видаліть його (дані буде стерто), потім встановіть тут.</string>
     <string name="err_install">Android не встановив застосунок. Спробуйте ще раз; якщо повториться, перезапустіть телефон.</string>
-    <string name="look">Вигляд і мова</string>
+    <string name="look">Налаштування</string>
     <string name="back">Назад</string>
     <string name="look_mode">Світла чи темна</string>
-    <string name="mode_auto">Як у телефоні</string>
+    <string name="mode_auto">Авто</string>
     <string name="mode_light">Світла</string>
     <string name="mode_dark">Темна</string>
     <string name="day_theme">Тема вдень</string>
@@ -58,8 +58,19 @@
     <string name="theme_system">Кольори телефона</string>
     <string name="theme_system_dark">Кольори телефона</string>
     <string name="apps_header">Застосунки · %1$d</string>
-    <string name="footer_permissions">Дозволів лише два: інтернет (тільки GitHub) і встановлення застосунків. Без акаунтів, реклами й стеження.</string>
+    <string name="footer_permissions">Потрібні інтернет (тільки GitHub) і дозвіл встановлювати застосунки; сповіщення — лише якщо ви ввімкнете повідомлення про оновлення. Без акаунтів, реклами й стеження.</string>
     <string name="theme_glyna">Глина</string>
     <string name="theme_zhar">Жар</string>
     <string name="app_language">Мова</string>
+    <string name="whats_new">Що нового</string>
+    <string name="hide_whats_new">Сховати</string>
+    <string name="updates_title">Оновлення</string>
+    <string name="notify_updates">Повідомляти про оновлення</string>
+    <string name="notify_updates_summary">Раз на день Комора у фоні питає GitHub і повідомляє, коли для застосунку на цьому телефоні є нова версія. Встановлення — як і раніше, тут.</string>
+    <string name="wifi_only">Лише через Wi-Fi</string>
+    <string name="notify_denied">Android не дозволяє Коморі показувати сповіщення. Їх можна дозволити в налаштуваннях телефона.</string>
+    <string name="notification_channel">Оновлення застосунків</string>
+    <string name="notification_title">Є оновлення</string>
+    <string name="notify_settings">Налаштування сповіщень</string>
+    <string name="check">Перевірити</string>
 </resources>
