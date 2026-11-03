@@ -32,6 +32,9 @@ import ua.komora.ui.Problem
 import ua.komora.ui.theme.KomoraTheme
 import ua.komora.ui.theme.Look
 import ua.komora.ui.theme.Theme
+import ua.komora.notify.UpdateCheck
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import java.io.File
 
 /**
@@ -49,6 +52,7 @@ class ScreensTest {
     private fun release(prefix: String, version: String, mb: Long) = Release(
         "v$version",
         Rules.Asset("$prefix-$version.apk", "https://github.com/x/$prefix/releases/download/v$version/$prefix-$version.apk", mb * 1024 * 1024, null),
+        notes = "Що змінилось\n• Нові теми й кольори\n• Швидше відкривається\n• Виправлено дрібні помилки",
     )
 
     /** Every state a card can be in, one app each. */
@@ -73,10 +77,15 @@ class ScreensTest {
         shadowOf(app.packageManager).addActivityIfNotPresent(ComponentName(app, ComponentActivity::class.java))
     }
 
-    private fun shot(name: String, theme: Theme, content: @Composable () -> Unit) =
+    private fun shot(name: String, theme: Theme, afterIdle: () -> Unit = {}, content: @Composable () -> Unit) =
         ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
             scenario.onActivity { it.setContent { KomoraTheme(theme) { content() } } }
             repeat(6) {
+                shadowOf(Looper.getMainLooper()).idle()
+                compose.waitForIdle()
+            }
+            afterIdle()
+            repeat(4) {
                 shadowOf(Looper.getMainLooper()).idle()
                 compose.waitForIdle()
             }
@@ -123,4 +132,17 @@ class ScreensTest {
 
     @Config(qualifiers = "en-w400dp-h1600dp-xhdpi")
     @Test fun listEnglish() = list("11-list-english", Theme.NEBO)
+
+    @Test fun whatsNewOpen() {
+        val by = catalog.associateBy { it.packageName }
+        val row = AppRow(by.getValue("ua.tarilka"), installedVersion = "1.2.3", latest = release("tarilka", "1.3.0", 48))
+        shot("12-whats-new", Theme.SYSTEM, afterIdle = { compose.onNodeWithText("Що нового").performClick() }) {
+            KomoraList(listOf(row), busy = false, confirm = null, canInstall = true, onLook = {},
+                actions = noActions, onCheck = {}, onInstall = {}, onCancel = {})
+        }
+    }
+
+    @Test fun settingsWithUpdates() = shot("13-settings-updates-on", Theme.SYSTEM) {
+        LookPage(Look(), onBack = {}, updates = UpdateCheck.Settings(enabled = true, wifiOnly = true)) {}
+    }
 }

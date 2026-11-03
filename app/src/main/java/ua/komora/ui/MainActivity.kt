@@ -1,5 +1,6 @@
 package ua.komora.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -10,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +43,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import ua.komora.ui.theme.SectionTitle
+import ua.komora.ui.theme.Group
+import ua.komora.notify.UpdateCheck
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.asImageBitmap
@@ -109,6 +118,25 @@ class MainActivity : ComponentActivity() {
     /** Light or dark, and the day and night themes; remembered on this phone only. */
     private val look = mutableStateOf(Look())
 
+    /** Update notices (off by default), and whether Android refused notifications when asked. */
+    private val updates = mutableStateOf(UpdateCheck.Settings())
+    private val notifyDenied = mutableStateOf(false)
+
+    /** Android's own question about notifications, asked only when the owner turns notices on. */
+    private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) setUpdates(updates.value.copy(enabled = true)) else notifyDenied.value = true
+    }
+
+    private fun setUpdates(s: UpdateCheck.Settings) {
+        if (s.enabled && !updates.value.enabled && !UpdateCheck.canNotify(this)) {
+            askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
+        }
+        notifyDenied.value = false
+        updates.value = s
+        UpdateCheck.apply(this, s)
+    }
+
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLanguage.wrap(newBase))
     }
@@ -117,6 +145,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         look.value = LookStore.load(this)
+        updates.value = UpdateCheck.settings(this)
+        UpdateCheck.ensure(this)
         // Android's confirmation screen opens only while Komora is in front
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -149,6 +179,9 @@ class MainActivity : ComponentActivity() {
                         onBack = { showLook = false },
                         language = AppLanguage.current(this),
                         onLanguage = { AppLanguage.set(this, it) },
+                        updates = updates.value,
+                        notifyDenied = notifyDenied.value,
+                        onUpdates = ::setUpdates,
                     ) { changed ->
                         look.value = changed
                         LookStore.save(this, changed)
@@ -245,7 +278,7 @@ internal fun KomoraList(
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.padding(end = 8.dp),
                         ) {
-                            Icon(painterResource(R.drawable.ic_palette), contentDescription = stringResource(R.string.look))
+                            Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.look))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -467,7 +500,11 @@ private fun AppCard(
         val problem = row.problem ?: Problem.OtherKey.takeIf { row.foreignKey && !row.hasUpdate }
         val retry = problem == Problem.Network || problem == Problem.RateLimit
         val idle = row.phase == Phase.Idle || row.phase == Phase.Checking
-        val anyAction = !row.isInstalled || row.hasUpdate || problem == Problem.OtherKey || canOpen || retry
+        // The release's description, before installing or updating
+        val notes = row.latest?.notes.orEmpty()
+        val offerNotes = notes.isNotBlank() && (!row.isInstalled || row.hasUpdate)
+        var showNotes by rememberSaveable(row.app.packageName) { mutableStateOf(false) }
+        val anyAction = !row.isInstalled || row.hasUpdate || problem == Problem.OtherKey || canOpen || retry || offerNotes
         val below = problem != null || !idle || anyAction
 
         // Everything below lines up with the name, not with the coloured square
@@ -534,7 +571,19 @@ private fun AppCard(
                         }
                     }
                 }
-                Phase.Checking, Phase.Idle -> if (anyAction) FlowRowCompat {
+                Phase.Checking, Phase.Idle -> if (anyAction) Column {
+                if (offerNotes && showNotes) {
+                    Text(
+                        notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                FlowRowCompat {
                     val installLabel = stringResource(R.string.install)
                     val updateLabel = stringResource(R.string.update)
                     val openLabel = stringResource(R.string.open)
@@ -562,6 +611,12 @@ private fun AppCard(
                     if (retry) {
                         TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
                     }
+                    if (offerNotes) {
+                        TextButton(onClick = { showNotes = !showNotes }) {
+                            Text(stringResource(if (showNotes) R.string.hide_whats_new else R.string.whats_new))
+                        }
+                    }
+                }
                 }
             }
         }
@@ -621,6 +676,9 @@ internal fun LookPage(
     onBack: () -> Unit,
     language: AppLanguage.Choice = AppLanguage.Choice.AUTO,
     onLanguage: (AppLanguage.Choice) -> Unit = {},
+    updates: UpdateCheck.Settings = UpdateCheck.Settings(),
+    notifyDenied: Boolean = false,
+    onUpdates: (UpdateCheck.Settings) -> Unit = {},
     onChange: (Look) -> Unit,
 ) {
     Scaffold(
@@ -643,6 +701,53 @@ internal fun LookPage(
         LookSettings(
             look, onChange, language, onLanguage,
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
-        )
+        ) { UpdateSettings(updates, notifyDenied, onUpdates) }
+    }
+}
+
+/** "Updates": notices on or off, and whether the daily check may use mobile data. */
+@Composable
+private fun UpdateSettings(s: UpdateCheck.Settings, denied: Boolean, onChange: (UpdateCheck.Settings) -> Unit) {
+    Spacer(Modifier.height(8.dp))
+    SectionTitle(stringResource(R.string.updates_title))
+    Group {
+        Column {
+            SwitchRow(
+                stringResource(R.string.notify_updates),
+                stringResource(R.string.notify_updates_summary),
+                s.enabled,
+            ) { onChange(s.copy(enabled = it)) }
+            if (denied) {
+                Text(
+                    stringResource(R.string.notify_denied),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                )
+            }
+            if (s.enabled) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SwitchRow(stringResource(R.string.wifi_only), null, s.wifiOnly) { onChange(s.copy(wifiOnly = it)) }
+            }
+        }
+    }
+}
+
+/** A setting that is on or off: the whole row is the switch, read as one by TalkBack. */
+@Composable
+private fun SwitchRow(title: String, summary: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 56.dp)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            if (summary != null) {
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

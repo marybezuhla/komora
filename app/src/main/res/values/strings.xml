@@ -41,7 +41,7 @@
     <string name="err_not_newer">You already have this version or a newer one.</string>
     <string name="err_other_key">This app is already on your phone from another source, so Komora cannot update it. To switch: save its data, remove it (this deletes its data), then install it here.</string>
     <string name="err_install">Android did not install the app. Try again; if it repeats, restart the phone.</string>
-    <string name="look">Look and language</string>
+    <string name="look">Settings</string>
     <string name="back">Back</string>
     <string name="look_mode">Light or dark</string>
     <string name="mode_auto">As the phone</string>
@@ -64,4 +64,13 @@
     <string name="app_language">Language</string>
     <string name="lang_uk" translatable="false">Українська</string>
     <string name="lang_en" translatable="false">English</string>
+    <string name="whats_new">What\'s new</string>
+    <string name="hide_whats_new">Hide</string>
+    <string name="updates_title">Updates</string>
+    <string name="notify_updates">Tell me about updates</string>
+    <string name="notify_updates_summary">Once a day Komora asks GitHub in the background and tells you when an app on this phone has a new version. Installing still happens here.</string>
+    <string name="wifi_only">Only over Wi-Fi</string>
+    <string name="notify_denied">Android does not allow Komora\'s notifications. They can be allowed in the phone\'s settings.</string>
+    <string name="notification_channel">App updates</string>
+    <string name="notification_title">Updates are ready</string>
 </resources>

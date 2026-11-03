@@ -12,7 +12,8 @@ import java.security.MessageDigest
 import java.util.concurrent.CancellationException
 import javax.net.ssl.HttpsURLConnection
 
-data class Release(val tag: String, val apk: Rules.Asset)
+/** A published release: its tag, its one APK, and its description made plain ("What's new"). */
+data class Release(val tag: String, val apk: Rules.Asset, val notes: String = "")
 
 /** GitHub allows 60 requests an hour without an account. */
 class RateLimitException : IOException("GitHub rate limit")
@@ -34,10 +35,10 @@ object GitHub {
             readLimited(conn.inputStream, Rules.MAX_JSON_BYTES)
         }
         // An answer that cannot be read as a release is a bad release, not a lost connection
-        val (tag, assets) = try {
+        val (tag, assets, notes) = try {
             val o = JSONObject(String(body, Charsets.UTF_8))
             val assetsJson = o.getJSONArray("assets")
-            o.getString("tag_name") to (0 until assetsJson.length()).map { i ->
+            Triple(o.getString("tag_name"), (0 until assetsJson.length()).map { i ->
                 val a = assetsJson.getJSONObject(i)
                 Rules.Asset(
                     name = a.getString("name"),
@@ -45,14 +46,14 @@ object GitHub {
                     size = a.getLong("size"),
                     sha256 = Rules.parseDigest(a.optString("digest", "").ifEmpty { null }),
                 )
-            }
+            }, ReleaseNotes.clean(o.optString("body", "")))
         } catch (e: JSONException) {
             throw BadReleaseException("Unreadable release")
         } catch (e: StackOverflowError) {
             // Absurdly nested JSON: never a crash
             throw BadReleaseException("Unreadable release")
         }
-        return Release(tag = tag, apk = Rules.pickApk(assets, assetPrefix, repo))
+        return Release(tag = tag, apk = Rules.pickApk(assets, assetPrefix, repo), notes = notes)
     }
 
     /**
