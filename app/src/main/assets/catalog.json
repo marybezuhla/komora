@@ -23,7 +23,7 @@
       "assetPrefix": "mandat",
       "certSha256": "a7065316672ac15bc387a68c2ea296ec8ea279420913d69ec50205bb548d773e",
       "name": { "uk": "Мандат", "en": "Mandat" },
-      "summary": { "uk": "Приватний офлайн-органайзер у зашифрованому місці.", "en": "Private offline organizer, all encrypted." }
+      "summary": { "uk": "Приватний офлайн-органайзер із шифруванням.", "en": "Private offline organizer, all encrypted." }
     },
     {
       "packageName": "ua.sprotyv",

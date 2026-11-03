@@ -36,4 +36,26 @@ class CatalogTest {
         val bad = catalogJson.replace("64eaf973ec74aa88ab62a6b32b9552cc8713042385fa3d749f66698bcdb25c60", "self")
         assertThrows(IllegalArgumentException::class.java) { Catalog.parse(bad) }
     }
+    @Test
+    fun otherVersionIsRefused() {
+        assertThrows(IllegalArgumentException::class.java) { Catalog.parse(catalogJson.replace("\"version\": 1", "\"version\": 2")) }
+    }
+
+    @Test
+    fun duplicatePackageIsRefused() {
+        val bad = catalogJson.replace("\"packageName\": \"ua.mandat\"", "\"packageName\": \"ua.tarilka\"")
+        assertThrows(IllegalArgumentException::class.java) { Catalog.parse(bad) }
+    }
+
+    @Test
+    fun missingEnglishIsRefused() {
+        val bad = catalogJson.replace("\"en\": \"Tarilka\"", "\"pl\": \"Tarilka\"")
+        assertThrows(IllegalArgumentException::class.java) { Catalog.parse(bad) }
+    }
+
+    @Test
+    fun badRepoIsRefused() {
+        val bad = catalogJson.replace("\"Marybezu/tarilka\"", "\"Marybezu/tarilka/../x\"")
+        assertThrows(IllegalArgumentException::class.java) { Catalog.parse(bad) }
+    }
 }

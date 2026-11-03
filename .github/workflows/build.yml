@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# Stale pull request runs are stopped; runs on main always finish
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Tests and builds the unsigned APK. No secrets, no write access.
   build:
@@ -27,14 +32,10 @@ jobs:
       - name: Check version
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          V="$(tr -d '[:space:]' < version.txt)"
-          echo "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::version.txt must be major.minor.patch, got '$V'"; exit 1; }
-          # A push to main becomes a release: stop here, before any approval, if this version is already out.
-          if [ "${{ github.event_name }}" = push ] && [ "${{ github.ref }}" = refs/heads/main ] \
-             && gh api "repos/${{ github.repository }}/releases/tags/v$V" >/dev/null 2>&1; then
-            echo "::error::v$V is already released; raise version.txt first."; exit 1
-          fi
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPO: ${{ github.repository }}
+        run: bash .github/check-version.sh "$EVENT" "$REF" "$REPO"
 
       - name: Check the Gradle version and checksum
         run: |
@@ -48,9 +49,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # A release is built from scratch, without anything cached by earlier runs
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: "8.14.3"
+          cache-disabled: ${{ github.event_name == 'push' }}
 
       - name: Test and build (unsigned)
         shell: bash
@@ -87,7 +90,14 @@ jobs:
         with:
           name: komora-unsigned
           path: app/build/outputs/apk/release/app-release-unsigned.apk
-          retention-days: 14
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || 14 }}
+
+      # To read crash traces from the shrunk (R8) build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: komora-mapping
+          path: app/build/outputs/mapping/release/mapping.txt
+          retention-days: 90
 
   # Signs. Only for main, only in the "release" environment (needs the owner's approval), and with
   # no Gradle or other third-party build code: just the Android SDK's own zipalign and apksigner.
@@ -95,6 +105,7 @@ jobs:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: release
     concurrency:
       group: release
@@ -189,6 +200,7 @@ jobs:
     needs: release
     if: needs.release.outputs.signed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     concurrency:
       group: publish
       cancel-in-progress: false
@@ -199,6 +211,7 @@ jobs:
         with:
           sparse-checkout: |
             .github/release-notes.md
+            .github/check-version.sh
             version.txt
           sparse-checkout-cone-mode: false
           persist-credentials: false
@@ -209,8 +222,10 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
-          # The same version can be released only once: the tag already exists otherwise.
+          # Checked again right before publishing: two approved runs must not publish out of order
+          bash .github/check-version.sh push refs/heads/main "$REPO"
           V="$(tr -d '[:space:]' < version.txt)"
           # The SHA-256 of the APK, so anyone can check the file they downloaded is this one
           cp .github/release-notes.md notes.md

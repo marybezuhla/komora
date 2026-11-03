@@ -19,7 +19,7 @@ import java.io.File
 sealed class InstallResult {
     abstract val sessionId: Int
     data class Success(override val sessionId: Int) : InstallResult()
-    data class Failure(override val sessionId: Int) : InstallResult()
+    data class Failure(override val sessionId: Int, val noSpace: Boolean = false) : InstallResult()
     data class Cancelled(override val sessionId: Int) : InstallResult()
 }
 
@@ -101,10 +101,21 @@ object Installer {
         }
     }
 
-    /** Stops a session the owner no longer wants (or one Android lost). */
+    /**
+     * Stops a session that is waiting for the owner's answer. Reported as cancelled only if Android really
+     * dropped it; a session Android already holds finishes and reports by itself.
+     */
     fun cancel(context: Context, sessionId: Int) {
-        runCatching { context.packageManager.packageInstaller.abandonSession(sessionId) }
-        report(InstallResult.Cancelled(sessionId))
+        val dropped = runCatching { context.packageManager.packageInstaller.abandonSession(sessionId) }.isSuccess
+        if (dropped || context.packageManager.packageInstaller.getSessionInfo(sessionId) == null) {
+            report(InstallResult.Cancelled(sessionId))
+        }
+    }
+
+    /** Drops sessions Komora prepared but never handed to Android (e.g. it was closed in between). */
+    fun dropUncommitted(context: Context) {
+        val installer = context.packageManager.packageInstaller
+        installer.mySessions.filter { !it.isCommitted }.forEach { runCatching { installer.abandonSession(it.sessionId) } }
     }
 
     private inline fun <T> wrap(block: () -> T): T = try {
@@ -133,6 +144,7 @@ class InstallReceiver : BroadcastReceiver() {
             }
             PackageInstaller.STATUS_SUCCESS -> Installer.report(InstallResult.Success(id))
             PackageInstaller.STATUS_FAILURE_ABORTED -> Installer.report(InstallResult.Cancelled(id))
+            PackageInstaller.STATUS_FAILURE_STORAGE -> Installer.report(InstallResult.Failure(id, noSpace = true))
             else -> Installer.report(InstallResult.Failure(id))
         }
     }

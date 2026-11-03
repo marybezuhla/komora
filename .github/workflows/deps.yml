@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# Two runs must not race to update the deps-metadata branch
+concurrency:
+  group: deps-refresh
+  cancel-in-progress: true
+
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -26,12 +31,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: "8.14.3"
+          # Nothing from earlier runs: every file is downloaded, so every checksum is written
+          cache-disabled: true
       - name: Write checksums
         shell: bash
         run: |
           rm -f gradle/verification-metadata.xml
           # Failing tests must not stop the checksums from being written; the log shows why
-          gradle --no-daemon --continue --write-verification-metadata sha256 testReleaseUnitTest assembleRelease > deps.log 2>&1 || true
+          gradle --no-daemon --refresh-dependencies --continue --write-verification-metadata sha256 testReleaseUnitTest assembleRelease > deps.log 2>&1 || true
           mkdir -p meta
           cp gradle/verification-metadata.xml meta/ 2>/dev/null || echo "no metadata written" > meta/MISSING
           # (no matches is fine: grep would otherwise stop the step under pipefail)
@@ -45,6 +52,7 @@ jobs:
   publish:
     needs: generate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
@@ -56,6 +64,14 @@ jobs:
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd out
-          git init -q && git checkout -q -b deps-metadata && git add . && git -c user.name=ci -c user.email=ci@localhost commit -qm "verification metadata ${{ github.run_number }}"
+          # Only these two files, and only if the XML is readable
+          mkdir push && cd push
+          cp ../out/deps.log . 2>/dev/null || true
+          if [ -f ../out/verification-metadata.xml ]; then
+            python3 -c "import sys, xml.dom.minidom as m; m.parse(sys.argv[1])" ../out/verification-metadata.xml
+            cp ../out/verification-metadata.xml .
+          fi
+          # This folder holds only the files copied above
+          git init -q && git checkout -q -b deps-metadata && git add .
+          git -c user.name=ci -c user.email=ci@localhost commit -qm "verification metadata ${{ github.run_number }}"
           git push -qf "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}" deps-metadata

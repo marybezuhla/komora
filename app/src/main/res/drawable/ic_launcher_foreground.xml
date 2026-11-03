@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A chest with a lock: a lid, a body and a keyhole -->
+<!-- A painted chest in Pysanka's manner: cream outline, gold bands and an eight-pointed star, a keyhole.
+     Shapes never overlap, so the same drawing works as a one-colour (themed) icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="@color/icon_chest"
-        android:fillType="evenOdd"
-        android:pathData="M32,48 L32,44 Q32,32 54,32 Q76,32 76,44 L76,48 Z
-            M32,52 L76,52 L76,76 Q76,80 72,80 L36,80 Q32,80 32,76 Z
-            M50,57 L58,57 L58,67 L50,67 Z" />
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="1.08" android:scaleY="1.08">
+        <path android:strokeColor="@color/icon_cream" android:strokeWidth="3" android:strokeLineJoin="round" android:pathData="M33,48 L33,43 Q33,31 54,31 Q75,31 75,43 L75,48 Z" />
+        <path android:strokeColor="@color/icon_cream" android:strokeWidth="3" android:strokeLineJoin="round" android:pathData="M33,52 L75,52 L75,74 Q75,77 72,77 L36,77 Q33,77 33,74 Z" />
+        <path android:fillColor="@color/icon_gold" android:pathData="M37.5,56 L70.5,56 L70.5,58.4 L37.5,58.4 Z" />
+        <path android:fillColor="@color/icon_gold" android:pathData="M37.5,70.8 L70.5,70.8 L70.5,73.2 L37.5,73.2 Z" />
+        <path android:fillColor="@color/icon_gold" android:pathData="M39.5,64.6 L42.7,61.4 L45.9,64.6 L42.7,67.8 Z" />
+        <path android:fillColor="@color/icon_gold" android:pathData="M62.1,64.6 L65.3,61.4 L68.5,64.6 L65.3,67.8 Z" />
+        <path android:fillColor="@color/icon_gold" android:pathData="M54.00,33.80 L52.85,37.43 L49.47,35.67 L51.23,39.05 L47.60,40.20 L51.23,41.35 L49.47,44.73 L52.85,42.97 L54.00,46.60 L55.15,42.97 L58.53,44.73 L56.77,41.35 L60.40,40.20 L56.77,39.05 L58.53,35.67 L55.15,37.43 Z" />
+        <path android:fillColor="@color/icon_cream" android:pathData="M54,60.4 A2.8,2.8 0 1 1 53.99,60.4 Z M52.8,64.6 L55.2,64.6 L56.1,68.8 L51.9,68.8 Z" />
+    </group>
 </vector>
