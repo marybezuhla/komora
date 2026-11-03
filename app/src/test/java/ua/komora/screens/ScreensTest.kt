@@ -165,4 +165,29 @@ class ScreensTest {
 
     @Config(qualifiers = "uk-w800dp-h1280dp-mdpi")
     @Test fun tabletUpright() = list("19-tablet-upright", Theme.PODILLIA)
+
+    /** A calm day: two updates waiting, nothing downloading, the rest up to date or available. */
+    @Test fun calmWithUpdates() {
+        val by = catalog.associateBy { it.packageName }
+        val calm = listOf(
+            AppRow(by.getValue("ua.komora"), installedVersion = "0.1.7", latest = release("komora", "0.1.7", 2)),
+            AppRow(by.getValue("ua.tarilka"), installedVersion = "1.2.3", latest = release("tarilka", "1.3.0", 48)),
+            AppRow(by.getValue("ua.mandat"), installedVersion = "0.1.80", latest = release("mandat", "0.1.90", 31)),
+            AppRow(by.getValue("ua.sprotyv"), installedVersion = "1.0.4", latest = release("sprotyv", "1.0.4", 9)),
+            AppRow(by.getValue("ua.pysanka"), latest = release("pysanka", "2.1.0", 120)),
+            AppRow(by.getValue("ua.svitlyna"), latest = release("svitlyna", "0.6.1", 54)),
+        )
+        list("20-calm-two-updates", Theme.SYSTEM, rows = calm)
+    }
+
+    @Config(qualifiers = "+night")
+    @Test fun calmDark() {
+        val by = catalog.associateBy { it.packageName }
+        val calm = listOf(
+            AppRow(by.getValue("ua.komora"), installedVersion = "0.1.7", latest = release("komora", "0.1.7", 2)),
+            AppRow(by.getValue("ua.tarilka"), installedVersion = "1.3.0", latest = release("tarilka", "1.3.0", 48)),
+            AppRow(by.getValue("ua.sprotyv"), latest = release("sprotyv", "1.0.4", 9)),
+        )
+        list("21-calm-dark-podillia", Theme.PODILLIA, rows = calm)
+    }
 }

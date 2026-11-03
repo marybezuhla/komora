@@ -18,9 +18,6 @@
     <string name="updating_self">Оновлюю Комору. Вона закриється, і її можна буде відкрити знову.</string>
     <string name="not_installed">Не встановлено</string>
     <string name="installed">Встановлено</string>
-    <string name="installed_version">Встановлено %1$s</string>
-    <string name="available_version">доступна %1$s (%2$s)</string>
-    <string name="up_to_date">актуальна версія</string>
     <string name="allow_title">Дозвольте Коморі встановлювати застосунки</string>
     <string name="allow_text">Android запитує про це один раз. Натисніть «Дозволити», увімкніть «Дозволити з цього джерела» й поверніться назад. Комора встановлює лише застосунки з цього списку.</string>
     <string name="allow_button">Дозволити</string>
@@ -57,7 +54,6 @@
     <string name="theme_chornozem">Чорнозем</string>
     <string name="theme_system">Кольори телефона</string>
     <string name="theme_system_dark">Кольори телефона</string>
-    <string name="apps_header">Застосунки · %1$d</string>
     <string name="footer_permissions">Потрібні інтернет (тільки GitHub) і дозвіл встановлювати застосунки; сповіщення — лише якщо ви ввімкнете повідомлення про оновлення. Без акаунтів, реклами й стеження.</string>
     <string name="theme_glyna">Глина</string>
     <string name="theme_zhar">Жар</string>
@@ -73,4 +69,16 @@
     <string name="notification_title">Є оновлення</string>
     <string name="notify_settings">Налаштування сповіщень</string>
     <string name="check">Перевірити</string>
+    <string name="summary_checking">Перевіряю оновлення…</string>
+    <string name="summary_updates">Доступно оновлень: %1$d</string>
+    <string name="summary_all_current">Усе актуально</string>
+    <string name="summary_tap_check">Потягніть донизу або натисніть «Перевірити»</string>
+    <string name="update_all">Оновити все</string>
+    <string name="group_updates">Оновлення</string>
+    <string name="group_installed">Встановлені</string>
+    <string name="group_available">Можна встановити</string>
+    <string name="pill_update">Нова %1$s · %2$s</string>
+    <string name="pill_current">Актуальна · %1$s</string>
+    <string name="pill_installed">Встановлено %1$s</string>
+    <string name="pill_available">%1$s · %2$s</string>
 </resources>

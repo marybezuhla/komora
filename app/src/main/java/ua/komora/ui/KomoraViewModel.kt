@@ -118,6 +118,9 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 set(a.pkg) { it.copy(phase = Phase.Idle, problem = problem) }
                 refreshInstalled()
+                // "Update all": the next one, unless the owner cancelled
+                if (result is InstallResult.Cancelled) queue.clear()
+                startNextQueued()
             }
         }
     }
@@ -218,6 +221,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             val id = prepared.getOrElse { e ->
                 if (active === current) finish(current)
                 set(pkg) { it.copy(phase = Phase.Idle, problem = problemOf(e)) }
+                // One app failing does not stop "Update all"
+                startNextQueued()
                 return@launch
             }
             // Known before Android can answer, so no answer is missed
@@ -227,6 +232,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                 if (active === current) {
                     finish(current)
                     set(pkg) { it.copy(phase = Phase.Idle, problem = Problem.Install) }
+                    startNextQueued()
                 }
             }
         }
@@ -242,7 +248,29 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Stops the download, or the install that waits for the owner's answer. */
+    /** Apps waiting their turn after "Update all"; installed one after another. */
+    private val queue = ArrayDeque<String>()
+
+    /** Updates every app with a newer release, one at a time (Android may ask about each). */
+    fun updateAll() {
+        queue.clear()
+        _rows.value.filter { it.hasUpdate && !it.foreignKey && it.latest != null }
+            // Komora itself last: updating it closes it
+            .sortedBy { it.app.isSelf }
+            .forEach { queue.addLast(it.app.packageName) }
+        startNextQueued()
+    }
+
+    private fun startNextQueued() {
+        while (active == null) {
+            val pkg = queue.removeFirstOrNull() ?: return
+            val row = _rows.value.firstOrNull { it.app.packageName == pkg } ?: continue
+            if (row.hasUpdate && row.latest != null) install(row)
+        }
+    }
+
     fun cancelInstall() {
+        queue.clear()
         val a = active ?: return
         val id = a.sessionId
         if (id == null) a.job?.cancel() else Installer.cancel(ctx, id)

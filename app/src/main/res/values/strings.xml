@@ -18,9 +18,6 @@
     <string name="updating_self">Updating Komora. It will close and can be opened again.</string>
     <string name="not_installed">Not installed</string>
     <string name="installed">Installed</string>
-    <string name="installed_version">Installed %1$s</string>
-    <string name="available_version">available %1$s (%2$s)</string>
-    <string name="up_to_date">up to date</string>
     <string name="allow_title">Allow Komora to install apps</string>
     <string name="allow_text">Android asks for this once. Tap Allow, turn on \"Allow from this source\", then go back. Komora installs only the apps in this list.</string>
     <string name="allow_button">Allow</string>
@@ -57,7 +54,6 @@
     <string name="theme_chornozem">Black earth</string>
     <string name="theme_system">Phone colours</string>
     <string name="theme_system_dark">Phone colours</string>
-    <string name="apps_header">Apps · %1$d</string>
     <string name="footer_permissions">It needs the internet (GitHub only) and permission to install apps; notifications only if you turn on update notices. No accounts, no ads, no tracking.</string>
     <string name="theme_glyna">Clay</string>
     <string name="theme_zhar">Embers</string>
@@ -75,4 +71,16 @@
     <string name="notification_title">Updates are ready</string>
     <string name="notify_settings">Notification settings</string>
     <string name="check">Check</string>
+    <string name="summary_checking">Checking for updates…</string>
+    <string name="summary_updates">Updates available: %1$d</string>
+    <string name="summary_all_current">Everything is up to date</string>
+    <string name="summary_tap_check">Pull down or tap Check</string>
+    <string name="update_all">Update all</string>
+    <string name="group_updates">Updates</string>
+    <string name="group_installed">Installed</string>
+    <string name="group_available">Available</string>
+    <string name="pill_update">New %1$s · %2$s</string>
+    <string name="pill_current">Up to date · %1$s</string>
+    <string name="pill_installed">Installed %1$s</string>
+    <string name="pill_available">%1$s · %2$s</string>
 </resources>
