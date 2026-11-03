@@ -43,6 +43,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.AlertDialog
@@ -191,15 +193,18 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
             }
             var showLook by rememberSaveable { mutableStateOf(false) }
-            BackHandler(enabled = showLook) { showLook = false }
+            var showAbout by rememberSaveable { mutableStateOf(false) }
+            BackHandler(enabled = showLook) { if (showAbout) showAbout = false else showLook = false }
             // Kept while Settings is open, so the list comes back exactly where it was
             val listState = rememberLazyListState()
             val addedListState = rememberLazyListState()
             val addedTab = rememberSaveable { mutableStateOf(false) }
             KomoraTheme(theme) {
                 // A short fade between the list and Settings, instead of a flash
-                Crossfade(targetState = showLook, animationSpec = tween(120), label = "page") { settings ->
-                if (settings) {
+                Crossfade(targetState = if (showLook && showAbout) 2 else if (showLook) 1 else 0, animationSpec = tween(120), label = "page") { page ->
+                if (page == 2) {
+                    AboutPage(onBack = { showAbout = false })
+                } else if (page == 1) {
                     LookPage(
                         look.value,
                         onBack = { showLook = false },
@@ -213,6 +218,7 @@ class MainActivity : ComponentActivity() {
                         },
                         sourcesEnabled = vm.sourcesEnabled.collectAsStateWithLifecycle().value,
                         onSources = vm::setSourcesEnabled,
+                        onAbout = { showAbout = true },
                     ) { changed ->
                         look.value = changed
                         LookStore.save(this, changed)
@@ -341,6 +347,7 @@ internal fun LookPage(
     onNotifySettings: () -> Unit = {},
     sourcesEnabled: Boolean = false,
     onSources: (Boolean) -> Unit = {},
+    onAbout: () -> Unit = {},
     onChange: (Look) -> Unit,
 ) {
     Scaffold(
@@ -371,6 +378,7 @@ internal fun LookPage(
             ) {
                 UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings)
                 SourcesSettings(sourcesEnabled, onSources)
+                AboutRow(onAbout)
             }
         }
     }
@@ -443,6 +451,28 @@ internal fun SourcesSettings(enabled: Boolean, onChange: (Boolean) -> Unit, star
         }
     }
     if (asking) SourcesWarning(onAgree = { asking = false; onChange(true) }, onDismiss = { asking = false })
+}
+
+/** The way to "About Komora", last in Settings. */
+@Composable
+private fun AboutRow(onClick: () -> Unit) {
+    Spacer(Modifier.height(16.dp))
+    Group {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 64.dp)
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.about_komora), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.about_komora_summary), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.graphicsLayer { rotationZ = 180f })
+        }
+    }
 }
 
 /** The risks, plainly, and a box to tick before other sources can be turned on. */

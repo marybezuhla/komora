@@ -47,6 +47,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ua.komora.R
+import android.os.Build
+import java.net.URLEncoder
+
+/** A new issue in [repo] with a title and the text already there; nothing is sent until the owner does. */
+fun issueUrl(repo: String, name: String, version: String, body: String): String {
+    fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+    return "https://github.com/$repo/issues/new?title=${enc("$name $version: ")}&body=${enc(body)}"
+}
 
 /** A signing key, as people compare it: 64 hex digits in groups of four, on four lines. */
 fun formatKey(sha256: String): String =
@@ -218,6 +226,17 @@ fun DetailsSheet(row: AppRow, lang: String, pinnedKey: String?, onRemove: (() ->
                     TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_source), color = MaterialTheme.colorScheme.error) }
                 }
             }
+            // A problem with the app: a new issue in its repository, filled in only with what is shown here
+            Spacer(Modifier.height(16.dp))
+            val name = row.app.name(lang)
+            val version = row.installedVersion?.takeIf { it.isNotEmpty() } ?: row.latestVersion ?: "?"
+            val android = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+            val body = stringResource(R.string.report_bug_body, name, version, android)
+            OutlinedButton(onClick = { runCatching { uri.openUri(issueUrl(row.app.repo, name, version, body)) } }) {
+                Text(stringResource(R.string.report_bug))
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(stringResource(R.string.report_bug_note), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
