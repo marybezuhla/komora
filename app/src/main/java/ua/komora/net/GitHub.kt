@@ -29,16 +29,46 @@ object GitHub {
     private const val TIMEOUT_MS = 20_000
     private const val MAX_REDIRECTS = 5
 
+    /** The newest release of an app: for Komora's own list by the APK's name, for added sources by its pattern. */
+    fun latestRelease(app: ua.komora.catalog.CatalogApp): Release {
+        val r = latest(app.repo)
+        // An added source may have been renamed since: GitHub sends it on, and its files carry the new name
+        val apk = app.apkPattern?.let { Rules.pickByPattern(r.assets, it, r.repo ?: app.repo) }
+            ?: Rules.pickApk(r.assets, app.assetPrefix, app.repo)
+        return Release(tag = r.tag, apk = apk, notes = r.notes)
+    }
+
+    /**
+     * Every APK in a repository's newest release, to choose one when adding it as a source, with the
+     * repository's name as GitHub spells it.
+     */
+    fun latestApks(repo: String): Pair<String, List<Rules.Asset>> {
+        val r = latest(repo)
+        val name = r.repo ?: repo
+        return name to r.assets.filter { it.name.endsWith(".apk") && Rules.inRepo(it.url, name) }
+    }
+
     /** The newest published (not draft, not pre-release) release of [repo], with its one APK. */
     fun latestRelease(repo: String, assetPrefix: String): Release {
+        val r = latest(repo)
+        return Release(tag = r.tag, apk = Rules.pickApk(r.assets, assetPrefix, repo), notes = r.notes)
+    }
+
+    private class Latest(val tag: String, val assets: List<Rules.Asset>, val notes: String, val repo: String?)
+
+    private val RELEASE_PAGE = Regex("^https://github\\.com/([A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100})/releases/")
+
+    private fun latest(repo: String): Latest {
         val body = open("https://api.github.com/repos/$repo/releases/latest", api = true).use { conn ->
             readLimited(conn.inputStream, Rules.MAX_JSON_BYTES)
         }
         // An answer that cannot be read as a release is a bad release, not a lost connection
-        val (tag, assets, notes) = try {
+        return try {
             val o = JSONObject(String(body, Charsets.UTF_8))
             val assetsJson = o.getJSONArray("assets")
-            Triple(o.getString("tag_name"), (0 until assetsJson.length()).map { i ->
+            // The repository as GitHub spells it now (from GitHub's own answer, over the checked connection)
+            val canonical = RELEASE_PAGE.find(o.optString("html_url"))?.groupValues?.get(1)?.takeUnless { it.substringAfter('/').startsWith(".") }
+            Latest(Rules.plainTag(o.getString("tag_name")), (0 until assetsJson.length()).map { i ->
                 val a = assetsJson.getJSONObject(i)
                 Rules.Asset(
                     name = a.getString("name"),
@@ -46,14 +76,13 @@ object GitHub {
                     size = a.getLong("size"),
                     sha256 = Rules.parseDigest(a.optString("digest", "").ifEmpty { null }),
                 )
-            }, ReleaseNotes.clean(o.optString("body", "")))
+            }, ReleaseNotes.clean(o.optString("body", "")), canonical)
         } catch (e: JSONException) {
             throw BadReleaseException("Unreadable release")
         } catch (e: StackOverflowError) {
             // Absurdly nested JSON: never a crash
             throw BadReleaseException("Unreadable release")
         }
-        return Release(tag = tag, apk = Rules.pickApk(assets, assetPrefix, repo), notes = notes)
     }
 
     /**

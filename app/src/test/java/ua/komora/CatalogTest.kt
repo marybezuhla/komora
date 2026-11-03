@@ -19,7 +19,7 @@ class CatalogTest {
     }
 
     @Test
-    fun manifestSeesExactlyTheCatalogApps() {
+    fun manifestNamesExactlyTheCatalogApps() {
         val inCatalog = Catalog.parse(catalogJson).filterNot { it.isSelf }.map { it.packageName }.toSet()
         val inManifest = Regex("<package android:name=\"([^\"]+)\"").findAll(manifest).map { it.groupValues[1] }.toSet()
         assertEquals(inCatalog, inManifest)
@@ -72,7 +72,7 @@ class CatalogTest {
 
     @Test
     fun everyAppHasItsIcon() {
-        val ui = File("src/main/java/ua/komora/ui/MainActivity.kt").readText()
+        val ui = File("src/main/java/ua/komora/ui/ListScreen.kt").readText()
         for (app in Catalog.parse(catalogJson)) {
             assertTrue("${app.packageName} has no icon", ui.contains("\"${app.packageName}\" to R.drawable.app_icon_${app.assetPrefix}"))
             assertTrue("missing picture for ${app.assetPrefix}", File("src/main/res/drawable-nodpi/app_icon_${app.assetPrefix}.png").exists())

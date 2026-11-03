@@ -43,6 +43,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.MutableState
+import ua.komora.install.ApkVerifier
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.widthIn
@@ -116,8 +123,6 @@ import ua.komora.ui.theme.LookSettings
 import ua.komora.ui.theme.LookStore
 import ua.komora.ui.theme.Ornament
 
-private const val SOURCE_URL = "https://github.com/Marybezu/komora"
-private const val LICENSE_URL = "$SOURCE_URL/blob/main/LICENSE"
 
 class MainActivity : ComponentActivity() {
     private val vm: KomoraViewModel by viewModels()
@@ -188,13 +193,18 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
             }
             var showLook by rememberSaveable { mutableStateOf(false) }
-            BackHandler(enabled = showLook) { showLook = false }
+            var showAbout by rememberSaveable { mutableStateOf(false) }
+            BackHandler(enabled = showLook) { if (showAbout) showAbout = false else showLook = false }
             // Kept while Settings is open, so the list comes back exactly where it was
             val listState = rememberLazyListState()
+            val addedListState = rememberLazyListState()
+            val addedTab = rememberSaveable { mutableStateOf(false) }
             KomoraTheme(theme) {
                 // A short fade between the list and Settings, instead of a flash
-                Crossfade(targetState = showLook, animationSpec = tween(120), label = "page") { settings ->
-                if (settings) {
+                Crossfade(targetState = if (showLook && showAbout) 2 else if (showLook) 1 else 0, animationSpec = tween(120), label = "page") { page ->
+                if (page == 2) {
+                    AboutPage(onBack = { showAbout = false })
+                } else if (page == 1) {
                     LookPage(
                         look.value,
                         onBack = { showLook = false },
@@ -206,6 +216,9 @@ class MainActivity : ComponentActivity() {
                         onNotifySettings = {
                             start(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
                         },
+                        sourcesEnabled = vm.sourcesEnabled.collectAsStateWithLifecycle().value,
+                        onSources = vm::setSourcesEnabled,
+                        onAbout = { showAbout = true },
                     ) { changed ->
                         look.value = changed
                         LookStore.save(this, changed)
@@ -215,6 +228,8 @@ class MainActivity : ComponentActivity() {
                         vm = vm,
                         canInstall = canInstall.value,
                         listState = listState,
+                        addedListState = addedListState,
+                        addedTab = addedTab,
                         onLook = { showLook = true },
                         actions = Actions(
                             allowInstalls = {
@@ -258,478 +273,65 @@ internal class Actions(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: LazyListState, onLook: () -> Unit, actions: Actions) {
+private fun KomoraScreen(
+    vm: KomoraViewModel,
+    canInstall: Boolean,
+    listState: LazyListState,
+    addedListState: LazyListState,
+    addedTab: MutableState<Boolean>,
+    onLook: () -> Unit,
+    actions: Actions,
+) {
     val rows by vm.rows.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val confirm by Installer.confirm.collectAsStateWithLifecycle()
+    val sourcesOn by vm.sourcesEnabled.collectAsStateWithLifecycle()
+    val adding by vm.adding.collectAsStateWithLifecycle()
+    val trust by vm.trust.collectAsStateWithLifecycle()
+    var showAdd by rememberSaveable { mutableStateOf(false) }
+    var detailsKey by rememberSaveable { mutableStateOf<String?>(null) }
+    // The add dialog closes by itself once the source is added
+    var submitted by remember { mutableStateOf(false) }
+    LaunchedEffect(adding) {
+        if (adding is AddState.Working || adding is AddState.Choose) submitted = true
+        else if (adding is AddState.Idle && submitted) { submitted = false; showAdd = false }
+    }
     KomoraList(
         rows, busy, confirm, canInstall, onLook, actions,
         listState = listState,
         onCheck = vm::checkUpdates,
         onInstall = vm::install,
         onCancel = vm::cancelInstall,
+        onUpdateAll = vm::updateAll,
+        sourcesEnabled = sourcesOn,
+        onAddSource = { vm.dismissAdding(); showAdd = true },
+        onDetails = { detailsKey = it.app.key },
+        addedTab = addedTab.value,
+        onTab = { addedTab.value = it },
+        addedListState = addedListState,
     )
-}
-
-/** The list itself, from plain values only: what the app shows, and what the screen tests draw. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun KomoraList(
-    rows: List<AppRow>,
-    busy: Boolean,
-    confirm: Confirm?,
-    canInstall: Boolean,
-    onLook: () -> Unit,
-    actions: Actions,
-    onCheck: () -> Unit,
-    onInstall: (AppRow) -> Unit,
-    onCancel: () -> Unit,
-    listState: LazyListState = rememberLazyListState(),
-) {
-    // Same language as the rest of the screen (Android picks the strings; the catalog follows them)
-    val lang = stringResource(R.string.catalog_lang)
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            Column(Modifier.background(MaterialTheme.colorScheme.background)) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            stringResource(R.string.app_name),
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    actions = {
-                        // A round, framed button, like a chip
-                        OutlinedIconButton(
-                            onClick = onLook,
-                            colors = IconButtonDefaults.outlinedIconButtonColors(containerColor = MaterialTheme.colorScheme.surface),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                            modifier = Modifier.padding(end = 8.dp),
-                        ) {
-                            Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.look))
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                )
-                Ornament(Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
-            }
-        },
-    ) { padding ->
-        // One column on a phone; two on an unfolded Galaxy Fold / Pixel Fold or an upright tablet;
-        // three on a tablet held sideways
-        val width = LocalConfiguration.current.screenWidthDp
-        val columns = when {
-            width >= 1000 -> 3
-            width >= 600 -> 2
-            else -> 1
-        }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            if (!canInstall) {
-                item {
-                    // The one thing to do first: framed in the accent
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(
-                                stringResource(R.string.allow_title),
-                                style = CardTitle,
-                                modifier = Modifier.semantics { heading() },
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                stringResource(R.string.allow_text),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Button(onClick = actions.allowInstalls, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                                Text(stringResource(R.string.allow_button))
-                            }
-                        }
-                    }
-                }
-            }
-            item {
-                // "Apps · 6" on the left, the check on the right
-                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.apps_header, rows.size),
-                        maxLines = 1,
-                        softWrap = false,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f).semantics { heading() },
-                    )
-                    // A short label, so it fits beside the heading; TalkBack reads the full one
-                    val full = stringResource(R.string.refresh)
-                    TextButton(onClick = onCheck, modifier = Modifier.semantics { contentDescription = full }) {
-                        Text(stringResource(R.string.check), fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    }
-                }
-            }
-            // Cards side by side share one height, with their buttons on one line at the bottom
-            items(rows.chunked(columns), key = { chunk -> chunk.first().app.packageName }) { chunk ->
-                Row(
-                    Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    for (row in chunk) {
-                        val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
-                        AppCard(
-                            row = row,
-                            lang = lang,
-                            canGet = canInstall && !busy && row.latest != null,
-                            canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
-                            onInstall = { onInstall(row) },
-                            onOpen = { actions.open(row.app.packageName) },
-                            onAppSettings = { actions.appSettings(row.app.packageName) },
-                            onRetry = onCheck,
-                            onContinue = waiting?.let { c -> { actions.start(c.intent) } },
-                            onCancel = onCancel,
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                            stretch = columns > 1,
-                        )
-                    }
-                    // An incomplete last row keeps the same card width
-                    repeat(columns - chunk.size) { Spacer(Modifier.weight(1f)) }
-                }
-            }
-            item { About() }
+    if (showAdd) {
+        AddSourceDialog(adding, onAdd = vm::addSource, onChoose = vm::chooseApk) {
+            vm.dismissAdding()
+            submitted = false
+            showAdd = false
         }
     }
-}
-
-@Composable
-private fun About() {
-    val uri = LocalUriHandler.current
-    val note = MaterialTheme.colorScheme.onSurfaceVariant
-    // On a wide screen the notes keep a readable line length, in the middle
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-    Column(Modifier.widthIn(max = 600.dp).fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(stringResource(R.string.footer), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.footer_permissions), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            stringResource(R.string.about_title),
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.semantics { heading() },
-        )
-        Text(stringResource(R.string.about_text), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
-        FlowRowCompat {
-            TextButton(onClick = { runCatching { uri.openUri(SOURCE_URL) } }) { Text(stringResource(R.string.source_code)) }
-            TextButton(onClick = { runCatching { uri.openUri(LICENSE_URL) } }) { Text(stringResource(R.string.license)) }
-        }
-    }
-    }
-}
-
-/**
- * An installed app's icon, drawn round like the bundled ones: the two layers of an adaptive icon are
- * drawn in full and the middle cut out as a circle, so every launcher style looks the same here.
- */
-private fun installedIcon(context: Context, packageName: String, px: Int): ImageBitmap? = try {
-    val drawable = context.packageManager.getApplicationIcon(packageName)
-    val bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-    val canvas = android.graphics.Canvas(bitmap)
-    val circle = android.graphics.Path().apply { addCircle(px / 2f, px / 2f, px / 2f, android.graphics.Path.Direction.CW) }
-    canvas.clipPath(circle)
-    if (drawable is AdaptiveIconDrawable) {
-        // A layer is 108 dp, of which the middle 72 dp is the visible icon
-        val full = px * 1.5f
-        val offset = ((px - full) / 2f).toInt()
-        for (layer in listOfNotNull(drawable.background, drawable.foreground)) {
-            layer.setBounds(offset, offset, offset + full.toInt(), offset + full.toInt())
-            layer.draw(canvas)
-        }
-    } else {
-        drawable.setBounds(0, 0, px, px)
-        drawable.draw(canvas)
-    }
-    bitmap.asImageBitmap()
-} catch (_: Exception) {
-    null
-}
-
-/**
- * Each app's own icon, copied from its repository into Komora (round, as most launchers show it).
- * Listed by hand, not looked up by name, so the build's resource shrinking keeps them.
- */
-private val APP_ICONS = mapOf(
-    "ua.komora" to R.drawable.app_icon_komora,
-    "ua.tarilka" to R.drawable.app_icon_tarilka,
-    "ua.mandat" to R.drawable.app_icon_mandat,
-    "ua.sprotyv" to R.drawable.app_icon_sprotyv,
-    "ua.pysanka" to R.drawable.app_icon_pysanka,
-    "ua.svitlyna" to R.drawable.app_icon_svitlyna,
-)
-
-/**
- * The app's icon. Once installed, it comes from the app itself on this phone, so a new icon shows as
- * soon as the app is updated; before that, the copy bundled in Komora. An app with neither gets a
- * small square with its first letters. Decoration only.
- */
-@Composable
-private fun AppIcon(packageName: String, name: String, color: Long, installedVersion: String?) {
+    trust?.let { request -> TrustDialog(request) { yes -> vm.answerTrust(request, yes) } }
     val context = LocalContext.current
-    val density = LocalDensity.current
-    val px = with(density) { 44.dp.roundToPx() }
-    // Read again whenever the installed version changes (an update may bring a new icon)
-    val installed = remember(packageName, installedVersion) {
-        if (installedVersion == null) null else installedIcon(context, packageName, px)
-    }
-    if (installed != null) {
-        Image(installed, contentDescription = null, modifier = Modifier.size(44.dp).clearAndSetSemantics { })
-        return
-    }
-    val icon = APP_ICONS[packageName]
-    if (icon != null) {
-        Image(
-            painterResource(icon),
-            contentDescription = null,
-            modifier = Modifier.size(44.dp).clip(CircleShape).clearAndSetSemantics { },
-        )
-        return
-    }
-    Box(
-        Modifier.size(44.dp).background(androidx.compose.ui.graphics.Color(color), RoundedCornerShape(10.dp)).clearAndSetSemantics { },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            name.take(2),
-            color = androidx.compose.ui.graphics.Color.White,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
+    val lang = stringResource(R.string.catalog_lang)
+    rows.firstOrNull { it.app.key == detailsKey }?.let { row ->
+        val key = remember(row.app.key, row.app.certSha256) {
+            runCatching { ApkVerifier.pinnedCert(context, row.app) }.getOrNull()?.takeIf { it.length == 64 }
+        }
+        DetailsSheet(
+            row, lang, key,
+            // Not while it is downloading or installing
+            onRemove = if (row.app.added && !row.isBusy) ({ vm.removeSource(row.app.repo); detailsKey = null }) else null,
+            onDismiss = { detailsKey = null },
         )
     }
 }
-
-@Composable
-private fun AppCard(
-    row: AppRow,
-    lang: String,
-    canGet: Boolean,
-    canOpen: Boolean,
-    onInstall: () -> Unit,
-    onOpen: () -> Unit,
-    onAppSettings: () -> Unit,
-    onRetry: () -> Unit,
-    onContinue: (() -> Unit)?,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-    /** In a row of cards of one height: the buttons go to the bottom. */
-    stretch: Boolean = false,
-) {
-    val name = row.app.name(lang)
-    val scheme = MaterialTheme.colorScheme
-    // A light card with a thin frame: the app's square, its name, what it is, and where it stands
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = scheme.surface),
-        border = BorderStroke(1.dp, scheme.outlineVariant),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Row(Modifier.padding(start = 14.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Top) {
-            AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
-            Spacer(Modifier.width(12.dp))
-            // One swipe reads one app
-            Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
-                Text(name, style = CardTitle, color = scheme.onSurface, modifier = Modifier.semantics { heading() })
-                Text(row.app.summary(lang), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    statusText(row),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                )
-            }
-        }
-
-        // A copy from another source: said at once when there is nothing to update; otherwise after a try
-        val problem = row.problem ?: Problem.OtherKey.takeIf { row.foreignKey && !row.hasUpdate }
-        val retry = problem == Problem.Network || problem == Problem.RateLimit
-        val idle = row.phase == Phase.Idle || row.phase == Phase.Checking
-        // The release's description, before installing or updating
-        val notes = row.latest?.notes.orEmpty()
-        val offerNotes = notes.isNotBlank() && (!row.isInstalled || row.hasUpdate)
-        var showNotes by rememberSaveable(row.app.packageName) { mutableStateOf(false) }
-        val anyAction = !row.isInstalled || row.hasUpdate || problem == Problem.OtherKey || canOpen || retry || offerNotes
-        val below = problem != null || !idle || anyAction
-
-        if (stretch) Spacer(Modifier.weight(1f))
-
-        // Everything below lines up with the name, not with the coloured square
-        Column(Modifier.padding(start = 70.dp, end = 16.dp, top = if (below) 10.dp else 0.dp, bottom = 14.dp)) {
-            problem?.let {
-                // A sign as well as the colour: in red themes the error and the accent are close
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(
-                        painterResource(R.drawable.ic_warning),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 1.dp, end = 6.dp).size(16.dp),
-                    )
-                    Text(
-                        problemText(it),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                }
-                if (!idle || anyAction) Spacer(Modifier.height(10.dp))
-            }
-
-            when (val phase = row.phase) {
-                is Phase.Downloading -> {
-                    LinearProgressIndicator(progress = { phase.fraction }, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(6.dp))
-                    val ctx = LocalContext.current
-                    val percent = (phase.fraction * 100).toInt()
-                    val spoken = stringResource(R.string.downloading_short, percent / 10 * 10)
-                    Text(
-                        stringResource(
-                            R.string.downloading, percent,
-                            Formatter.formatShortFileSize(ctx, phase.bytes), Formatter.formatShortFileSize(ctx, phase.total),
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        // Read aloud only every 10%, not on every change
-                        modifier = Modifier.semantics {
-                            contentDescription = spoken
-                            liveRegion = LiveRegionMode.Polite
-                        },
-                    )
-                    Text(
-                        stringResource(R.string.keep_open),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
-                }
-                is Phase.Installing -> {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        stringResource(if (row.app.isSelf) R.string.updating_self else R.string.installing),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    // Android is waiting for the owner's answer on its own screen
-                    if (onContinue != null) {
-                        Spacer(Modifier.height(8.dp))
-                        FlowRowCompat {
-                            Button(onClick = onContinue) { Text(stringResource(R.string.continue_install)) }
-                            OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
-                        }
-                    }
-                }
-                Phase.Checking, Phase.Idle -> if (anyAction) Column {
-                if (offerNotes && showNotes) {
-                    Text(
-                        notes,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
-                            .padding(12.dp),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                }
-                FlowRowCompat {
-                    val installLabel = stringResource(R.string.install)
-                    val updateLabel = stringResource(R.string.update)
-                    val openLabel = stringResource(R.string.open)
-                    when {
-                        !row.isInstalled -> Button(
-                            onClick = onInstall,
-                            enabled = canGet,
-                            modifier = Modifier.semantics { contentDescription = "$installLabel $name" },
-                        ) { Text(installLabel) }
-                        row.hasUpdate -> Button(
-                            onClick = onInstall,
-                            enabled = canGet,
-                            modifier = Modifier.semantics { contentDescription = "$updateLabel $name" },
-                        ) { Text(updateLabel) }
-                    }
-                    if (problem == Problem.OtherKey) {
-                        OutlinedButton(onClick = onAppSettings) { Text(stringResource(R.string.app_settings)) }
-                    }
-                    if (canOpen) {
-                        OutlinedButton(
-                            onClick = onOpen,
-                            modifier = Modifier.semantics { contentDescription = "$openLabel $name" },
-                        ) { Text(openLabel) }
-                    }
-                    if (retry) {
-                        TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
-                    }
-                    if (offerNotes) {
-                        TextButton(onClick = { showNotes = !showNotes }) {
-                            Text(stringResource(if (showNotes) R.string.hide_whats_new else R.string.whats_new))
-                        }
-                    }
-                }
-                }
-            }
-        }
-    }
-}
-
-/** Buttons wrap to a new line when the font is large or the screen is narrow. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FlowRowCompat(content: @Composable () -> Unit) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) { content() }
-}
-
-@Composable
-private fun statusText(row: AppRow): String {
-    if (row.phase == Phase.Checking) return stringResource(R.string.checking)
-    val left = when (val v = row.installedVersion) {
-        null -> stringResource(R.string.not_installed)
-        "" -> stringResource(R.string.installed)
-        else -> stringResource(R.string.installed_version, v)
-    }
-    val latest = row.latestVersion ?: return left
-    val size = Formatter.formatShortFileSize(LocalContext.current, row.latest!!.apk.size)
-    val right = when {
-        !row.isInstalled || row.hasUpdate -> stringResource(R.string.available_version, latest, size)
-        else -> stringResource(R.string.up_to_date)
-    }
-    return "$left, $right"
-}
-
-@Composable
-private fun problemText(p: Problem): String = stringResource(
-    when (p) {
-        Problem.Network -> R.string.err_network
-        Problem.RateLimit -> R.string.err_rate_limit
-        Problem.NoRelease -> R.string.err_no_release
-        Problem.BadRelease -> R.string.err_bad_release
-        Problem.Download -> R.string.err_download
-        Problem.NoSpace -> R.string.err_no_space
-        Problem.Unreadable -> R.string.err_unreadable
-        Problem.WrongPackage -> R.string.err_wrong_package
-        Problem.WrongSigner -> R.string.err_wrong_signer
-        Problem.NotNewer -> R.string.err_not_newer
-        Problem.OtherKey -> R.string.err_other_key
-        Problem.Install -> R.string.err_install
-    },
-)
 
 /** "Look": light or dark, and the day and night themes, with a way back. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -743,6 +345,9 @@ internal fun LookPage(
     notifyDenied: Boolean = false,
     onUpdates: (UpdateCheck.Settings) -> Unit = {},
     onNotifySettings: () -> Unit = {},
+    sourcesEnabled: Boolean = false,
+    onSources: (Boolean) -> Unit = {},
+    onAbout: () -> Unit = {},
     onChange: (Look) -> Unit,
 ) {
     Scaffold(
@@ -770,7 +375,11 @@ internal fun LookPage(
             LookSettings(
                 look, onChange, language, onLanguage,
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
-            ) { UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings) }
+            ) {
+                UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings)
+                SourcesSettings(sourcesEnabled, onSources)
+                AboutRow(onAbout)
+            }
         }
     }
 }
@@ -827,4 +436,82 @@ private fun SwitchRow(title: String, summary: String?, checked: Boolean, onChang
         }
         Switch(checked = checked, onCheckedChange = null)
     }
+}
+
+/** "Other sources": off by default; turning it on shows the second tab, with a plain warning. */
+@Composable
+internal fun SourcesSettings(enabled: Boolean, onChange: (Boolean) -> Unit, startAsking: Boolean = false) {
+    var asking by rememberSaveable { mutableStateOf(startAsking) }
+    Spacer(Modifier.height(8.dp))
+    SectionTitle(stringResource(R.string.sources_title))
+    Group {
+        // Turning it on only after the warning is read and agreed to; turning it off needs nothing
+        SwitchRow(stringResource(R.string.sources_switch), stringResource(R.string.sources_summary), enabled) { on ->
+            if (on) asking = true else onChange(false)
+        }
+    }
+    if (asking) SourcesWarning(onAgree = { asking = false; onChange(true) }, onDismiss = { asking = false })
+}
+
+/** The way to "About Komora", last in Settings. */
+@Composable
+private fun AboutRow(onClick: () -> Unit) {
+    Spacer(Modifier.height(16.dp))
+    Group {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 64.dp)
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.about_komora), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.about_komora_summary), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.graphicsLayer { rotationZ = 180f })
+        }
+    }
+}
+
+/** The risks, plainly, and a box to tick before other sources can be turned on. */
+@Composable
+internal fun SourcesWarning(onAgree: () -> Unit, onDismiss: () -> Unit) {
+    var understood by rememberSaveable { mutableStateOf(false) }
+    val scheme = MaterialTheme.colorScheme
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = scheme.errorContainer,
+        iconContentColor = scheme.error,
+        titleContentColor = scheme.onErrorContainer,
+        textContentColor = scheme.onErrorContainer,
+        icon = { Icon(painterResource(R.drawable.ic_warning), contentDescription = null, modifier = Modifier.size(32.dp)) },
+        title = { Text(stringResource(R.string.sources_warn_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(stringResource(R.string.sources_warn_text), style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(12.dp))
+                Text(stringResource(R.string.sources_warn_disclaimer), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .toggleable(value = understood, role = Role.Checkbox) { understood = it },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = understood, onCheckedChange = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.sources_warn_check), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onAgree,
+                enabled = understood,
+                colors = ButtonDefaults.buttonColors(containerColor = scheme.error, contentColor = scheme.onError),
+            ) { Text(stringResource(R.string.sources_warn_yes)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }

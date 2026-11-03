@@ -6,6 +6,7 @@ package ua.komora.net
  */
 object ReleaseNotes {
     const val MAX_CHARS = 1500
+    private const val MAX_INPUT = 6000
     private val HEX = Regex("^[0-9a-fA-F]{32,}(\\s+\\S+)?$")
 
     // Characters that change the reading direction of text: never shown
@@ -13,7 +14,8 @@ object ReleaseNotes {
 
     fun clean(body: String?): String {
         if (body.isNullOrBlank()) return ""
-        val text = body.replace("\r\n", "\n")
+        // Only the beginning is ever shown: a huge description must not keep the patterns below busy
+        val text = body.take(MAX_INPUT).replace("\r\n", "\n")
             .replace(BIDI, "")
             // HTML comments and tags are not text
             .replace(Regex("<!--.*?-->", RegexOption.DOT_MATCHES_ALL), "")
