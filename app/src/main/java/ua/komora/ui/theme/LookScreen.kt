@@ -3,6 +3,7 @@ package ua.komora.ui.theme
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -120,6 +121,8 @@ private fun <T> Segments(options: List<Pair<T, Int>>, chosen: T, onChoose: (T) -
             Box(
                 Modifier.weight(1f).heightIn(min = 44.dp)
                     .background(if (selected) scheme.surface else Color.Transparent, RoundedCornerShape(50))
+                    // A frame too, so the choice is clear without telling colours apart
+                    .border(1.dp, if (selected) scheme.outline else Color.Transparent, RoundedCornerShape(50))
                     .selectable(selected, role = Role.RadioButton) { onChoose(value) }
                     .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center,

@@ -9,6 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,7 +50,10 @@ sealed class Phase {
 data class AppRow(
     val app: CatalogApp,
     val installedVersion: String? = null,
-    /** Installed, but signed with a different key: Komora cannot update it. */
+    /**
+     * Installed with a key other than the pinned one: from another source, or from before the author
+     * changed keys. Only the downloaded APK can tell which (its signed key history), so an update is still tried.
+     */
     val foreignKey: Boolean = false,
     val latest: Release? = null,
     val phase: Phase = Phase.Idle,
@@ -170,7 +174,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
 
     fun install(row: AppRow) {
         val release = row.latest ?: return
-        if (active != null || row.foreignKey) return
+        if (active != null) return
         val pkg = row.app.packageName
         val current = Active(pkg)
         active = current
@@ -197,7 +201,14 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         ApkVerifier.verify(ctx, f, row.app)
                         set(pkg) { it.copy(phase = Phase.Installing()) }
-                        Installer.prepare(ctx, f, pkg)
+                        ensureActive()
+                        val id = Installer.prepare(ctx, f, pkg)
+                        // Cancelled while the APK was being handed over: drop that copy at once
+                        if (!isActive) {
+                            Installer.dropUncommitted(ctx)
+                            throw CancellationException("Cancelled")
+                        }
+                        id
                     }
                 } finally {
                     // The session holds its own copy now

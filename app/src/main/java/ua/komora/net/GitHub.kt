@@ -1,5 +1,6 @@
 package ua.komora.net
 
+import org.json.JSONException
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -32,23 +33,26 @@ object GitHub {
         val body = open("https://api.github.com/repos/$repo/releases/latest", api = true).use { conn ->
             readLimited(conn.inputStream, Rules.MAX_JSON_BYTES)
         }
-        val o = try {
-            JSONObject(String(body, Charsets.UTF_8))
+        // An answer that cannot be read as a release is a bad release, not a lost connection
+        val (tag, assets) = try {
+            val o = JSONObject(String(body, Charsets.UTF_8))
+            val assetsJson = o.getJSONArray("assets")
+            o.getString("tag_name") to (0 until assetsJson.length()).map { i ->
+                val a = assetsJson.getJSONObject(i)
+                Rules.Asset(
+                    name = a.getString("name"),
+                    url = a.getString("browser_download_url"),
+                    size = a.getLong("size"),
+                    sha256 = Rules.parseDigest(a.optString("digest", "").ifEmpty { null }),
+                )
+            }
+        } catch (e: JSONException) {
+            throw BadReleaseException("Unreadable release")
         } catch (e: StackOverflowError) {
-            // Absurdly nested JSON: treated as a bad answer, never as a crash
-            throw IOException("Unreadable answer")
+            // Absurdly nested JSON: never a crash
+            throw BadReleaseException("Unreadable release")
         }
-        val assetsJson = o.getJSONArray("assets")
-        val assets = (0 until assetsJson.length()).map { i ->
-            val a = assetsJson.getJSONObject(i)
-            Rules.Asset(
-                name = a.getString("name"),
-                url = a.getString("browser_download_url"),
-                size = a.getLong("size"),
-                sha256 = Rules.parseDigest(a.optString("digest", "").ifEmpty { null }),
-            )
-        }
-        return Release(tag = o.getString("tag_name"), apk = Rules.pickApk(assets, assetPrefix, repo))
+        return Release(tag = tag, apk = Rules.pickApk(assets, assetPrefix, repo))
     }
 
     /**
@@ -118,7 +122,9 @@ object GitHub {
                     301, 302, 303, 307, 308 -> {
                         val next = conn.getHeaderField("Location")
                         if (next.isNullOrEmpty()) throw IOException("Redirect without a target")
-                        url = URI(url).resolve(next).toString()
+                        url = try { URI(url).resolve(next).toString() } catch (e: IllegalArgumentException) {
+                            throw IOException("Bad redirect")
+                        }
                     }
                     // Only the API's own "rate limit" answers count as such
                     403, 429 -> if (api && (code == 429 || conn.getHeaderField("X-RateLimit-Remaining") == "0")) {

@@ -11,7 +11,8 @@ on:
 permissions:
   contents: read
 
-# Stale pull request runs are stopped; runs on main always finish
+# Stale pull request runs are stopped. On main a run is never stopped once started; a newer push
+# may replace one still waiting to start, and the newer version is then the one released
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

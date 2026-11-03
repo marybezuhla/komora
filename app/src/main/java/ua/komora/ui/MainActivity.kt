@@ -359,7 +359,8 @@ private fun AppCard(
 
         Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
 
-            val problem = if (row.foreignKey) Problem.OtherKey else row.problem
+            // A copy from another source: said at once when there is nothing to update; otherwise after a try
+            val problem = row.problem ?: Problem.OtherKey.takeIf { row.foreignKey && !row.hasUpdate }
             problem?.let {
                 Spacer(Modifier.height(4.dp))
                 // A sign as well as the colour: in red themes the error and the accent are close
@@ -374,7 +375,7 @@ private fun AppCard(
                         problemText(it),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                     )
                 }
             }
@@ -426,7 +427,6 @@ private fun AppCard(
                     val updateLabel = stringResource(R.string.update)
                     val openLabel = stringResource(R.string.open)
                     when {
-                        row.foreignKey -> OutlinedButton(onClick = onAppSettings) { Text(stringResource(R.string.app_settings)) }
                         !row.isInstalled -> Button(
                             onClick = onInstall,
                             enabled = canGet,
@@ -437,6 +437,9 @@ private fun AppCard(
                             enabled = canGet,
                             modifier = Modifier.semantics { contentDescription = "$updateLabel $name" },
                         ) { Text(updateLabel) }
+                    }
+                    if (problem == Problem.OtherKey) {
+                        OutlinedButton(onClick = onAppSettings) { Text(stringResource(R.string.app_settings)) }
                     }
                     if (canOpen) {
                         OutlinedButton(
