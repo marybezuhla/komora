@@ -61,42 +61,72 @@ fun colorScheme(theme: Theme, context: Context): ColorScheme {
 
 @Composable
 fun KomoraTheme(theme: Theme, content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = colorScheme(theme, LocalContext.current), content = content)
+    val scheme = colorScheme(theme, LocalContext.current).let {
+        // Descriptions and small print darker (or lighter at night) than Android's grey: easier to read
+        it.copy(onSurfaceVariant = androidx.compose.ui.graphics.lerp(it.onSurfaceVariant, it.onSurface, 0.45f))
+    }
+    MaterialTheme(colorScheme = scheme, typography = KomoraType, content = content)
+}
+
+/**
+ * Text a size larger than Android's defaults, so nothing on a card is tiny; Android's own font size
+ * setting still scales all of it.
+ */
+private val KomoraType = androidx.compose.material3.Typography().run {
+    copy(
+        bodyLarge = bodyLarge.copy(fontSize = 18.sp, lineHeight = 26.sp),
+        bodyMedium = bodyMedium.copy(fontSize = 17.sp, lineHeight = 24.sp, letterSpacing = 0.15.sp),
+        bodySmall = bodySmall.copy(fontSize = 15.sp, lineHeight = 21.sp),
+        labelLarge = labelLarge.copy(fontSize = 16.sp, lineHeight = 22.sp),
+        labelMedium = labelMedium.copy(fontSize = 15.sp, lineHeight = 20.sp),
+        labelSmall = labelSmall.copy(fontSize = 14.sp, lineHeight = 18.sp),
+        titleMedium = titleMedium.copy(fontSize = 19.sp, lineHeight = 26.sp),
+        titleLarge = titleLarge.copy(fontSize = 24.sp, lineHeight = 30.sp),
+    )
 }
 
 /** An app's name in its card header: larger and bolder than anything inside, as in Pysanka. */
 val CardTitle: TextStyle
-    @Composable get() = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+    @Composable get() = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold)
 
 /**
- * A narrow embroidered band, like the edge of a rushnyk: rhombuses in the theme's accent with a dot of
- * its second colour between them. Decoration only: hidden from TalkBack.
+ * A small embroidered motif under a title: three rhombuses in the middle (the big one in the theme's
+ * accent, the small ones in its second colour) between two thin lines that fade out to the sides.
+ * Decoration only: hidden from TalkBack.
  */
 @Composable
 fun Ornament(modifier: Modifier = Modifier) {
-    val red = MaterialTheme.colorScheme.primary
-    val gold = MaterialTheme.colorScheme.secondary
-    val eye = MaterialTheme.colorScheme.background
-    Canvas(modifier.fillMaxWidth().height(12.dp).clearAndSetSemantics { }) {
-        val h = size.height
-        val step = h * 1.6f
-        val count = (size.width / step).toInt().coerceAtLeast(1)
-        // Centred, so both ends look the same
-        val start = (size.width - count * step) / 2f
-        val half = h / 2f
-        for (i in 0 until count) {
-            val cx = start + step * i + step / 2f
-            val rhombus = Path().apply {
-                moveTo(cx, 0f)
-                lineTo(cx + half * 0.9f, half)
-                lineTo(cx, h)
-                lineTo(cx - half * 0.9f, half)
-                close()
-            }
-            drawPath(rhombus, red)
-            // The "eye" of the motif: a dot of the background in the middle of each rhombus
-            drawCircle(eye, radius = h * 0.12f, center = Offset(cx, half))
-            if (i < count - 1) drawCircle(gold, radius = h * 0.13f, center = Offset(cx + step / 2f, half))
+    val accent = MaterialTheme.colorScheme.primary
+    val second = MaterialTheme.colorScheme.secondary
+    val line = MaterialTheme.colorScheme.outlineVariant
+    Canvas(modifier.fillMaxWidth().height(14.dp).clearAndSetSemantics { }) {
+        val mid = size.height / 2f
+        val cx = size.width / 2f
+        val big = size.height * 0.5f
+        val small = big * 0.62f
+        val gap = big * 2.6f
+        fun rhombus(x: Float, r: Float, color: androidx.compose.ui.graphics.Color) = drawPath(
+            Path().apply {
+                moveTo(x, mid - r); lineTo(x + r, mid); lineTo(x, mid + r); lineTo(x - r, mid); close()
+            },
+            color,
+        )
+        rhombus(cx - gap, small, second)
+        rhombus(cx, big, accent)
+        rhombus(cx + gap, small, second)
+        // The lines: from a little beyond the motif, fading to nothing a short way off
+        val inner = gap + small + big * 1.4f
+        val reach = minOf(size.width / 2f - inner, 140.dp.toPx())
+        if (reach > 0f) {
+            val stroke = 1.dp.toPx()
+            drawLine(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(line.copy(alpha = 0f), line), cx - inner - reach, cx - inner),
+                Offset(cx - inner - reach, mid), Offset(cx - inner, mid), stroke,
+            )
+            drawLine(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(line, line.copy(alpha = 0f)), cx + inner, cx + inner + reach),
+                Offset(cx + inner, mid), Offset(cx + inner + reach, mid), stroke,
+            )
         }
     }
 }

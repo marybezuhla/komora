@@ -15,8 +15,18 @@ data class CatalogApp(
     val badge: Long,
     private val names: Map<String, String>,
     private val summaries: Map<String, String>,
+    /** Added by the owner (not part of Komora's own list). */
+    val added: Boolean = false,
+    /** For added sources: the APK's name in a release, as a pattern (versions as digits). */
+    val apkPattern: String? = null,
 ) {
     val isSelf: Boolean get() = certSha256 == SELF
+
+    /** The key Komora knows it by: the package, or for an added source not yet installed, its repository. */
+    val key: String get() = packageName.ifEmpty { "src:$repo" }
+
+    /** An added source whose key is not yet known: it is shown and confirmed at the first install. */
+    val needsTrust: Boolean get() = added && certSha256.isEmpty()
 
     fun name(lang: String): String = names[lang] ?: names.getValue("en")
     fun summary(lang: String): String = summaries[lang] ?: summaries.getValue("en")

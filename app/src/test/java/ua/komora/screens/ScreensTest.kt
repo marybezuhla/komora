@@ -19,6 +19,15 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
+import ua.komora.catalog.Source
+import ua.komora.install.ApkVerifier
+import ua.komora.ui.AddError
+import ua.komora.ui.AddSourceDialog
+import ua.komora.ui.AddState
+import ua.komora.ui.DetailsSheet
+import ua.komora.ui.TrustDialog
+import ua.komora.ui.TrustRequest
 import ua.komora.catalog.Catalog
 import ua.komora.install.Confirm
 import ua.komora.net.Release
@@ -27,6 +36,8 @@ import ua.komora.ui.Actions
 import ua.komora.ui.AppRow
 import ua.komora.ui.KomoraList
 import ua.komora.ui.LookPage
+import ua.komora.ui.AboutPage
+import ua.komora.ui.SourcesWarning
 import ua.komora.ui.Phase
 import ua.komora.ui.Problem
 import ua.komora.ui.theme.KomoraTheme
@@ -77,34 +88,53 @@ class ScreensTest {
         shadowOf(app.packageManager).addActivityIfNotPresent(ComponentName(app, ComponentActivity::class.java))
     }
 
-    private fun shot(name: String, theme: Theme, afterIdle: () -> Unit = {}, content: @Composable () -> Unit) =
+    private fun shot(name: String, theme: Theme, manualClock: Boolean = false, afterIdle: () -> Unit = {}, content: @Composable () -> Unit) =
         ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
+            // A text field keeps the screen busy for ever: then time is moved on by hand
+            if (manualClock) compose.mainClock.autoAdvance = false
             scenario.onActivity { it.setContent { KomoraTheme(theme) { content() } } }
-            repeat(6) {
-                shadowOf(Looper.getMainLooper()).idle()
-                compose.waitForIdle()
+            // Frames played by hand, without waiting for a quiet moment that never comes
+            fun settle(times: Int) = repeat(times) {
+                if (manualClock) {
+                    repeat(30) { compose.mainClock.advanceTimeByFrame() }
+                    shadowOf(Looper.getMainLooper()).idle()
+                } else {
+                    shadowOf(Looper.getMainLooper()).idle()
+                    compose.waitForIdle()
+                }
             }
+            settle(6)
             afterIdle()
-            repeat(4) {
-                shadowOf(Looper.getMainLooper()).idle()
-                compose.waitForIdle()
-            }
+            settle(4)
             var bitmap: Bitmap? = null
             scenario.onActivity { activity ->
                 val view = activity.window.decorView
-                bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-                    .also { view.draw(android.graphics.Canvas(it)) }
+                bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { b ->
+                    val canvas = android.graphics.Canvas(b)
+                    view.draw(canvas)
+                    // A dialog or sheet is a window of its own: drawn on top, over a dimmed screen
+                    ShadowDialog.getLatestDialog()?.takeIf { it.isShowing }?.window?.decorView?.let { d ->
+                        canvas.drawColor(0x66000000)
+                        canvas.save()
+                        canvas.translate(((b.width - d.width) / 2).toFloat().coerceAtLeast(0f), ((b.height - d.height) / 2).toFloat().coerceAtLeast(0f))
+                        d.draw(canvas)
+                        canvas.restore()
+                    }
+                }
             }
             val dir = File("build/screens").apply { mkdirs() }
             File(dir, "$name.png").outputStream().use { bitmap!!.compress(Bitmap.CompressFormat.PNG, 100, it) }
             Unit
         }
 
-    private fun list(name: String, theme: Theme, canInstall: Boolean = true, confirm: Confirm? = null, rows: List<AppRow> = this.rows) =
-        shot(name, theme) {
-            KomoraList(rows, busy = rows.any { it.isBusy }, confirm = confirm, canInstall = canInstall, onLook = {},
-                actions = noActions, onCheck = {}, onInstall = {}, onCancel = {})
-        }
+    private fun list(
+        name: String, theme: Theme, canInstall: Boolean = true, confirm: Confirm? = null, rows: List<AppRow> = this.rows,
+        sources: Boolean = false, addedTab: Boolean = false,
+    ) = shot(name, theme) {
+        KomoraList(rows, busy = rows.any { it.isBusy }, confirm = confirm, canInstall = canInstall, onLook = {},
+            actions = noActions, onCheck = {}, onInstall = {}, onCancel = {},
+            sourcesEnabled = sources, addedTab = addedTab)
+    }
 
     @Test fun listPhone() = list("01-list-phone-colours", Theme.SYSTEM)
     @Config(qualifiers = "+night")
@@ -165,4 +195,102 @@ class ScreensTest {
 
     @Config(qualifiers = "uk-w800dp-h1280dp-mdpi")
     @Test fun tabletUpright() = list("19-tablet-upright", Theme.PODILLIA)
+
+    /** A calm day: two updates waiting, nothing downloading, the rest up to date or available. */
+    @Test fun calmWithUpdates() {
+        val by = catalog.associateBy { it.packageName }
+        val calm = listOf(
+            AppRow(by.getValue("ua.komora"), installedVersion = "0.1.7", latest = release("komora", "0.1.7", 2)),
+            AppRow(by.getValue("ua.tarilka"), installedVersion = "1.2.3", latest = release("tarilka", "1.3.0", 48)),
+            AppRow(by.getValue("ua.mandat"), installedVersion = "0.1.80", latest = release("mandat", "0.1.90", 31)),
+            AppRow(by.getValue("ua.sprotyv"), installedVersion = "1.0.4", latest = release("sprotyv", "1.0.4", 9)),
+            AppRow(by.getValue("ua.pysanka"), latest = release("pysanka", "2.1.0", 120)),
+            AppRow(by.getValue("ua.svitlyna"), latest = release("svitlyna", "0.6.1", 54)),
+        )
+        list("20-calm-two-updates", Theme.SYSTEM, rows = calm)
+    }
+
+    @Config(qualifiers = "+night")
+    @Test fun calmDark() {
+        val by = catalog.associateBy { it.packageName }
+        val calm = listOf(
+            AppRow(by.getValue("ua.komora"), installedVersion = "0.1.7", latest = release("komora", "0.1.7", 2)),
+            AppRow(by.getValue("ua.tarilka"), installedVersion = "1.3.0", latest = release("tarilka", "1.3.0", 48)),
+            AppRow(by.getValue("ua.sprotyv"), latest = release("sprotyv", "1.0.4", 9)),
+        )
+        list("21-calm-dark-podillia", Theme.PODILLIA, rows = calm)
+    }
+
+    // Other sources: two added apps, one trusted and installed, one not installed yet
+    private val key = "3f9a0c7be15d42a8" + "9c0e5b71d26fa4c3" + "e8b07a2d915c6f40" + "b3d8e1a7c42f9065"
+    private val addedRows: List<AppRow> by lazy {
+        val trusted = Source("someone/notes-app", "notes-[0-9]+\\.[0-9]+\\.apk", "org.example.notes", key, "Notes").toApp()
+        val fresh = Source("other-dev/weather", "weather-[0-9]+\\.apk").toApp()
+        listOf(
+            AppRow(trusted, installedVersion = "2.4", latest = release("notes", "2.5", 7)),
+            AppRow(fresh, latest = release("weather", "1.0", 12)),
+        )
+    }
+
+    @Test fun sourcesVerifiedTab() = list("22-sources-verified-tab", Theme.SYSTEM, rows = rows + addedRows, sources = true)
+
+    @Test fun sourcesAddedTab() = list("23-sources-added-tab", Theme.SYSTEM, rows = rows + addedRows, sources = true, addedTab = true)
+
+    @Config(qualifiers = "+night")
+    @Test fun sourcesAddedTabDark() = list("24-sources-added-dark", Theme.GLYNA, rows = rows + addedRows, sources = true, addedTab = true)
+
+    @Test fun trustQuestion() = shot("25-trust-question", Theme.SYSTEM) {
+        KomoraList(rows + addedRows, busy = false, confirm = null, canInstall = true, onLook = {}, actions = noActions,
+            onCheck = {}, onInstall = {}, onCancel = {}, sourcesEnabled = true, addedTab = true)
+        TrustDialog(TrustRequest("other-dev/weather", ApkVerifier.Identity("org.example.weather", key, "Weather", "1.0"))) {}
+    }
+
+    @Test fun addSourceFailed() = shot("26-add-source-error", Theme.SYSTEM, manualClock = true) {
+        AddSourceDialog(AddState.Failed(AddError.NoApk), onAdd = {}, onChoose = { _, _ -> }) {}
+    }
+
+    @Test fun chooseApk() = shot("27-add-source-choose", Theme.SYSTEM) {
+        AddSourceDialog(
+            AddState.Choose("other-dev/weather", listOf("weather-1.0-arm64-v8a.apk", "weather-1.0-armeabi-v7a.apk", "weather-1.0-universal.apk")),
+            onAdd = {}, onChoose = { _, _ -> },
+        ) {}
+    }
+
+    @Test fun detailsAdded() = shot("28-details-added", Theme.SYSTEM) {
+        DetailsSheet(addedRows[0], "uk", key, onRemove = {}, onDismiss = {})
+    }
+
+    @Test fun detailsVerified() = shot("29-details-verified", Theme.PODILLIA) {
+        DetailsSheet(rows[1], "uk", rows[1].app.certSha256, onRemove = null, onDismiss = {})
+    }
+
+    @Test fun settingsWithSources() = shot("30-settings-sources-on", Theme.SYSTEM) {
+        LookPage(Look(), onBack = {}, sourcesEnabled = true) {}
+    }
+
+    @Test fun sourcesWarning() = shot("31-sources-warning", Theme.SYSTEM) {
+        LookPage(Look(), onBack = {}) {}
+        SourcesWarning(onAgree = {}, onDismiss = {})
+    }
+
+    @Config(qualifiers = "+night")
+    @Test fun sourcesWarningDark() = shot("32-sources-warning-dark", Theme.SYSTEM_DARK) {
+        SourcesWarning(onAgree = {}, onDismiss = {})
+    }
+
+    // "About Komora": the author's word, support links, facts; tall, to see all of it
+    @Config(qualifiers = "uk-w400dp-h3600dp-xhdpi")
+    @Test fun about() = shot("33-about", Theme.SYSTEM) { AboutPage(onBack = {}) }
+
+    @Config(qualifiers = "en-w400dp-h3600dp-xhdpi")
+    @Test fun aboutEnglish() = shot("34-about-english", Theme.PODILLIA) { AboutPage(onBack = {}) }
+
+    @Config(qualifiers = "uk-w400dp-h1200dp-xhdpi")
+    @Test fun detailsWithReport() = shot("35-details-report", Theme.SYSTEM) {
+        DetailsSheet(rows[1], "uk", rows[1].app.certSha256, onRemove = null, onDismiss = {})
+    }
+
+    @Test fun settingsAboutRow() = shot("36-settings-about-row", Theme.SYSTEM) {
+        LookPage(Look(), onBack = {}, sourcesEnabled = true) {}
+    }
 }

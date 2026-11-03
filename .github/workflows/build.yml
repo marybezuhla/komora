@@ -137,7 +137,12 @@ jobs:
           mkdir push && cp screens/*.png push/ && cd push
           git init -q && git checkout -q -b ci-screens && git add .
           git -c user.name=ci -c user.email=ci@localhost commit -qm "screens for ${SHA:0:7}"
-          git push -qf "https://x-access-token:${TOKEN}@github.com/${REPO}" ci-screens
+          # A dropped connection: try again, and never fail a build over pictures
+          for i in 1 2 3; do
+            git push -qf "https://x-access-token:${TOKEN}@github.com/${REPO}" ci-screens && exit 0
+            sleep $((i * 5))
+          done
+          echo "::warning::Could not push the pictures"
 
   # Signs. Only for main, only in the "release" environment (needs the owner's approval), and with
   # no Gradle or other third-party build code: just the Android SDK's own zipalign and apksigner.

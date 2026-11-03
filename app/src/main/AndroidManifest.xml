@@ -20,14 +20,20 @@
     <!-- Removed even if a library asks for them -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" tools:node="remove" />
 
-    <!-- Komora sees only the apps in its own catalog, not the whole phone.
-         Must match assets/catalog.json (a unit test checks this). -->
+    <!-- Komora sees the apps in its own catalog (must match assets/catalog.json; a unit test checks this).
+         For sources the owner adds, it also sees apps that have an icon on the home screen (this includes
+         system apps with an icon), only to tell whether an added app is installed and with which key.
+         Komora never lists them, sends them anywhere or keeps them; apps without an icon stay hidden. -->
     <queries>
         <package android:name="ua.tarilka" />
         <package android:name="ua.mandat" />
         <package android:name="ua.sprotyv" />
         <package android:name="ua.pysanka" />
         <package android:name="ua.svitlyna" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
 
     <application
