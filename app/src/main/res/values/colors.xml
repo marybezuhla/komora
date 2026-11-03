@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background">#FAF6EF</color>
+    <!-- The window behind the screen at start, as the default day theme (Chalk) -->
+    <color name="background">#E6DFD5</color>
     <color name="icon_bg">#6B4A2B</color>
     <color name="icon_chest">#F3E3C3</color>
 </resources>
