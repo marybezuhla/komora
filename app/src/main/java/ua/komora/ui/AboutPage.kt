@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ua.komora.R
 import ua.komora.ui.theme.CardTitle
@@ -102,7 +103,8 @@ internal fun AboutPage(onBack: () -> Unit) {
             contentAlignment = Alignment.TopCenter,
         ) {
             // A readable line length on a tablet or an unfolded phone
-            Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp)) {
+            // Everything in the middle, like a letter and its postscript
+            Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 // The author's word
                 Card(
                     shape = RoundedCornerShape(16.dp),
@@ -111,42 +113,44 @@ internal fun AboutPage(onBack: () -> Unit) {
                 ) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         for (p in LETTER) {
-                            Text(stringResource(p), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface)
+                            Text(stringResource(p), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface,
+                                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                         }
                         Text(
                             stringResource(R.string.letter_signature),
                             style = MaterialTheme.typography.bodyLarge,
                             fontStyle = FontStyle.Italic,
                             color = scheme.primary,
-                            modifier = Modifier.align(Alignment.End),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
 
                 Spacer(Modifier.height(24.dp))
-                Text(stringResource(R.string.support_title), style = CardTitle, color = scheme.onSurface,
+                Text(stringResource(R.string.support_title), style = CardTitle, color = scheme.onSurface, textAlign = TextAlign.Center,
                     modifier = Modifier.semantics { heading() })
                 Spacer(Modifier.height(4.dp))
-                Text(stringResource(R.string.support_note), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                Text(stringResource(R.string.support_note), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
                 CauseGroup(R.string.support_defence, DEFENCE, open)
                 Spacer(Modifier.height(16.dp))
                 CauseGroup(R.string.support_humanitarian, HUMANITARIAN, open)
                 Spacer(Modifier.height(12.dp))
-                Text(stringResource(R.string.support_any), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                Text(stringResource(R.string.support_any), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
 
                 Spacer(Modifier.height(24.dp))
-                Text(stringResource(R.string.about_title), style = CardTitle, color = scheme.onSurface,
+                Text(stringResource(R.string.about_title), style = CardTitle, color = scheme.onSurface, textAlign = TextAlign.Center,
                     modifier = Modifier.semantics { heading() })
                 Spacer(Modifier.height(4.dp))
-                Text(stringResource(R.string.about_text), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                Text(stringResource(R.string.about_text), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 val context = LocalContext.current
                 val version = remember {
                     runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
                 }
                 version?.let {
                     Spacer(Modifier.height(4.dp))
-                    Text(stringResource(R.string.about_version, it), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                    Text(stringResource(R.string.about_version, it), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
                 Row {
                     TextButton(onClick = { open(SOURCE_URL) }) { Text(stringResource(R.string.source_code)) }
@@ -161,7 +165,7 @@ internal fun AboutPage(onBack: () -> Unit) {
 private fun CauseGroup(@StringRes title: Int, causes: List<Cause>, open: (String) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Text(stringResource(title), style = MaterialTheme.typography.titleMedium, color = scheme.primary,
-        fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
+        fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
     Spacer(Modifier.height(8.dp))
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -178,14 +182,18 @@ private fun CauseGroup(@StringRes title: Int, causes: List<Cause>, open: (String
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(cause.name), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
-                    Text(stringResource(cause.what), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(cause.name), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold,
+                            color = scheme.onSurface, textAlign = TextAlign.Center)
+                        Spacer(Modifier.width(6.dp))
+                        Icon(painterResource(R.drawable.ic_open), contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
+                    }
+                    Text(stringResource(cause.what), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center)
                     // Only the site's name: where it leads, readable at a glance
                     Text(url.removePrefix("https://").substringBefore('/'), style = MaterialTheme.typography.labelMedium, color = scheme.primary)
                 }
-                Spacer(Modifier.width(8.dp))
-                Icon(painterResource(R.drawable.ic_open), contentDescription = null, tint = scheme.primary, modifier = Modifier.size(20.dp))
             }
         }
     }
