@@ -58,7 +58,7 @@
     <string name="theme_system">Phone colours</string>
     <string name="theme_system_dark">Phone colours</string>
     <string name="apps_header">Apps · %1$d</string>
-    <string name="footer_permissions">Only two permissions: the internet (GitHub only) and installing apps. No accounts, no ads, no tracking.</string>
+    <string name="footer_permissions">It needs the internet (GitHub only) and permission to install apps; notifications only if you turn on update notices. No accounts, no ads, no tracking.</string>
     <string name="theme_glyna">Clay</string>
     <string name="theme_zhar">Embers</string>
     <string name="app_language">Language</string>
