@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -466,7 +467,10 @@ private fun AppCard(
         border = if (added) null else BorderStroke(1.dp, scheme.outlineVariant),
         modifier = modifier.fillMaxWidth().then(if (added) Modifier.dashedBorder(frame, 16.dp) else Modifier),
     ) {
-        // The icon, what the app is, and its one main action on the right, as in app stores
+        // The icon, what the app is, and its one main action on the right, as in app stores. On a narrow
+        // screen or with a large font there is no room beside the text: the action goes under it instead
+        BoxWithConstraints {
+        val roomy = maxWidth.value / LocalDensity.current.fontScale >= 330f
         Row(Modifier.padding(start = 14.dp, end = 12.dp, top = 14.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
             Spacer(Modifier.width(14.dp))
@@ -514,11 +518,16 @@ private fun AppCard(
                         )
                     }
                 }
+                if (idle && !roomy) {
+                    Spacer(Modifier.height(8.dp))
+                    MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen)
+                }
             }
-            if (idle) {
+            if (idle && roomy) {
                 Spacer(Modifier.width(8.dp))
                 MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen)
             }
+        }
         }
 
         val secondary = retry || problem == Problem.OtherKey
