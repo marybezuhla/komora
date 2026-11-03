@@ -394,7 +394,7 @@ private fun AppIcon(packageName: String, name: String, color: Long, installedVer
         Modifier.size(ICON).background(Color(color), CircleShape).clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
-        Text(name.take(2), color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Text(name.take(2).replaceFirstChar { it.uppercase() }, color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 
