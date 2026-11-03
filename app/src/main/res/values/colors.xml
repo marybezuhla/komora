@@ -2,6 +2,8 @@
 <resources>
     <!-- The window behind the screen at start, as the default day theme (Chalk) -->
     <color name="background">#E6DFD5</color>
-    <color name="icon_bg">#6B4A2B</color>
-    <color name="icon_chest">#F3E3C3</color>
+    <!-- The icon: deep blue, cream, gold -->
+    <color name="icon_bg">#013B88</color>
+    <color name="icon_cream">#FEF2DD</color>
+    <color name="icon_gold">#FEC21A</color>
 </resources>
