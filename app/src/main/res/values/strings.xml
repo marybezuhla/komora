@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Komora</string>
+    <string name="refresh">Check for updates</string>
+    <string name="install">Install</string>
+    <string name="update">Update</string>
+    <string name="open">Open</string>
+    <string name="checking">Checking…</string>
+    <string name="downloading">Downloading… %1$d%%</string>
+    <string name="installing">Installing…</string>
+    <string name="not_installed">Not installed</string>
+    <string name="installed_version">Installed %1$s</string>
+    <string name="available_version">available %1$s</string>
+    <string name="up_to_date">Up to date</string>
+    <string name="allow_title">Allow Komora to install apps</string>
+    <string name="allow_text">Android asks for this once. Komora installs only the apps in this list.</string>
+    <string name="allow_button">Allow</string>
+    <string name="footer">Every file is checked before installing: it must be signed with the key Komora knows for that app. A file signed by anyone else is refused.</string>
+    <string name="about_title">About</string>
+    <string name="about_text">Komora is free software under the GNU GPL 3.0, without any warranty. Uses AndroidX and Kotlin libraries (Apache 2.0). Apps are downloaded from GitHub.</string>
+    <string name="source_code">Source code</string>
+    <string name="err_network">No connection to GitHub. Try again later.</string>
+    <string name="err_rate_limit">GitHub asks to wait a bit (too many checks). Try again in an hour.</string>
+    <string name="err_no_release">No release published yet.</string>
+    <string name="err_unreadable">The file could not be read as an app. Nothing was installed.</string>
+    <string name="err_wrong_package">The file is a different app than expected. Nothing was installed.</string>
+    <string name="err_wrong_signer">The file is not signed with the expected key. Nothing was installed.</string>
+    <string name="err_not_newer">You already have this version or a newer one.</string>
+    <string name="err_other_key">The installed copy was signed with a different key. Remove it first, then install from here.</string>
+    <string name="err_install">Android did not install the app.</string>
+    <string name="err_bad_release">The latest release has no suitable app file.</string>
+    <string name="continue_install">Continue</string>
+    <string name="cancel">Cancel</string>
+</resources>
