@@ -11,6 +11,8 @@ data class CatalogApp(
     val assetPrefix: String,
     /** SHA-256 of the author's signing certificate, lowercase hex; or [SELF] for Komora itself. */
     val certSha256: String,
+    /** The colour of the app's small square in the list (ARGB). */
+    val badge: Long,
     private val names: Map<String, String>,
     private val summaries: Map<String, String>,
 ) {
@@ -30,6 +32,8 @@ object Catalog {
     private val REPO = Regex("^[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}$")
     private val PREFIX = Regex("^[a-z0-9][a-z0-9_-]{0,40}$")
     private val SHA256 = Regex("^[0-9a-f]{64}$")
+    private val BADGE = Regex("^#[0-9A-Fa-f]{6}$")
+    private const val DEFAULT_BADGE = "#5A5048"
 
     /** Reads and strictly checks the catalog. Anything unexpected stops it, rather than being skipped quietly. */
     fun parse(json: String): List<CatalogApp> {
@@ -43,6 +47,10 @@ object Catalog {
                 repo = o.getString("repo"),
                 assetPrefix = o.getString("assetPrefix"),
                 certSha256 = o.getString("certSha256"),
+                badge = o.optString("badge", DEFAULT_BADGE).let { c ->
+                    require(BADGE.matches(c)) { "Bad badge colour: $c" }
+                    0xFF000000L or c.removePrefix("#").toLong(16)
+                },
                 names = o.getJSONObject("name").toMap(),
                 summaries = o.getJSONObject("summary").toMap(),
             )

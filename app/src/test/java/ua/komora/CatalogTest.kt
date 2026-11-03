@@ -58,4 +58,15 @@ class CatalogTest {
         val bad = catalogJson.replace("\"Marybezu/tarilka\"", "\"Marybezu/tarilka/../x\"")
         assertThrows(IllegalArgumentException::class.java) { Catalog.parse(bad) }
     }
+
+    @Test
+    fun badBadgeColourIsRefused() {
+        val bad = catalogJson.replace("\"badge\": \"#3E7B57\"", "\"badge\": \"green\"")
+        assertThrows(IllegalArgumentException::class.java) { Catalog.parse(bad) }
+    }
+
+    @Test
+    fun badgesAreOpaqueColours() {
+        for (app in Catalog.parse(catalogJson)) assertEquals(0xFFL, app.badge ushr 24)
+    }
 }

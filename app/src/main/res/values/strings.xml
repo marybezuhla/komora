@@ -41,4 +41,24 @@
     <string name="err_not_newer">You already have this version or a newer one.</string>
     <string name="err_other_key">This app is already on your phone from another source, so Komora cannot update it. To switch: save its data, remove it (this deletes its data), then install it here.</string>
     <string name="err_install">Android did not install the app. Try again; if it repeats, restart the phone.</string>
+    <string name="look">Look</string>
+    <string name="back">Back</string>
+    <string name="look_mode">Light or dark</string>
+    <string name="mode_auto">As the phone</string>
+    <string name="mode_light">Light</string>
+    <string name="mode_dark">Dark</string>
+    <string name="day_theme">Theme by day</string>
+    <string name="night_theme">Theme by night</string>
+    <string name="theme_kreyda">Chalk</string>
+    <string name="theme_visk">Beeswax</string>
+    <string name="theme_nebo">Sky</string>
+    <string name="theme_podillia">Podillia</string>
+    <string name="theme_hutsulshchyna">Hutsul</string>
+    <string name="theme_chornozem">Black earth</string>
+    <string name="theme_system">System colours</string>
+    <string name="theme_system_dark">Dark, system colours</string>
+    <string name="apps_header">Apps · %1$d</string>
+    <string name="footer_permissions">Only two permissions: the internet (GitHub only) and installing apps. No accounts, no ads, no tracking.</string>
+    <string name="theme_glyna">Clay</string>
+    <string name="theme_zhar">Embers</string>
 </resources>

@@ -41,4 +41,24 @@
     <string name="err_not_newer">У вас уже ця або новіша версія.</string>
     <string name="err_other_key">Цей застосунок уже встановлено з іншого джерела, тому Комора не може його оновити. Щоб перейти: збережіть його дані, видаліть його (дані буде стерто), потім встановіть тут.</string>
     <string name="err_install">Android не встановив застосунок. Спробуйте ще раз; якщо повториться, перезапустіть телефон.</string>
+    <string name="look">Вигляд</string>
+    <string name="back">Назад</string>
+    <string name="look_mode">Світла чи темна</string>
+    <string name="mode_auto">Як у телефоні</string>
+    <string name="mode_light">Світла</string>
+    <string name="mode_dark">Темна</string>
+    <string name="day_theme">Тема вдень</string>
+    <string name="night_theme">Тема вночі</string>
+    <string name="theme_kreyda">Крейда</string>
+    <string name="theme_visk">Віск</string>
+    <string name="theme_nebo">Небо</string>
+    <string name="theme_podillia">Поділля</string>
+    <string name="theme_hutsulshchyna">Гуцульщина</string>
+    <string name="theme_chornozem">Чорнозем</string>
+    <string name="theme_system">Кольори системи</string>
+    <string name="theme_system_dark">Темна, кольори системи</string>
+    <string name="apps_header">Застосунки · %1$d</string>
+    <string name="footer_permissions">Дозволів лише два: інтернет (тільки GitHub) і встановлення застосунків. Без акаунтів, реклами й стеження.</string>
+    <string name="theme_glyna">Глина</string>
+    <string name="theme_zhar">Жар</string>
 </resources>

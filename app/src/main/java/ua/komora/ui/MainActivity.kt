@@ -40,6 +40,23 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.activity.compose.BackHandler
+import androidx.activity.SystemBarStyle
+import android.graphics.Color
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
@@ -62,6 +79,12 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import ua.komora.R
 import ua.komora.install.Installer
+import ua.komora.ui.theme.CardTitle
+import ua.komora.ui.theme.KomoraTheme
+import ua.komora.ui.theme.Look
+import ua.komora.ui.theme.LookSettings
+import ua.komora.ui.theme.LookStore
+import ua.komora.ui.theme.Ornament
 
 private const val SOURCE_URL = "https://github.com/Marybezu/komora"
 private const val LICENSE_URL = "$SOURCE_URL/blob/main/LICENSE"
@@ -72,9 +95,13 @@ class MainActivity : ComponentActivity() {
     /** Re-read on every return, e.g. after the owner allowed installs in Settings. */
     private val canInstall = mutableStateOf(false)
 
+    /** Light or dark, and the day and night themes; remembered on this phone only. */
+    private val look = mutableStateOf(Look())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        look.value = LookStore.load(this)
         // Android's confirmation screen opens only while Komora is in front
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -88,22 +115,42 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContent {
-            KomoraTheme {
-                KomoraScreen(
-                    vm = vm,
-                    canInstall = canInstall.value,
-                    actions = Actions(
-                        allowInstalls = {
-                            start(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
-                        },
-                        open = { pkg -> packageManager.getLaunchIntentForPackage(pkg)?.let(::start) },
-                        canOpen = { pkg -> packageManager.getLaunchIntentForPackage(pkg) != null },
-                        appSettings = { pkg ->
-                            start(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")))
-                        },
-                        start = ::start,
-                    ),
-                )
+            val theme = look.value.current(isSystemInDarkTheme())
+            // Status and navigation bar icons follow the chosen theme, not only the phone
+            LaunchedEffect(theme.dark) {
+                val bars = if (theme.dark) {
+                    SystemBarStyle.dark(Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+            }
+            var showLook by rememberSaveable { mutableStateOf(false) }
+            BackHandler(enabled = showLook) { showLook = false }
+            KomoraTheme(theme) {
+                if (showLook) {
+                    LookPage(look.value, onBack = { showLook = false }) { changed ->
+                        look.value = changed
+                        LookStore.save(this, changed)
+                    }
+                } else {
+                    KomoraScreen(
+                        vm = vm,
+                        canInstall = canInstall.value,
+                        onLook = { showLook = true },
+                        actions = Actions(
+                            allowInstalls = {
+                                start(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                            },
+                            open = { pkg -> packageManager.getLaunchIntentForPackage(pkg)?.let(::start) },
+                            canOpen = { pkg -> packageManager.getLaunchIntentForPackage(pkg) != null },
+                            appSettings = { pkg ->
+                                start(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")))
+                            },
+                            start = ::start,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -130,7 +177,7 @@ private class Actions(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, actions: Actions) {
+private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, onLook: () -> Unit, actions: Actions) {
     val rows by vm.rows.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val confirm by Installer.confirm.collectAsStateWithLifecycle()
@@ -149,8 +196,14 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, actions: Acti
                         )
                     },
                     actions = {
-                        IconButton(onClick = vm::checkUpdates) {
-                            Icon(painterResource(R.drawable.ic_refresh), contentDescription = stringResource(R.string.refresh))
+                        // A round, framed button, like a chip
+                        OutlinedIconButton(
+                            onClick = onLook,
+                            colors = IconButtonDefaults.outlinedIconButtonColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.padding(end = 8.dp),
+                        ) {
+                            Icon(painterResource(R.drawable.ic_palette), contentDescription = stringResource(R.string.look))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -162,22 +215,48 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, actions: Acti
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (!canInstall) {
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                    // The one thing to do first: framed in the accent
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                    ) {
                         Column(Modifier.padding(16.dp)) {
                             Text(
                                 stringResource(R.string.allow_title),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = CardTitle,
                                 modifier = Modifier.semantics { heading() },
                             )
                             Spacer(Modifier.height(4.dp))
-                            Text(stringResource(R.string.allow_text), style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                stringResource(R.string.allow_text),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                             Spacer(Modifier.height(12.dp))
-                            Button(onClick = actions.allowInstalls) { Text(stringResource(R.string.allow_button)) }
+                            Button(onClick = actions.allowInstalls, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                Text(stringResource(R.string.allow_button))
+                            }
                         }
+                    }
+                }
+            }
+            item {
+                // "Apps · 6" on the left, the check on the right
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.apps_header, rows.size),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f).semantics { heading() },
+                    )
+                    TextButton(onClick = vm::checkUpdates) {
+                        Text(stringResource(R.string.refresh), fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -204,27 +283,38 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, actions: Acti
 @Composable
 private fun About() {
     val uri = LocalUriHandler.current
-    Column(Modifier.padding(top = 8.dp)) {
-        Text(
-            stringResource(R.string.footer),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    val note = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(stringResource(R.string.footer), style = MaterialTheme.typography.bodySmall, color = note, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(8.dp))
+        Text(stringResource(R.string.footer_permissions), style = MaterialTheme.typography.bodySmall, color = note, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         Text(
             stringResource(R.string.about_title),
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.semantics { heading() },
         )
-        Text(
-            stringResource(R.string.about_text),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text(stringResource(R.string.about_text), style = MaterialTheme.typography.bodySmall, color = note, textAlign = TextAlign.Center)
         FlowRowCompat {
             TextButton(onClick = { runCatching { uri.openUri(SOURCE_URL) } }) { Text(stringResource(R.string.source_code)) }
             TextButton(onClick = { runCatching { uri.openUri(LICENSE_URL) } }) { Text(stringResource(R.string.license)) }
         }
+    }
+}
+
+/** A small square with the app's first letters in its own colour, in place of an icon. Decoration only. */
+@Composable
+private fun Badge(name: String, color: Long) {
+    Box(
+        Modifier.size(42.dp).background(androidx.compose.ui.graphics.Color(color), RoundedCornerShape(10.dp)).clearAndSetSemantics { },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            name.take(2),
+            color = androidx.compose.ui.graphics.Color.White,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -243,24 +333,21 @@ private fun AppCard(
 ) {
     val name = row.app.name(lang)
     val scheme = MaterialTheme.colorScheme
-    // As Pysanka's blocks: a coloured header band with the name, and a thin frame of the same colour
+    // A light card with a thin frame: the app's square, its name, what it is, and where it stands
     Card(
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = scheme.surface),
-        border = BorderStroke(1.dp, scheme.primaryContainer),
+        border = BorderStroke(1.dp, scheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        // One swipe reads one app: name, what it is, and where it stands
-        Column(Modifier.semantics(mergeDescendants = true) {}) {
-            Row(
-                Modifier.fillMaxWidth().background(scheme.primaryContainer).heightIn(min = 52.dp)
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(name, style = CardTitle, color = scheme.onPrimaryContainer, modifier = Modifier.semantics { heading() })
-            }
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)) {
-                Text(row.app.summary(lang), style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
+        Row(Modifier.padding(start = 14.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Top) {
+            Badge(name, row.app.badge)
+            Spacer(Modifier.width(12.dp))
+            // One swipe reads one app
+            Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
+                Text(name, style = CardTitle, color = scheme.onSurface, modifier = Modifier.semantics { heading() })
+                Text(row.app.summary(lang), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
                 Text(
                     statusText(row),
                     style = MaterialTheme.typography.bodySmall,
@@ -270,17 +357,26 @@ private fun AppCard(
             }
         }
 
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
 
             val problem = if (row.foreignKey) Problem.OtherKey else row.problem
             problem?.let {
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    problemText(it),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
-                )
+                // A sign as well as the colour: in red themes the error and the accent are close
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        painterResource(R.drawable.ic_warning),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 1.dp, end = 6.dp).size(16.dp),
+                    )
+                    Text(
+                        problemText(it),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+                    )
+                }
             }
 
             Spacer(Modifier.height(12.dp))
@@ -401,3 +497,31 @@ private fun problemText(p: Problem): String = stringResource(
         Problem.Install -> R.string.err_install
     },
 )
+
+/** "Look": light or dark, and the day and night themes, with a way back. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LookPage(look: Look, onBack: () -> Unit, onChange: (Look) -> Unit) {
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            Column(Modifier.background(MaterialTheme.colorScheme.background)) {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.look), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                )
+                Ornament(Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+            }
+        },
+    ) { padding ->
+        LookSettings(
+            look, onChange,
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+        )
+    }
+}
