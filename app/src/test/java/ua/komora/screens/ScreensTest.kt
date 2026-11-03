@@ -145,4 +145,11 @@ class ScreensTest {
     @Test fun settingsWithUpdates() = shot("13-settings-updates-on", Theme.SYSTEM) {
         LookPage(Look(), onBack = {}, updates = UpdateCheck.Settings(enabled = true, wifiOnly = true)) {}
     }
+
+    // A narrow phone, and one with a larger font: nothing may wrap badly or hide
+    @Config(qualifiers = "uk-w340dp-h1600dp-xhdpi")
+    @Test fun lookNarrow() = shot("14-settings-narrow", Theme.SYSTEM) { LookPage(Look(), onBack = {}) {} }
+
+    @Config(qualifiers = "uk-w340dp-h1800dp-xhdpi", fontScale = 1.3f)
+    @Test fun listNarrowLargeFont() = list("15-list-narrow-large-font", Theme.SYSTEM)
 }

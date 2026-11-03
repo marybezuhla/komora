@@ -45,6 +45,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.Crossfade
 import ua.komora.ui.theme.SectionTitle
 import ua.komora.ui.theme.Group
 import ua.komora.notify.UpdateCheck
@@ -181,8 +185,12 @@ class MainActivity : ComponentActivity() {
             }
             var showLook by rememberSaveable { mutableStateOf(false) }
             BackHandler(enabled = showLook) { showLook = false }
+            // Kept while Settings is open, so the list comes back exactly where it was
+            val listState = rememberLazyListState()
             KomoraTheme(theme) {
-                if (showLook) {
+                // A short fade between the list and Settings, instead of a flash
+                Crossfade(targetState = showLook, animationSpec = tween(120), label = "page") { settings ->
+                if (settings) {
                     LookPage(
                         look.value,
                         onBack = { showLook = false },
@@ -202,6 +210,7 @@ class MainActivity : ComponentActivity() {
                     KomoraScreen(
                         vm = vm,
                         canInstall = canInstall.value,
+                        listState = listState,
                         onLook = { showLook = true },
                         actions = Actions(
                             allowInstalls = {
@@ -215,6 +224,7 @@ class MainActivity : ComponentActivity() {
                             start = ::start,
                         ),
                     )
+                }
                 }
             }
         }
@@ -244,12 +254,13 @@ internal class Actions(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, onLook: () -> Unit, actions: Actions) {
+private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: LazyListState, onLook: () -> Unit, actions: Actions) {
     val rows by vm.rows.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val confirm by Installer.confirm.collectAsStateWithLifecycle()
     KomoraList(
         rows, busy, confirm, canInstall, onLook, actions,
+        listState = listState,
         onCheck = vm::checkUpdates,
         onInstall = vm::install,
         onCancel = vm::cancelInstall,
@@ -269,6 +280,7 @@ internal fun KomoraList(
     onCheck: () -> Unit,
     onInstall: (AppRow) -> Unit,
     onCancel: () -> Unit,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     // Same language as the rest of the screen (Android picks the strings; the catalog follows them)
     val lang = stringResource(R.string.catalog_lang)
@@ -302,6 +314,7 @@ internal fun KomoraList(
         },
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -374,16 +387,16 @@ private fun About() {
     val uri = LocalUriHandler.current
     val note = MaterialTheme.colorScheme.onSurfaceVariant
     Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(stringResource(R.string.footer), style = MaterialTheme.typography.bodySmall, color = note, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.footer), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.footer_permissions), style = MaterialTheme.typography.bodySmall, color = note, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.footer_permissions), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         Text(
             stringResource(R.string.about_title),
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.semantics { heading() },
         )
-        Text(stringResource(R.string.about_text), style = MaterialTheme.typography.bodySmall, color = note, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.about_text), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
         FlowRowCompat {
             TextButton(onClick = { runCatching { uri.openUri(SOURCE_URL) } }) { Text(stringResource(R.string.source_code)) }
             TextButton(onClick = { runCatching { uri.openUri(LICENSE_URL) } }) { Text(stringResource(R.string.license)) }
@@ -499,11 +512,11 @@ private fun AppCard(
             // One swipe reads one app
             Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
                 Text(name, style = CardTitle, color = scheme.onSurface, modifier = Modifier.semantics { heading() })
-                Text(row.app.summary(lang), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                Text(row.app.summary(lang), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
                 Spacer(Modifier.height(6.dp))
                 Text(
                     statusText(row),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onSurfaceVariant,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
@@ -534,7 +547,7 @@ private fun AppCard(
                     )
                     Text(
                         problemText(it),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                     )
@@ -554,7 +567,7 @@ private fun AppCard(
                             R.string.downloading, percent,
                             Formatter.formatShortFileSize(ctx, phase.bytes), Formatter.formatShortFileSize(ctx, phase.total),
                         ),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         // Read aloud only every 10%, not on every change
                         modifier = Modifier.semantics {
                             contentDescription = spoken
@@ -563,7 +576,7 @@ private fun AppCard(
                     )
                     Text(
                         stringResource(R.string.keep_open),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
@@ -574,7 +587,7 @@ private fun AppCard(
                     Spacer(Modifier.height(6.dp))
                     Text(
                         stringResource(if (row.app.isSelf) R.string.updating_self else R.string.installing),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     // Android is waiting for the owner's answer on its own screen
                     if (onContinue != null) {
@@ -589,7 +602,7 @@ private fun AppCard(
                 if (offerNotes && showNotes) {
                     Text(
                         notes,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.fillMaxWidth()
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
@@ -740,7 +753,7 @@ private fun UpdateSettings(
             if (denied) {
                 Text(
                     stringResource(R.string.notify_denied),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
                         .semantics { liveRegion = LiveRegionMode.Polite },
@@ -767,7 +780,7 @@ private fun SwitchRow(title: String, summary: String?, checked: Boolean, onChang
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
             if (summary != null) {
-                Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Switch(checked = checked, onCheckedChange = null)

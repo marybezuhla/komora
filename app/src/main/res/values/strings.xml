@@ -44,7 +44,7 @@
     <string name="look">Settings</string>
     <string name="back">Back</string>
     <string name="look_mode">Light or dark</string>
-    <string name="mode_auto">As the phone</string>
+    <string name="mode_auto">Auto</string>
     <string name="mode_light">Light</string>
     <string name="mode_dark">Dark</string>
     <string name="day_theme">Theme by day</string>

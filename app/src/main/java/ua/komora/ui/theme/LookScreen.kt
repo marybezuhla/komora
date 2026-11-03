@@ -150,7 +150,8 @@ private fun <T> Segments(options: List<Pair<T, Int>>, chosen: T, onChoose: (T) -
             ) {
                 Text(
                     stringResource(label),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -164,7 +165,7 @@ private fun <T> Segments(options: List<Pair<T, Int>>, chosen: T, onChoose: (T) -
 internal fun SectionTitle(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 4.dp).semantics { heading() },
@@ -177,7 +178,8 @@ internal fun SectionTitle(text: String) {
 private fun ThemeRow(themes: List<Theme>, chosen: Theme, onChoose: (Theme) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val gap = 10.dp
-        val width = (maxWidth - gap * 2) / 3
+        // Rounded down to whole dp, so three always fit in a row on any screen
+        val width = ((maxWidth - gap * 2) / 3).value.toInt().dp
         FlowRow(
             Modifier.fillMaxWidth().selectableGroup().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(gap),
