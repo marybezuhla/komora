@@ -162,4 +162,7 @@
     <string name="report_bug">Повідомити про помилку</string>
     <string name="report_bug_note">Відкриється GitHub із заготовкою: назва застосунку, його версія й версія Android. Потрібен акаунт GitHub. Комора нічого не надсилає сама: ви бачите текст і вирішуєте.</string>
     <string name="report_bug_body">Застосунок: %1$s\nВерсія: %2$s\nAndroid: %3$s\n\nЩо сталося:\n\nЩо мало статися:\n\nЯк повторити:\n</string>
+    <string name="org_brave1">Brave1</string>
+    <string name="org_brave1_what">Державний кластер оборонних технологій. Не збір коштів: дізнатися, як українські розробники захищають країну</string>
+    <string name="org_brave1_url">https://brave1.gov.ua/</string>
 </resources>

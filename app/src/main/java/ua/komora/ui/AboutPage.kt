@@ -57,6 +57,8 @@ private val DEFENCE = listOf(
     Cause(R.string.org_united24, R.string.org_united24_what, R.string.org_united24_url),
     Cause(R.string.org_savelife, R.string.org_savelife_what, R.string.org_savelife_url),
     Cause(R.string.org_prytula, R.string.org_prytula_what, R.string.org_prytula_url),
+    // Not a fundraiser: the state's defence-tech cluster, to learn about it
+    Cause(R.string.org_brave1, R.string.org_brave1_what, R.string.org_brave1_url),
 )
 
 private val HUMANITARIAN = listOf(

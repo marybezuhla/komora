@@ -164,4 +164,7 @@
     <string name="report_bug">Report a problem</string>
     <string name="report_bug_note">GitHub opens with a ready start: the app\'s name, its version and the Android version. A GitHub account is needed. Komora sends nothing by itself: you see the text and decide.</string>
     <string name="report_bug_body">App: %1$s\nVersion: %2$s\nAndroid: %3$s\n\nWhat happened:\n\nWhat should have happened:\n\nHow to repeat it:\n</string>
+    <string name="org_brave1">Brave1</string>
+    <string name="org_brave1_what">Ukraine\'s state defence-tech cluster. Not a fundraiser: learn how Ukrainian engineers defend the country</string>
+    <string name="org_brave1_url">https://brave1.gov.ua/en</string>
 </resources>
