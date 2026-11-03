@@ -459,8 +459,8 @@ private fun AppCard(
     var showNotes by rememberSaveable(row.app.key) { mutableStateOf(false) }
     val added = row.app.added
 
-    // Komora's own apps: a plain thin frame. Added by the owner: a dashed frame in the accent, never mistaken
-    val frame = scheme.primary
+    // Komora's own apps: a plain thin frame. Added by the owner: a dashed frame in the warning colour, never mistaken
+    val frame = scheme.error
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = scheme.surface),
@@ -487,12 +487,16 @@ private fun AppCard(
             ) {
                 if (added) {
                     // Said in words too, not only by the frame
-                    Text(
-                        stringResource(R.string.added_by_you),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = scheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(R.drawable.ic_warning), contentDescription = null, tint = scheme.error, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            stringResource(R.string.added_by_you),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = scheme.error,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
                 Text(name, style = CardTitle, color = scheme.onSurface, modifier = Modifier.semantics { heading() })
                 Text(
@@ -717,12 +721,21 @@ private fun Tabs(verified: Int, added: Int, addedTab: Boolean, onChoose: (Boolea
 @Composable
 private fun AddedIntro(onAdd: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    // A warning, plainly: a reddish background, a sign and a red frame (the theme's own error colours)
     Column(
-        Modifier.fillMaxWidth().dashedBorder(scheme.primary, 16.dp).padding(16.dp),
+        Modifier.fillMaxWidth()
+            .background(scheme.errorContainer, RoundedCornerShape(16.dp))
+            .dashedBorder(scheme.error, 16.dp)
+            .padding(16.dp),
     ) {
-        Text(stringResource(R.string.added_intro_title), style = CardTitle, modifier = Modifier.semantics { heading() })
-        Spacer(Modifier.height(4.dp))
-        Text(stringResource(R.string.added_intro_text), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(painterResource(R.drawable.ic_warning), contentDescription = null, tint = scheme.error, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.added_intro_title), style = CardTitle, color = scheme.onErrorContainer,
+                modifier = Modifier.semantics { heading() })
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.added_intro_text), style = MaterialTheme.typography.bodyMedium, color = scheme.onErrorContainer)
         Spacer(Modifier.height(12.dp))
         Button(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.add_source)) }
     }

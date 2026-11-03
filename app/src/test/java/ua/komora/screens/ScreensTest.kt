@@ -36,6 +36,7 @@ import ua.komora.ui.Actions
 import ua.komora.ui.AppRow
 import ua.komora.ui.KomoraList
 import ua.komora.ui.LookPage
+import ua.komora.ui.SourcesWarning
 import ua.komora.ui.Phase
 import ua.komora.ui.Problem
 import ua.komora.ui.theme.KomoraTheme
@@ -264,5 +265,15 @@ class ScreensTest {
 
     @Test fun settingsWithSources() = shot("30-settings-sources-on", Theme.SYSTEM) {
         LookPage(Look(), onBack = {}, sourcesEnabled = true) {}
+    }
+
+    @Test fun sourcesWarning() = shot("31-sources-warning", Theme.SYSTEM) {
+        LookPage(Look(), onBack = {}) {}
+        SourcesWarning(onAgree = {}, onDismiss = {})
+    }
+
+    @Config(qualifiers = "+night")
+    @Test fun sourcesWarningDark() = shot("32-sources-warning-dark", Theme.SYSTEM_DARK) {
+        SourcesWarning(onAgree = {}, onDismiss = {})
     }
 }

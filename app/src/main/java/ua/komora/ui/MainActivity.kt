@@ -43,6 +43,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.MutableState
 import ua.komora.install.ApkVerifier
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -429,10 +432,56 @@ private fun SwitchRow(title: String, summary: String?, checked: Boolean, onChang
 
 /** "Other sources": off by default; turning it on shows the second tab, with a plain warning. */
 @Composable
-private fun SourcesSettings(enabled: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SourcesSettings(enabled: Boolean, onChange: (Boolean) -> Unit, startAsking: Boolean = false) {
+    var asking by rememberSaveable { mutableStateOf(startAsking) }
     Spacer(Modifier.height(8.dp))
     SectionTitle(stringResource(R.string.sources_title))
     Group {
-        SwitchRow(stringResource(R.string.sources_switch), stringResource(R.string.sources_summary), enabled, onChange)
+        // Turning it on only after the warning is read and agreed to; turning it off needs nothing
+        SwitchRow(stringResource(R.string.sources_switch), stringResource(R.string.sources_summary), enabled) { on ->
+            if (on) asking = true else onChange(false)
+        }
     }
+    if (asking) SourcesWarning(onAgree = { asking = false; onChange(true) }, onDismiss = { asking = false })
+}
+
+/** The risks, plainly, and a box to tick before other sources can be turned on. */
+@Composable
+internal fun SourcesWarning(onAgree: () -> Unit, onDismiss: () -> Unit) {
+    var understood by rememberSaveable { mutableStateOf(false) }
+    val scheme = MaterialTheme.colorScheme
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = scheme.errorContainer,
+        iconContentColor = scheme.error,
+        titleContentColor = scheme.onErrorContainer,
+        textContentColor = scheme.onErrorContainer,
+        icon = { Icon(painterResource(R.drawable.ic_warning), contentDescription = null, modifier = Modifier.size(32.dp)) },
+        title = { Text(stringResource(R.string.sources_warn_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(stringResource(R.string.sources_warn_text), style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(12.dp))
+                Text(stringResource(R.string.sources_warn_disclaimer), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .toggleable(value = understood, role = Role.Checkbox) { understood = it },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = understood, onCheckedChange = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.sources_warn_check), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onAgree,
+                enabled = understood,
+                colors = ButtonDefaults.buttonColors(containerColor = scheme.error, contentColor = scheme.onError),
+            ) { Text(stringResource(R.string.sources_warn_yes)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }
