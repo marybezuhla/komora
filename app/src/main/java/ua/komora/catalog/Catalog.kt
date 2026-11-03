@@ -50,7 +50,7 @@ object Catalog {
             require(REPO.matches(app.repo)) { "Bad repo: ${app.repo}" }
             require(PREFIX.matches(app.assetPrefix)) { "Bad asset prefix: ${app.assetPrefix}" }
             require(app.isSelf || SHA256.matches(app.certSha256)) { "Bad certificate for ${app.packageName}" }
-            require("en" in o.getJSONObject("name").keySet() && "en" in o.getJSONObject("summary").keySet()) {
+            require(o.getJSONObject("name").has("en") && o.getJSONObject("summary").has("en")) {
                 "English name and summary are required for ${app.packageName}"
             }
             app
@@ -60,5 +60,6 @@ object Catalog {
         return apps
     }
 
-    private fun JSONObject.toMap(): Map<String, String> = keySet().associateWith { getString(it) }
+    // Android's org.json has keys(), not keySet()
+    private fun JSONObject.toMap(): Map<String, String> = keys().asSequence().associateWith { getString(it) }
 }
