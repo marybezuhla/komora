@@ -8,6 +8,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.border
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -116,7 +120,16 @@ internal fun KomoraList(
     onCancel: () -> Unit,
     listState: LazyListState = rememberLazyListState(),
     onUpdateAll: () -> Unit = {},
+    sourcesEnabled: Boolean = false,
+    onAddSource: () -> Unit = {},
+    onDetails: (AppRow) -> Unit = {},
+    startOnAdded: Boolean = false,
 ) {
+    // Two tabs once other sources are turned on: Komora's own list, and what the owner added
+    var addedTab by rememberSaveable { mutableStateOf(startOnAdded) }
+    val showAdded = sourcesEnabled && addedTab
+    val verifiedRows = rows.filter { !it.app.added }
+    val addedRows = rows.filter { it.app.added }
     // Same language as the rest of the screen (Android picks the strings; the catalog follows them)
     val lang = stringResource(R.string.catalog_lang)
     val checking = rows.any { it.phase == Phase.Checking }
@@ -161,15 +174,23 @@ internal fun KomoraList(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                if (sourcesEnabled) {
+                    item { Tabs(verifiedRows.size, addedRows.size, addedTab) { addedTab = it } }
+                }
                 if (!canInstall) item { AllowCard(actions.allowInstalls) }
-                item { Summary(rows, checking, busy, canInstall, onCheck, onUpdateAll) }
+                val shown = if (showAdded) addedRows else verifiedRows
+                if (showAdded) {
+                    item { AddedIntro(onAddSource) }
+                } else {
+                    item { Summary(rows, checking, busy, canInstall, onCheck, onUpdateAll) }
+                }
                 for (group in Group.entries) {
-                    val inGroup = rows.filter { Group.of(it) == group }
+                    val inGroup = shown.filter { Group.of(it) == group }
                     if (inGroup.isEmpty()) continue
                     item(key = "title-" + group.name) { GroupTitle(stringResource(group.title), inGroup.size) }
-                    cards(inGroup, columns, lang, busy, confirm, canInstall, actions, onCheck, onInstall, onCancel)
+                    cards(inGroup, columns, lang, busy, confirm, canInstall, actions, onCheck, onInstall, onCancel, onDetails)
                 }
-                item { About() }
+                if (!showAdded) item { About() }
             }
         }
     }
@@ -187,8 +208,9 @@ private fun LazyListScope.cards(
     onCheck: () -> Unit,
     onInstall: (AppRow) -> Unit,
     onCancel: () -> Unit,
+    onDetails: (AppRow) -> Unit,
 ) {
-    items(rows.chunked(columns), key = { chunk -> chunk.first().app.packageName }) { chunk ->
+    items(rows.chunked(columns), key = { chunk -> chunk.first().app.key }) { chunk ->
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             for (row in chunk) {
                 val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
@@ -203,6 +225,7 @@ private fun LazyListScope.cards(
                     onRetry = onCheck,
                     onContinue = waiting?.let { c -> { actions.start(c.intent) } },
                     onCancel = onCancel,
+                    onDetails = { onDetails(row) },
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                     stretch = columns > 1,
                 )
@@ -416,6 +439,7 @@ private fun AppCard(
     onRetry: () -> Unit,
     onContinue: (() -> Unit)?,
     onCancel: () -> Unit,
+    onDetails: () -> Unit = {},
     modifier: Modifier = Modifier,
     /** In a row of cards of one height: the lower part goes to the bottom. */
     stretch: Boolean = false,
@@ -429,20 +453,38 @@ private fun AppCard(
     // The release's description, before installing or updating
     val notes = row.latest?.notes.orEmpty()
     val offerNotes = notes.isNotBlank() && (!row.isInstalled || row.hasUpdate)
-    var showNotes by rememberSaveable(row.app.packageName) { mutableStateOf(false) }
+    var showNotes by rememberSaveable(row.app.key) { mutableStateOf(false) }
+    val added = row.app.added
 
+    // Komora's own apps: a plain thin frame. Added by the owner: a dashed frame in the accent, never mistaken
+    val frame = scheme.primary
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = scheme.surface),
-        border = BorderStroke(1.dp, scheme.outlineVariant),
-        modifier = modifier.fillMaxWidth(),
+        border = if (added) null else BorderStroke(1.dp, scheme.outlineVariant),
+        modifier = modifier.fillMaxWidth().then(if (added) Modifier.dashedBorder(frame, 16.dp) else Modifier),
     ) {
         // The icon, what the app is, and its one main action on the right, as in app stores
         Row(Modifier.padding(start = 14.dp, end = 12.dp, top = 14.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
             Spacer(Modifier.width(14.dp))
             // One swipe reads one app
-            Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
+            val details = stringResource(R.string.details)
+            Column(
+                Modifier.weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClickLabel = details, onClick = onDetails)
+                    .semantics(mergeDescendants = true) {},
+            ) {
+                if (added) {
+                    // Said in words too, not only by the frame
+                    Text(
+                        stringResource(R.string.added_by_you),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = scheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
                 Text(name, style = CardTitle, color = scheme.onSurface, modifier = Modifier.semantics { heading() })
                 Text(
                     row.app.summary(lang),
@@ -610,5 +652,64 @@ private fun problemText(p: Problem): String = stringResource(
         Problem.NotNewer -> R.string.err_not_newer
         Problem.OtherKey -> R.string.err_other_key
         Problem.Install -> R.string.err_install
+        Problem.AlreadyInKomora -> R.string.err_already_in_komora
     },
 )
+
+/** A dashed frame: the mark of an app the owner added. */
+private fun Modifier.dashedBorder(color: Color, radius: androidx.compose.ui.unit.Dp): Modifier = drawBehind {
+    val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
+        width = 1.5.dp.toPx(),
+        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 5.dp.toPx())),
+    )
+    val r = radius.toPx()
+    drawRoundRect(color = color, style = stroke, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r))
+}
+
+/** Komora's own list, and the apps the owner added: two tabs with their numbers. */
+@Composable
+private fun Tabs(verified: Int, added: Int, addedTab: Boolean, onChoose: (Boolean) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().background(scheme.surfaceVariant, RoundedCornerShape(50)).padding(4.dp).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        for ((isAdded, label) in listOf(false to stringResource(R.string.tab_verified, verified), true to stringResource(R.string.tab_added, added))) {
+            val selected = isAdded == addedTab
+            Row(
+                Modifier.weight(1f).heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (selected) scheme.surface else Color.Transparent, RoundedCornerShape(50))
+                    .border(1.dp, if (selected) scheme.outline else Color.Transparent, RoundedCornerShape(50))
+                    .selectable(selected, role = Role.Tab) { onChoose(isAdded) }
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+        }
+    }
+}
+
+/** On the "Added by you" tab: what these are, how Komora checks them, and a way to add one. */
+@Composable
+private fun AddedIntro(onAdd: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().dashedBorder(scheme.primary, 16.dp).padding(16.dp),
+    ) {
+        Text(stringResource(R.string.added_intro_title), style = CardTitle, modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(4.dp))
+        Text(stringResource(R.string.added_intro_text), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.add_source)) }
+    }
+}

@@ -47,6 +47,27 @@ object ApkVerifier {
         if (archive.longVersionCode <= installed.longVersionCode) throw ApkRejected.NotNewer
     }
 
+    /** What a downloaded APK says it is, shown to the owner before trusting an added source. */
+    data class Identity(val packageName: String, val certSha256: String, val label: String, val versionName: String?)
+
+    /** The package, the one signing key and the name of a downloaded APK; refused if any is missing. */
+    fun identity(context: Context, apk: File): Identity {
+        val pm = context.packageManager
+        val archive = archiveInfo(pm, apk) ?: throw ApkRejected.Unreadable
+        val signer = archive.signingInfo?.let(::currentSigner) ?: throw ApkRejected.WrongSigner
+        val label = archive.applicationInfo?.let { info ->
+            // The name is read from the file itself
+            info.sourceDir = apk.path
+            info.publicSourceDir = apk.path
+            runCatching { info.loadLabel(pm).toString() }.getOrNull()
+        }.orEmpty().replace(Regex("[\\p{C}]"), "").trim().take(60)
+        return Identity(archive.packageName, signer, label, archive.versionName)
+    }
+
+    /** The installed copy's signing key, or null if not installed (or not visible). */
+    fun installedSigner(context: Context, packageName: String): String? =
+        installedInfo(context.packageManager, packageName)?.signingInfo?.let(::currentSigner)
+
     /** True when the installed copy is signed with the pinned key, so Komora can update it. */
     fun installedMatchesPin(context: Context, app: CatalogApp, installed: PackageInfo): Boolean = try {
         installed.signingInfo?.let(::currentSigner) == pinnedCert(context, app)

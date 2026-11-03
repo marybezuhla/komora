@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import ua.komora.install.ApkVerifier
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.widthIn
@@ -204,6 +205,8 @@ class MainActivity : ComponentActivity() {
                         onNotifySettings = {
                             start(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
                         },
+                        sourcesEnabled = vm.sourcesEnabled.collectAsStateWithLifecycle().value,
+                        onSources = vm::setSourcesEnabled,
                     ) { changed ->
                         look.value = changed
                         LookStore.save(this, changed)
@@ -260,6 +263,17 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: La
     val rows by vm.rows.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val confirm by Installer.confirm.collectAsStateWithLifecycle()
+    val sourcesOn by vm.sourcesEnabled.collectAsStateWithLifecycle()
+    val adding by vm.adding.collectAsStateWithLifecycle()
+    val trust by vm.trust.collectAsStateWithLifecycle()
+    var showAdd by rememberSaveable { mutableStateOf(false) }
+    var detailsKey by rememberSaveable { mutableStateOf<String?>(null) }
+    // The add dialog closes by itself once the source is added
+    var submitted by remember { mutableStateOf(false) }
+    LaunchedEffect(adding) {
+        if (adding is AddState.Working || adding is AddState.Choose) submitted = true
+        else if (adding is AddState.Idle && submitted) { submitted = false; showAdd = false }
+    }
     KomoraList(
         rows, busy, confirm, canInstall, onLook, actions,
         listState = listState,
@@ -267,7 +281,30 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: La
         onInstall = vm::install,
         onCancel = vm::cancelInstall,
         onUpdateAll = vm::updateAll,
+        sourcesEnabled = sourcesOn,
+        onAddSource = { vm.dismissAdding(); showAdd = true },
+        onDetails = { detailsKey = it.app.key },
     )
+    if (showAdd) {
+        AddSourceDialog(adding, onAdd = vm::addSource, onChoose = vm::chooseApk) {
+            vm.dismissAdding()
+            submitted = false
+            showAdd = false
+        }
+    }
+    trust?.let { TrustDialog(it, vm::answerTrust) }
+    val context = LocalContext.current
+    val lang = stringResource(R.string.catalog_lang)
+    rows.firstOrNull { it.app.key == detailsKey }?.let { row ->
+        val key = remember(row.app.key, row.app.certSha256) {
+            runCatching { ApkVerifier.pinnedCert(context, row.app) }.getOrNull()?.takeIf { it.length == 64 }
+        }
+        DetailsSheet(
+            row, lang, key,
+            onRemove = if (row.app.added) ({ vm.removeSource(row.app.repo); detailsKey = null }) else null,
+            onDismiss = { detailsKey = null },
+        )
+    }
 }
 
 /** "Look": light or dark, and the day and night themes, with a way back. */
@@ -282,6 +319,8 @@ internal fun LookPage(
     notifyDenied: Boolean = false,
     onUpdates: (UpdateCheck.Settings) -> Unit = {},
     onNotifySettings: () -> Unit = {},
+    sourcesEnabled: Boolean = false,
+    onSources: (Boolean) -> Unit = {},
     onChange: (Look) -> Unit,
 ) {
     Scaffold(
@@ -309,7 +348,10 @@ internal fun LookPage(
             LookSettings(
                 look, onChange, language, onLanguage,
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
-            ) { UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings) }
+            ) {
+                UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings)
+                SourcesSettings(sourcesEnabled, onSources)
+            }
         }
     }
 }
@@ -365,5 +407,15 @@ private fun SwitchRow(title: String, summary: String?, checked: Boolean, onChang
             }
         }
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/** "Other sources": off by default; turning it on shows the second tab, with a plain warning. */
+@Composable
+private fun SourcesSettings(enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Spacer(Modifier.height(8.dp))
+    SectionTitle(stringResource(R.string.sources_title))
+    Group {
+        SwitchRow(stringResource(R.string.sources_switch), stringResource(R.string.sources_summary), enabled, onChange)
     }
 }

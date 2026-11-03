@@ -29,8 +29,24 @@ object GitHub {
     private const val TIMEOUT_MS = 20_000
     private const val MAX_REDIRECTS = 5
 
+    /** The newest release of an app: for Komora's own list by the APK's name, for added sources by its pattern. */
+    fun latestRelease(app: ua.komora.catalog.CatalogApp): Release {
+        val (tag, assets, notes) = latest(app.repo)
+        val apk = app.apkPattern?.let { Rules.pickByPattern(assets, it, app.repo) } ?: Rules.pickApk(assets, app.assetPrefix, app.repo)
+        return Release(tag = tag, apk = apk, notes = notes)
+    }
+
+    /** Every APK in a repository's newest release, to choose one when adding it as a source. */
+    fun latestApks(repo: String): List<Rules.Asset> =
+        latest(repo).second.filter { it.name.endsWith(".apk") && it.url.startsWith("https://github.com/$repo/releases/download/") }
+
     /** The newest published (not draft, not pre-release) release of [repo], with its one APK. */
     fun latestRelease(repo: String, assetPrefix: String): Release {
+        val (tag, assets, notes) = latest(repo)
+        return Release(tag = tag, apk = Rules.pickApk(assets, assetPrefix, repo), notes = notes)
+    }
+
+    private fun latest(repo: String): Triple<String, List<Rules.Asset>, String> {
         val body = open("https://api.github.com/repos/$repo/releases/latest", api = true).use { conn ->
             readLimited(conn.inputStream, Rules.MAX_JSON_BYTES)
         }
@@ -53,7 +69,7 @@ object GitHub {
             // Absurdly nested JSON: never a crash
             throw BadReleaseException("Unreadable release")
         }
-        return Release(tag = tag, apk = Rules.pickApk(assets, assetPrefix, repo), notes = notes)
+        return Triple(tag, assets, notes)
     }
 
     /**

@@ -51,6 +51,23 @@ object Rules {
         return asset
     }
 
+    /** For added sources: the one APK whose name matches the pattern chosen when the source was added. */
+    fun pickByPattern(assets: List<Asset>, pattern: String, repo: String): Asset {
+        val name = try { Regex(pattern) } catch (_: Exception) { throw BadReleaseException("Bad pattern") }
+        val matching = assets.filter { name.matches(it.name) }
+        if (matching.size != 1) throw BadReleaseException("Expected exactly one matching APK, found ${matching.size}")
+        val asset = matching.single()
+        if (!asset.url.startsWith("https://github.com/$repo/releases/download/")) throw BadReleaseException("APK link outside the repository")
+        if (asset.size !in 1..MAX_APK_BYTES) throw BadReleaseException("APK size out of range")
+        return asset
+    }
+
+    /** "app-1.2.3-universal.apk" -> a pattern that also matches the next versions' names. */
+    fun patternFor(assetName: String): String =
+        assetName.split(Regex("[0-9]+")).joinToString("[0-9]+") { part ->
+            part.map { c -> if (c in "\\.^$|?*+()[]{}-") "\\$c" else c.toString() }.joinToString("")
+        }
+
     /** GitHub gives a file's checksum as "sha256:<hex>"; anything else is treated as not given. */
     fun parseDigest(digest: String?): String? {
         if (digest == null || !digest.startsWith("sha256:")) return null

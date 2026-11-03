@@ -20,14 +20,18 @@
     <!-- Removed even if a library asks for them -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" tools:node="remove" />
 
-    <!-- Komora sees only the apps in its own catalog, not the whole phone.
-         Must match assets/catalog.json (a unit test checks this). -->
+    <!-- Komora sees the apps in its own catalog (must match assets/catalog.json; a unit test checks this)
+         and, for sources the owner adds, apps that have a launcher icon: never services or system parts. -->
     <queries>
         <package android:name="ua.tarilka" />
         <package android:name="ua.mandat" />
         <package android:name="ua.sprotyv" />
         <package android:name="ua.pysanka" />
         <package android:name="ua.svitlyna" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
 
     <application

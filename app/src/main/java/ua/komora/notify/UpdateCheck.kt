@@ -14,6 +14,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import ua.komora.R
 import ua.komora.catalog.Catalog
+import ua.komora.catalog.Sources
 import ua.komora.install.ApkVerifier
 import ua.komora.net.GitHub
 import ua.komora.net.NoReleaseException
@@ -26,8 +27,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Update notices, off unless the owner turns them on: once a day, in the background, Komora asks
- * GitHub about every app in its list (the same questions as when it is opened, so they say nothing
- * about what is installed) and says when an app on this phone has a newer version. It only tells;
+ * GitHub about every app in its list and the trusted sources the owner added (the same questions as
+ * when it is opened, so they say nothing about what is installed) and says when an app on this phone has a newer version. It only tells;
  * installing still happens in Komora, with every check.
  */
 object UpdateCheck {
@@ -101,14 +102,17 @@ object UpdateCheck {
         val context = AppLanguage.wrap(base)
         // Notices turned off in Android: no point asking GitHub at all
         if (!canNotify(context)) return true
-        val catalog = Catalog.parse(context.assets.open("catalog.json").bufferedReader().use { it.readText() })
+        val builtIn = Catalog.parse(context.assets.open("catalog.json").bufferedReader().use { it.readText() })
+        // Added sources only when shown, and only once trusted (their package and key are known)
+        val added = if (Sources.enabled(context)) Sources.load(context).filter { it.trusted }.map { it.toApp() } else emptyList()
+        val catalog = builtIn + added.filter { a -> builtIn.none { it.packageName == a.packageName } }
         val lang = context.getString(R.string.catalog_lang)
         val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         val updates = mutableListOf<Triple<String, String, String>>() // key, version, "Name 1.2.3"
         for (app in catalog) {
             if (stopped()) return true
             val release = try {
-                GitHub.latestRelease(app.repo, app.assetPrefix)
+                GitHub.latestRelease(app)
             } catch (_: RateLimitException) {
                 break
             } catch (_: NoReleaseException) {
