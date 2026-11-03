@@ -41,6 +41,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.Bitmap
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.Image
@@ -339,6 +345,33 @@ private fun About() {
 }
 
 /**
+ * An installed app's icon, drawn round like the bundled ones: the two layers of an adaptive icon are
+ * drawn in full and the middle cut out as a circle, so every launcher style looks the same here.
+ */
+private fun installedIcon(context: Context, packageName: String, px: Int): ImageBitmap? = try {
+    val drawable = context.packageManager.getApplicationIcon(packageName)
+    val bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val circle = android.graphics.Path().apply { addCircle(px / 2f, px / 2f, px / 2f, android.graphics.Path.Direction.CW) }
+    canvas.clipPath(circle)
+    if (drawable is AdaptiveIconDrawable) {
+        // A layer is 108 dp, of which the middle 72 dp is the visible icon
+        val full = px * 1.5f
+        val offset = ((px - full) / 2f).toInt()
+        for (layer in listOfNotNull(drawable.background, drawable.foreground)) {
+            layer.setBounds(offset, offset, offset + full.toInt(), offset + full.toInt())
+            layer.draw(canvas)
+        }
+    } else {
+        drawable.setBounds(0, 0, px, px)
+        drawable.draw(canvas)
+    }
+    bitmap.asImageBitmap()
+} catch (_: Exception) {
+    null
+}
+
+/**
  * Each app's own icon, copied from its repository into Komora (round, as most launchers show it).
  * Listed by hand, not looked up by name, so the build's resource shrinking keeps them.
  */
@@ -351,9 +384,24 @@ private val APP_ICONS = mapOf(
     "ua.svitlyna" to R.drawable.app_icon_svitlyna,
 )
 
-/** The app's icon; an app without one gets a small square with its first letters. Decoration only. */
+/**
+ * The app's icon. Once installed, it comes from the app itself on this phone, so a new icon shows as
+ * soon as the app is updated; before that, the copy bundled in Komora. An app with neither gets a
+ * small square with its first letters. Decoration only.
+ */
 @Composable
-private fun AppIcon(packageName: String, name: String, color: Long) {
+private fun AppIcon(packageName: String, name: String, color: Long, installedVersion: String?) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val px = with(density) { 44.dp.roundToPx() }
+    // Read again whenever the installed version changes (an update may bring a new icon)
+    val installed = remember(packageName, installedVersion) {
+        if (installedVersion == null) null else installedIcon(context, packageName, px)
+    }
+    if (installed != null) {
+        Image(installed, contentDescription = null, modifier = Modifier.size(44.dp).clearAndSetSemantics { })
+        return
+    }
     val icon = APP_ICONS[packageName]
     if (icon != null) {
         Image(
@@ -399,7 +447,7 @@ private fun AppCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(start = 14.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Top) {
-            AppIcon(row.app.packageName, name, row.app.badge)
+            AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
             Spacer(Modifier.width(12.dp))
             // One swipe reads one app
             Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
