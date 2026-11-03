@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -150,26 +151,34 @@ private fun SectionTitle(text: String) {
     )
 }
 
+/** All themes at once, three in a row: none hides behind the edge of the screen. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ThemeRow(themes: List<Theme>, chosen: Theme, onChoose: (Theme) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        for (theme in themes) {
-            val selected = theme == chosen
-            Column(
-                Modifier.width(120.dp).selectable(selected, role = Role.RadioButton) { onChoose(theme) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Sample(theme, selected)
-                Text(
-                    themeName(theme),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val gap = 10.dp
+        val width = (maxWidth - gap * 2) / 3
+        FlowRow(
+            Modifier.fillMaxWidth().selectableGroup().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            for (theme in themes) {
+                val selected = theme == chosen
+                Column(
+                    Modifier.width(width).selectable(selected, role = Role.RadioButton) { onChoose(theme) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Sample(theme, selected)
+                    Text(
+                        themeName(theme),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
             }
         }
     }
