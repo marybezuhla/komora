@@ -162,4 +162,7 @@ class ScreensTest {
 
     @Config(qualifiers = "uk-w1280dp-h800dp-mdpi")
     @Test fun tabletSettings() = shot("18-tablet-settings", Theme.SYSTEM) { LookPage(Look(), onBack = {}) {} }
+
+    @Config(qualifiers = "uk-w800dp-h1280dp-mdpi")
+    @Test fun tabletUpright() = list("19-tablet-upright", Theme.PODILLIA)
 }

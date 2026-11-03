@@ -90,6 +90,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -316,9 +317,16 @@ internal fun KomoraList(
             }
         },
     ) { padding ->
-        // One column on a phone; two or more on a tablet or an unfolded phone, each card at least 340 dp
+        // One column on a phone; two on an unfolded Galaxy Fold / Pixel Fold or an upright tablet;
+        // three on a tablet held sideways
+        val width = LocalConfiguration.current.screenWidthDp
+        val columns = when {
+            width >= 1000 -> 3
+            width >= 600 -> 2
+            else -> 1
+        }
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 340.dp),
+            columns = GridCells.Fixed(columns),
             state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
