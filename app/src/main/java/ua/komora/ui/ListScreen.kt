@@ -70,7 +70,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -163,12 +162,7 @@ internal fun KomoraList(
     ) { padding ->
         // One column on a phone; two on an unfolded Galaxy Fold / Pixel Fold or an upright tablet;
         // three on a tablet held sideways
-        val width = LocalConfiguration.current.screenWidthDp
-        val columns = when {
-            width >= 1000 -> 3
-            width >= 600 -> 2
-            else -> 1
-        }
+        val columns = columnsFor(LocalConfiguration.current.screenWidthDp)
         // Pull the list down to check for updates
         PullToRefreshBox(isRefreshing = checking, onRefresh = onCheck, modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
@@ -430,6 +424,12 @@ private fun StatusPill(row: AppRow) {
     )
 }
 
+private fun columnsFor(width: Int) = when {
+    width >= 1000 -> 3
+    width >= 600 -> 2
+    else -> 1
+}
+
 @Composable
 private fun AppCard(
     row: AppRow,
@@ -469,8 +469,11 @@ private fun AppCard(
     ) {
         // The icon, what the app is, and its one main action on the right, as in app stores. On a narrow
         // screen or with a large font there is no room beside the text: the action goes under it instead
-        BoxWithConstraints {
-        val roomy = maxWidth.value / LocalDensity.current.fontScale >= 330f
+        // (Worked out from the screen: a card's own size cannot be asked for in a row of cards of one height)
+        val screen = LocalConfiguration.current.screenWidthDp
+        val cols = columnsFor(screen)
+        val cardWidth = (screen - 32 - 10 * (cols - 1)) / cols
+        val roomy = cardWidth / LocalDensity.current.fontScale >= 320f
         Row(Modifier.padding(start = 14.dp, end = 12.dp, top = 14.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
             Spacer(Modifier.width(14.dp))
@@ -527,7 +530,6 @@ private fun AppCard(
                 Spacer(Modifier.width(8.dp))
                 MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen)
             }
-        }
         }
 
         val secondary = retry || problem == Problem.OtherKey
