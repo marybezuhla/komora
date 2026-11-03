@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ua.komora.R
+import ua.komora.ui.AppLanguage
 
 /** Remembers the look on this phone only. Never needed for anything to work: unreadable means the defaults. */
 object LookStore {
@@ -82,8 +83,25 @@ fun themeName(theme: Theme): String = stringResource(
 
 /** Light or dark, then the day and the night theme as small pictures of Komora; a tap chooses. */
 @Composable
-fun LookSettings(look: Look, onChange: (Look) -> Unit, modifier: Modifier = Modifier) {
+fun LookSettings(
+    look: Look,
+    onChange: (Look) -> Unit,
+    language: AppLanguage.Choice,
+    onLanguage: (AppLanguage.Choice) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(stringResource(R.string.app_language))
+        Segments(
+            options = listOf(
+                AppLanguage.Choice.AUTO to R.string.mode_auto,
+                AppLanguage.Choice.UK to R.string.lang_uk,
+                AppLanguage.Choice.EN to R.string.lang_en,
+            ),
+            chosen = language,
+            onChoose = onLanguage,
+        )
+        Spacer(Modifier.height(8.dp))
         SectionTitle(stringResource(R.string.look_mode))
         Segments(
             options = listOf(Mode.AUTO to R.string.mode_auto, Mode.LIGHT to R.string.mode_light, Mode.DARK to R.string.mode_dark),
