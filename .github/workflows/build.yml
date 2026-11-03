@@ -167,7 +167,9 @@ jobs:
           CERT="$(tr -d '[:space:]' < signing/certificate-sha256.txt)"
           [[ "$CERT" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::Bad signing/certificate-sha256.txt"; exit 1; }
           "$BT/apksigner" verify --print-certs "$OUT" | tee certs.txt
-          DIGESTS="$({ grep -iE "^Signer #[0-9]+ certificate SHA-256 digest:" certs.txt || true; } | sed -E 's/.*digest: *//' | tr -d ' ' | tr 'A-F' 'a-f')"
+          # Older apksigner prints "Signer #1 certificate ...", newer "V3.0 Signer: certificate ...".
+          # Each signing scheme may repeat the same certificate; any second, different one fails.
+          DIGESTS="$({ grep -iE "Signer[^:]*:? *certificate SHA-256 digest:" certs.txt || true; } | sed -E 's/.*digest: *//' | tr -d ' ' | tr 'A-F' 'a-f' | sort -u)"
           if [ "$DIGESTS" != "$CERT" ]; then
             echo "::error::Unexpected signing certificate"; exit 1
           fi
