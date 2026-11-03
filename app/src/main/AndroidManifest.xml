@@ -39,10 +39,14 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Komora">
 
+        <!-- Folding, unfolding, turning or resizing just redraws the screen (no restart, no flash).
+             Language changes still restart it, as Android expects. -->
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

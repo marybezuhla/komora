@@ -28,8 +28,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,8 +43,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.Crossfade
 import ua.komora.ui.theme.SectionTitle
@@ -87,6 +90,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -313,6 +317,14 @@ internal fun KomoraList(
             }
         },
     ) { padding ->
+        // One column on a phone; two on an unfolded Galaxy Fold / Pixel Fold or an upright tablet;
+        // three on a tablet held sideways
+        val width = LocalConfiguration.current.screenWidthDp
+        val columns = when {
+            width >= 1000 -> 3
+            width >= 600 -> 2
+            else -> 1
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
@@ -366,20 +378,32 @@ internal fun KomoraList(
                     }
                 }
             }
-            items(rows, key = { it.app.packageName }) { row ->
-                val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
-                AppCard(
-                    row = row,
-                    lang = lang,
-                    canGet = canInstall && !busy && row.latest != null,
-                    canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
-                    onInstall = { onInstall(row) },
-                    onOpen = { actions.open(row.app.packageName) },
-                    onAppSettings = { actions.appSettings(row.app.packageName) },
-                    onRetry = onCheck,
-                    onContinue = waiting?.let { c -> { actions.start(c.intent) } },
-                    onCancel = onCancel,
-                )
+            // Cards side by side share one height, with their buttons on one line at the bottom
+            items(rows.chunked(columns), key = { chunk -> chunk.first().app.packageName }) { chunk ->
+                Row(
+                    Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    for (row in chunk) {
+                        val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
+                        AppCard(
+                            row = row,
+                            lang = lang,
+                            canGet = canInstall && !busy && row.latest != null,
+                            canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
+                            onInstall = { onInstall(row) },
+                            onOpen = { actions.open(row.app.packageName) },
+                            onAppSettings = { actions.appSettings(row.app.packageName) },
+                            onRetry = onCheck,
+                            onContinue = waiting?.let { c -> { actions.start(c.intent) } },
+                            onCancel = onCancel,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            stretch = columns > 1,
+                        )
+                    }
+                    // An incomplete last row keeps the same card width
+                    repeat(columns - chunk.size) { Spacer(Modifier.weight(1f)) }
+                }
             }
             item { About() }
         }
@@ -390,7 +414,9 @@ internal fun KomoraList(
 private fun About() {
     val uri = LocalUriHandler.current
     val note = MaterialTheme.colorScheme.onSurfaceVariant
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    // On a wide screen the notes keep a readable line length, in the middle
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    Column(Modifier.widthIn(max = 600.dp).fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(stringResource(R.string.footer), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.footer_permissions), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
@@ -405,6 +431,7 @@ private fun About() {
             TextButton(onClick = { runCatching { uri.openUri(SOURCE_URL) } }) { Text(stringResource(R.string.source_code)) }
             TextButton(onClick = { runCatching { uri.openUri(LICENSE_URL) } }) { Text(stringResource(R.string.license)) }
         }
+    }
     }
 }
 
@@ -500,6 +527,9 @@ private fun AppCard(
     onRetry: () -> Unit,
     onContinue: (() -> Unit)?,
     onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** In a row of cards of one height: the buttons go to the bottom. */
+    stretch: Boolean = false,
 ) {
     val name = row.app.name(lang)
     val scheme = MaterialTheme.colorScheme
@@ -508,7 +538,7 @@ private fun AppCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = scheme.surface),
         border = BorderStroke(1.dp, scheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(start = 14.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Top) {
             AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
@@ -537,6 +567,8 @@ private fun AppCard(
         var showNotes by rememberSaveable(row.app.packageName) { mutableStateOf(false) }
         val anyAction = !row.isInstalled || row.hasUpdate || problem == Problem.OtherKey || canOpen || retry || offerNotes
         val below = problem != null || !idle || anyAction
+
+        if (stretch) Spacer(Modifier.weight(1f))
 
         // Everything below lines up with the name, not with the coloured square
         Column(Modifier.padding(start = 70.dp, end = 16.dp, top = if (below) 10.dp else 0.dp, bottom = 14.dp)) {
@@ -730,10 +762,16 @@ internal fun LookPage(
             }
         },
     ) { padding ->
-        LookSettings(
-            look, onChange, language, onLanguage,
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
-        ) { UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings) }
+        // On a tablet or an unfolded phone: a readable column in the middle, not stretched edge to edge
+        Box(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            LookSettings(
+                look, onChange, language, onLanguage,
+                Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
+            ) { UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings) }
+        }
     }
 }
 
