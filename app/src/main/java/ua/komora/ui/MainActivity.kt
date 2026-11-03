@@ -1,5 +1,6 @@
 package ua.komora.ui
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -40,6 +41,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.Bitmap
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.Image
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.width
@@ -99,6 +109,10 @@ class MainActivity : ComponentActivity() {
     /** Light or dark, and the day and night themes; remembered on this phone only. */
     private val look = mutableStateOf(Look())
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -130,7 +144,12 @@ class MainActivity : ComponentActivity() {
             BackHandler(enabled = showLook) { showLook = false }
             KomoraTheme(theme) {
                 if (showLook) {
-                    LookPage(look.value, onBack = { showLook = false }) { changed ->
+                    LookPage(
+                        look.value,
+                        onBack = { showLook = false },
+                        language = AppLanguage.current(this),
+                        onLanguage = { AppLanguage.set(this, it) },
+                    ) { changed ->
                         look.value = changed
                         LookStore.save(this, changed)
                     }
@@ -325,11 +344,75 @@ private fun About() {
     }
 }
 
-/** A small square with the app's first letters in its own colour, in place of an icon. Decoration only. */
+/**
+ * An installed app's icon, drawn round like the bundled ones: the two layers of an adaptive icon are
+ * drawn in full and the middle cut out as a circle, so every launcher style looks the same here.
+ */
+private fun installedIcon(context: Context, packageName: String, px: Int): ImageBitmap? = try {
+    val drawable = context.packageManager.getApplicationIcon(packageName)
+    val bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val circle = android.graphics.Path().apply { addCircle(px / 2f, px / 2f, px / 2f, android.graphics.Path.Direction.CW) }
+    canvas.clipPath(circle)
+    if (drawable is AdaptiveIconDrawable) {
+        // A layer is 108 dp, of which the middle 72 dp is the visible icon
+        val full = px * 1.5f
+        val offset = ((px - full) / 2f).toInt()
+        for (layer in listOfNotNull(drawable.background, drawable.foreground)) {
+            layer.setBounds(offset, offset, offset + full.toInt(), offset + full.toInt())
+            layer.draw(canvas)
+        }
+    } else {
+        drawable.setBounds(0, 0, px, px)
+        drawable.draw(canvas)
+    }
+    bitmap.asImageBitmap()
+} catch (_: Exception) {
+    null
+}
+
+/**
+ * Each app's own icon, copied from its repository into Komora (round, as most launchers show it).
+ * Listed by hand, not looked up by name, so the build's resource shrinking keeps them.
+ */
+private val APP_ICONS = mapOf(
+    "ua.komora" to R.drawable.app_icon_komora,
+    "ua.tarilka" to R.drawable.app_icon_tarilka,
+    "ua.mandat" to R.drawable.app_icon_mandat,
+    "ua.sprotyv" to R.drawable.app_icon_sprotyv,
+    "ua.pysanka" to R.drawable.app_icon_pysanka,
+    "ua.svitlyna" to R.drawable.app_icon_svitlyna,
+)
+
+/**
+ * The app's icon. Once installed, it comes from the app itself on this phone, so a new icon shows as
+ * soon as the app is updated; before that, the copy bundled in Komora. An app with neither gets a
+ * small square with its first letters. Decoration only.
+ */
 @Composable
-private fun Badge(name: String, color: Long) {
+private fun AppIcon(packageName: String, name: String, color: Long, installedVersion: String?) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val px = with(density) { 44.dp.roundToPx() }
+    // Read again whenever the installed version changes (an update may bring a new icon)
+    val installed = remember(packageName, installedVersion) {
+        if (installedVersion == null) null else installedIcon(context, packageName, px)
+    }
+    if (installed != null) {
+        Image(installed, contentDescription = null, modifier = Modifier.size(44.dp).clearAndSetSemantics { })
+        return
+    }
+    val icon = APP_ICONS[packageName]
+    if (icon != null) {
+        Image(
+            painterResource(icon),
+            contentDescription = null,
+            modifier = Modifier.size(44.dp).clip(CircleShape).clearAndSetSemantics { },
+        )
+        return
+    }
     Box(
-        Modifier.size(42.dp).background(androidx.compose.ui.graphics.Color(color), RoundedCornerShape(10.dp)).clearAndSetSemantics { },
+        Modifier.size(44.dp).background(androidx.compose.ui.graphics.Color(color), RoundedCornerShape(10.dp)).clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -364,7 +447,7 @@ private fun AppCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(start = 14.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Top) {
-            Badge(name, row.app.badge)
+            AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
             Spacer(Modifier.width(12.dp))
             // One swipe reads one app
             Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
@@ -388,7 +471,7 @@ private fun AppCard(
         val below = problem != null || !idle || anyAction
 
         // Everything below lines up with the name, not with the coloured square
-        Column(Modifier.padding(start = 68.dp, end = 16.dp, top = if (below) 10.dp else 0.dp, bottom = 14.dp)) {
+        Column(Modifier.padding(start = 70.dp, end = 16.dp, top = if (below) 10.dp else 0.dp, bottom = 14.dp)) {
             problem?.let {
                 // A sign as well as the colour: in red themes the error and the accent are close
                 Row(verticalAlignment = Alignment.Top) {
@@ -533,7 +616,13 @@ private fun problemText(p: Problem): String = stringResource(
 /** "Look": light or dark, and the day and night themes, with a way back. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun LookPage(look: Look, onBack: () -> Unit, onChange: (Look) -> Unit) {
+internal fun LookPage(
+    look: Look,
+    onBack: () -> Unit,
+    language: AppLanguage.Choice = AppLanguage.Choice.AUTO,
+    onLanguage: (AppLanguage.Choice) -> Unit = {},
+    onChange: (Look) -> Unit,
+) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -552,7 +641,7 @@ internal fun LookPage(look: Look, onBack: () -> Unit, onChange: (Look) -> Unit) 
         },
     ) { padding ->
         LookSettings(
-            look, onChange,
+            look, onChange, language, onLanguage,
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
         )
     }

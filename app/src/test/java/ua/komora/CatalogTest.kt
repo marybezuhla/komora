@@ -69,4 +69,13 @@ class CatalogTest {
     fun badgesAreOpaqueColours() {
         for (app in Catalog.parse(catalogJson)) assertEquals(0xFFL, app.badge ushr 24)
     }
+
+    @Test
+    fun everyAppHasItsIcon() {
+        val ui = File("src/main/java/ua/komora/ui/MainActivity.kt").readText()
+        for (app in Catalog.parse(catalogJson)) {
+            assertTrue("${app.packageName} has no icon", ui.contains("\"${app.packageName}\" to R.drawable.app_icon_${app.assetPrefix}"))
+            assertTrue("missing picture for ${app.assetPrefix}", File("src/main/res/drawable-nodpi/app_icon_${app.assetPrefix}.png").exists())
+        }
+    }
 }
