@@ -43,13 +43,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.Crossfade
 import ua.komora.ui.theme.SectionTitle
@@ -190,7 +190,7 @@ class MainActivity : ComponentActivity() {
             var showLook by rememberSaveable { mutableStateOf(false) }
             BackHandler(enabled = showLook) { showLook = false }
             // Kept while Settings is open, so the list comes back exactly where it was
-            val listState = rememberLazyGridState()
+            val listState = rememberLazyListState()
             KomoraTheme(theme) {
                 // A short fade between the list and Settings, instead of a flash
                 Crossfade(targetState = showLook, animationSpec = tween(120), label = "page") { settings ->
@@ -258,7 +258,7 @@ internal class Actions(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: LazyGridState, onLook: () -> Unit, actions: Actions) {
+private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: LazyListState, onLook: () -> Unit, actions: Actions) {
     val rows by vm.rows.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val confirm by Installer.confirm.collectAsStateWithLifecycle()
@@ -284,7 +284,7 @@ internal fun KomoraList(
     onCheck: () -> Unit,
     onInstall: (AppRow) -> Unit,
     onCancel: () -> Unit,
-    listState: LazyGridState = rememberLazyGridState(),
+    listState: LazyListState = rememberLazyListState(),
 ) {
     // Same language as the rest of the screen (Android picks the strings; the catalog follows them)
     val lang = stringResource(R.string.catalog_lang)
@@ -325,16 +325,14 @@ internal fun KomoraList(
             width >= 600 -> 2
             else -> 1
         }
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(columns),
+        LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (!canInstall) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item {
                     // The one thing to do first: framed in the accent
                     Card(
                         shape = RoundedCornerShape(16.dp),
@@ -361,7 +359,7 @@ internal fun KomoraList(
                     }
                 }
             }
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item {
                 // "Apps · 6" on the left, the check on the right
                 Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -380,22 +378,34 @@ internal fun KomoraList(
                     }
                 }
             }
-            items(rows, key = { it.app.packageName }) { row ->
-                val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
-                AppCard(
-                    row = row,
-                    lang = lang,
-                    canGet = canInstall && !busy && row.latest != null,
-                    canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
-                    onInstall = { onInstall(row) },
-                    onOpen = { actions.open(row.app.packageName) },
-                    onAppSettings = { actions.appSettings(row.app.packageName) },
-                    onRetry = onCheck,
-                    onContinue = waiting?.let { c -> { actions.start(c.intent) } },
-                    onCancel = onCancel,
-                )
+            // Cards side by side share one height, with their buttons on one line at the bottom
+            items(rows.chunked(columns), key = { chunk -> chunk.first().app.packageName }) { chunk ->
+                Row(
+                    Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    for (row in chunk) {
+                        val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
+                        AppCard(
+                            row = row,
+                            lang = lang,
+                            canGet = canInstall && !busy && row.latest != null,
+                            canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
+                            onInstall = { onInstall(row) },
+                            onOpen = { actions.open(row.app.packageName) },
+                            onAppSettings = { actions.appSettings(row.app.packageName) },
+                            onRetry = onCheck,
+                            onContinue = waiting?.let { c -> { actions.start(c.intent) } },
+                            onCancel = onCancel,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            stretch = columns > 1,
+                        )
+                    }
+                    // An incomplete last row keeps the same card width
+                    repeat(columns - chunk.size) { Spacer(Modifier.weight(1f)) }
+                }
             }
-            item(span = { GridItemSpan(maxLineSpan) }) { About() }
+            item { About() }
         }
     }
 }
@@ -517,6 +527,9 @@ private fun AppCard(
     onRetry: () -> Unit,
     onContinue: (() -> Unit)?,
     onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** In a row of cards of one height: the buttons go to the bottom. */
+    stretch: Boolean = false,
 ) {
     val name = row.app.name(lang)
     val scheme = MaterialTheme.colorScheme
@@ -525,7 +538,7 @@ private fun AppCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = scheme.surface),
         border = BorderStroke(1.dp, scheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(start = 14.dp, end = 16.dp, top = 14.dp), verticalAlignment = Alignment.Top) {
             AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
@@ -554,6 +567,8 @@ private fun AppCard(
         var showNotes by rememberSaveable(row.app.packageName) { mutableStateOf(false) }
         val anyAction = !row.isInstalled || row.hasUpdate || problem == Problem.OtherKey || canOpen || retry || offerNotes
         val below = problem != null || !idle || anyAction
+
+        if (stretch) Spacer(Modifier.weight(1f))
 
         // Everything below lines up with the name, not with the coloured square
         Column(Modifier.padding(start = 70.dp, end = 16.dp, top = if (below) 10.dp else 0.dp, bottom = 14.dp)) {
