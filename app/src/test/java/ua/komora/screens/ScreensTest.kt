@@ -36,6 +36,7 @@ import ua.komora.ui.Actions
 import ua.komora.ui.AppRow
 import ua.komora.ui.KomoraList
 import ua.komora.ui.LookPage
+import ua.komora.ui.AboutPage
 import ua.komora.ui.SourcesWarning
 import ua.komora.ui.Phase
 import ua.komora.ui.Problem
@@ -275,5 +276,21 @@ class ScreensTest {
     @Config(qualifiers = "+night")
     @Test fun sourcesWarningDark() = shot("32-sources-warning-dark", Theme.SYSTEM_DARK) {
         SourcesWarning(onAgree = {}, onDismiss = {})
+    }
+
+    // "About Komora": the author's word, support links, facts; tall, to see all of it
+    @Config(qualifiers = "uk-w400dp-h3600dp-xhdpi")
+    @Test fun about() = shot("33-about", Theme.SYSTEM) { AboutPage(onBack = {}) }
+
+    @Config(qualifiers = "en-w400dp-h3600dp-xhdpi")
+    @Test fun aboutEnglish() = shot("34-about-english", Theme.PODILLIA) { AboutPage(onBack = {}) }
+
+    @Config(qualifiers = "uk-w400dp-h1200dp-xhdpi")
+    @Test fun detailsWithReport() = shot("35-details-report", Theme.SYSTEM) {
+        DetailsSheet(rows[1], "uk", rows[1].app.certSha256, onRemove = null, onDismiss = {})
+    }
+
+    @Test fun settingsAboutRow() = shot("36-settings-about-row", Theme.SYSTEM) {
+        LookPage(Look(), onBack = {}, sourcesEnabled = true) {}
     }
 }
