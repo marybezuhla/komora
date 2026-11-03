@@ -35,4 +35,10 @@ class ReleaseNotesTest {
         assertTrue(long.length <= ReleaseNotes.MAX_CHARS + 1)
         assertTrue(long.endsWith("…"))
     }
+
+    @Test
+    fun noHtmlPicturesOrDirectionMarks() {
+        val body = "<!-- hidden -->\n<details><summary>Більше</summary>\nТекст\u202Eзворотний\n![pic](https://x/y.png)\n</details>"
+        assertEquals("Більше\nТекстзворотний", ReleaseNotes.clean(body))
+    }
 }

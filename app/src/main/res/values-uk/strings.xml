@@ -71,4 +71,5 @@
     <string name="notify_denied">Android не дозволяє Коморі показувати сповіщення. Їх можна дозволити в налаштуваннях телефона.</string>
     <string name="notification_channel">Оновлення застосунків</string>
     <string name="notification_title">Є оновлення</string>
+    <string name="notify_settings">Налаштування сповіщень</string>
 </resources>

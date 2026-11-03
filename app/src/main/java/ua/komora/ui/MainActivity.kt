@@ -2,6 +2,8 @@ package ua.komora.ui
 
 import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -128,13 +130,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setUpdates(s: UpdateCheck.Settings) {
-        if (s.enabled && !updates.value.enabled && !UpdateCheck.canNotify(this)) {
-            askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (s.enabled && !UpdateCheck.canNotify(this)) {
+            // Android asks only before the first refusal; after that, the note offers its settings
+            if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                notifyDenied.value = true
+            }
             return
         }
         notifyDenied.value = false
-        updates.value = s
+        // If Android refuses the daily check, the switch stays off
         UpdateCheck.apply(this, s)
+        updates.value = UpdateCheck.settings(this)
     }
 
     override fun attachBaseContext(newBase: Context) {
@@ -147,6 +155,7 @@ class MainActivity : ComponentActivity() {
         look.value = LookStore.load(this)
         updates.value = UpdateCheck.settings(this)
         UpdateCheck.ensure(this)
+        UpdateCheck.createChannel(this)
         // Android's confirmation screen opens only while Komora is in front
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -182,6 +191,9 @@ class MainActivity : ComponentActivity() {
                         updates = updates.value,
                         notifyDenied = notifyDenied.value,
                         onUpdates = ::setUpdates,
+                        onNotifySettings = {
+                            start(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+                        },
                     ) { changed ->
                         look.value = changed
                         LookStore.save(this, changed)
@@ -216,6 +228,8 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         canInstall.value = packageManager.canRequestPackageInstalls()
+        // Notices turned off in Android since: say so next to the switch
+        notifyDenied.value = updates.value.enabled && !UpdateCheck.canNotify(this)
         vm.refreshInstalled()
     }
 }
@@ -679,6 +693,7 @@ internal fun LookPage(
     updates: UpdateCheck.Settings = UpdateCheck.Settings(),
     notifyDenied: Boolean = false,
     onUpdates: (UpdateCheck.Settings) -> Unit = {},
+    onNotifySettings: () -> Unit = {},
     onChange: (Look) -> Unit,
 ) {
     Scaffold(
@@ -701,13 +716,18 @@ internal fun LookPage(
         LookSettings(
             look, onChange, language, onLanguage,
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
-        ) { UpdateSettings(updates, notifyDenied, onUpdates) }
+        ) { UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings) }
     }
 }
 
 /** "Updates": notices on or off, and whether the daily check may use mobile data. */
 @Composable
-private fun UpdateSettings(s: UpdateCheck.Settings, denied: Boolean, onChange: (UpdateCheck.Settings) -> Unit) {
+private fun UpdateSettings(
+    s: UpdateCheck.Settings,
+    denied: Boolean,
+    onChange: (UpdateCheck.Settings) -> Unit,
+    onNotifySettings: () -> Unit,
+) {
     Spacer(Modifier.height(8.dp))
     SectionTitle(stringResource(R.string.updates_title))
     Group {
@@ -722,8 +742,10 @@ private fun UpdateSettings(s: UpdateCheck.Settings, denied: Boolean, onChange: (
                     stringResource(R.string.notify_denied),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
                 )
+                TextButton(onClick = onNotifySettings) { Text(stringResource(R.string.notify_settings)) }
             }
             if (s.enabled) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

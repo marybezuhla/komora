@@ -73,4 +73,5 @@
     <string name="notify_denied">Android does not allow Komora\'s notifications. They can be allowed in the phone\'s settings.</string>
     <string name="notification_channel">App updates</string>
     <string name="notification_title">Updates are ready</string>
+    <string name="notify_settings">Notification settings</string>
 </resources>
