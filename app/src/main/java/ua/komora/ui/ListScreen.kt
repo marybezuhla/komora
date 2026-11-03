@@ -452,8 +452,8 @@ private fun AppCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(6.dp))
-                // The status, and "What's new" beside it when there is something to read
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // The status, and "What's new" beside it (or under it, when there is no room)
+                FlowRowCompat {
                     StatusPill(row)
                     if (offerNotes && idle) {
                         Text(
