@@ -28,8 +28,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,8 +43,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.Crossfade
 import ua.komora.ui.theme.SectionTitle
@@ -186,7 +189,7 @@ class MainActivity : ComponentActivity() {
             var showLook by rememberSaveable { mutableStateOf(false) }
             BackHandler(enabled = showLook) { showLook = false }
             // Kept while Settings is open, so the list comes back exactly where it was
-            val listState = rememberLazyListState()
+            val listState = rememberLazyGridState()
             KomoraTheme(theme) {
                 // A short fade between the list and Settings, instead of a flash
                 Crossfade(targetState = showLook, animationSpec = tween(120), label = "page") { settings ->
@@ -254,7 +257,7 @@ internal class Actions(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: LazyListState, onLook: () -> Unit, actions: Actions) {
+private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, listState: LazyGridState, onLook: () -> Unit, actions: Actions) {
     val rows by vm.rows.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val confirm by Installer.confirm.collectAsStateWithLifecycle()
@@ -280,7 +283,7 @@ internal fun KomoraList(
     onCheck: () -> Unit,
     onInstall: (AppRow) -> Unit,
     onCancel: () -> Unit,
-    listState: LazyListState = rememberLazyListState(),
+    listState: LazyGridState = rememberLazyGridState(),
 ) {
     // Same language as the rest of the screen (Android picks the strings; the catalog follows them)
     val lang = stringResource(R.string.catalog_lang)
@@ -313,14 +316,17 @@ internal fun KomoraList(
             }
         },
     ) { padding ->
-        LazyColumn(
+        // One column on a phone; two or more on a tablet or an unfolded phone, each card at least 340 dp
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 340.dp),
             state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (!canInstall) {
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     // The one thing to do first: framed in the accent
                     Card(
                         shape = RoundedCornerShape(16.dp),
@@ -347,7 +353,7 @@ internal fun KomoraList(
                     }
                 }
             }
-            item {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 // "Apps · 6" on the left, the check on the right
                 Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -381,7 +387,7 @@ internal fun KomoraList(
                     onCancel = onCancel,
                 )
             }
-            item { About() }
+            item(span = { GridItemSpan(maxLineSpan) }) { About() }
         }
     }
 }
@@ -390,7 +396,9 @@ internal fun KomoraList(
 private fun About() {
     val uri = LocalUriHandler.current
     val note = MaterialTheme.colorScheme.onSurfaceVariant
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    // On a wide screen the notes keep a readable line length, in the middle
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    Column(Modifier.widthIn(max = 600.dp).fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(stringResource(R.string.footer), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.footer_permissions), style = MaterialTheme.typography.bodyMedium, color = note, textAlign = TextAlign.Center)
@@ -405,6 +413,7 @@ private fun About() {
             TextButton(onClick = { runCatching { uri.openUri(SOURCE_URL) } }) { Text(stringResource(R.string.source_code)) }
             TextButton(onClick = { runCatching { uri.openUri(LICENSE_URL) } }) { Text(stringResource(R.string.license)) }
         }
+    }
     }
 }
 
@@ -730,10 +739,16 @@ internal fun LookPage(
             }
         },
     ) { padding ->
-        LookSettings(
-            look, onChange, language, onLanguage,
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
-        ) { UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings) }
+        // On a tablet or an unfolded phone: a readable column in the middle, not stretched edge to edge
+        Box(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            LookSettings(
+                look, onChange, language, onLanguage,
+                Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
+            ) { UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings) }
+        }
     }
 }
 

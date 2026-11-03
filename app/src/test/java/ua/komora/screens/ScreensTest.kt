@@ -152,4 +152,14 @@ class ScreensTest {
 
     @Config(qualifiers = "uk-w340dp-h1800dp-xhdpi", fontScale = 1.3f)
     @Test fun listNarrowLargeFont() = list("15-list-narrow-large-font", Theme.SYSTEM)
+
+    // An unfolded Galaxy Fold or Pixel Fold, and a tablet held sideways
+    @Config(qualifiers = "uk-w673dp-h841dp-xhdpi")
+    @Test fun foldableOpen() = list("16-foldable-open", Theme.SYSTEM)
+
+    @Config(qualifiers = "uk-w1280dp-h800dp-mdpi")
+    @Test fun tablet() = list("17-tablet-landscape", Theme.GLYNA)
+
+    @Config(qualifiers = "uk-w1280dp-h800dp-mdpi")
+    @Test fun tabletSettings() = shot("18-tablet-settings", Theme.SYSTEM) { LookPage(Look(), onBack = {}) {} }
 }
