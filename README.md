@@ -16,4 +16,10 @@ A simple open-source app store for Android. Installs and updates the apps in its
 
 Install: download the .apk from the latest release on your phone and open it. Requires Android 12 or newer.
 
-Ліцензія · License: GPL-3.0
+## Ліцензія · License
+
+Комора — вільне програмне забезпечення: її можна поширювати та змінювати за умовами GNU General Public License, опублікованої Free Software Foundation, версії 3 або (на ваш вибір) будь-якої новішої. Вона поширюється без жодних гарантій. Повний текст: [LICENSE](LICENSE).
+
+Komora is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It comes without any warranty. Full text: [LICENSE](LICENSE).
+
+SPDX-License-Identifier: GPL-3.0-or-later

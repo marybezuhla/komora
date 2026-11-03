@@ -26,7 +26,7 @@
     <string name="allow_button">Allow</string>
     <string name="footer">Every file is checked before installing: it must be signed with the key Komora knows for that app. A file signed by anyone else is refused.</string>
     <string name="about_title">About</string>
-    <string name="about_text">© Komora authors. Free software under the GNU GPL 3.0, without any warranty. Uses AndroidX and Kotlin libraries (Apache 2.0). Apps are downloaded from GitHub, which sees the address of the phone that asks.</string>
+    <string name="about_text">© Komora authors. Free software under the GNU GPL, version 3 or (at your option) any later version, without any warranty. Uses AndroidX and Kotlin libraries (Apache 2.0). Apps are downloaded from GitHub, which sees the address of the phone that asks.</string>
     <string name="source_code">Source code</string>
     <string name="license">License</string>
     <string name="err_network">No connection to GitHub. Check the internet and try again.</string>
