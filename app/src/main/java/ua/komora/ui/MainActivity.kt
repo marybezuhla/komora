@@ -78,6 +78,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import ua.komora.R
+import ua.komora.install.Confirm
 import ua.komora.install.Installer
 import ua.komora.ui.theme.CardTitle
 import ua.komora.ui.theme.KomoraTheme
@@ -167,7 +168,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private class Actions(
+internal class Actions(
     val allowInstalls: () -> Unit,
     val open: (String) -> Unit,
     val canOpen: (String) -> Boolean,
@@ -181,6 +182,28 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, onLook: () ->
     val rows by vm.rows.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val confirm by Installer.confirm.collectAsStateWithLifecycle()
+    KomoraList(
+        rows, busy, confirm, canInstall, onLook, actions,
+        onCheck = vm::checkUpdates,
+        onInstall = vm::install,
+        onCancel = vm::cancelInstall,
+    )
+}
+
+/** The list itself, from plain values only: what the app shows, and what the screen tests draw. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun KomoraList(
+    rows: List<AppRow>,
+    busy: Boolean,
+    confirm: Confirm?,
+    canInstall: Boolean,
+    onLook: () -> Unit,
+    actions: Actions,
+    onCheck: () -> Unit,
+    onInstall: (AppRow) -> Unit,
+    onCancel: () -> Unit,
+) {
     // Same language as the rest of the screen (Android picks the strings; the catalog follows them)
     val lang = stringResource(R.string.catalog_lang)
     Scaffold(
@@ -214,7 +237,7 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, onLook: () ->
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (!canInstall) {
@@ -255,7 +278,7 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, onLook: () ->
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f).semantics { heading() },
                     )
-                    TextButton(onClick = vm::checkUpdates) {
+                    TextButton(onClick = onCheck) {
                         Text(stringResource(R.string.refresh), fontWeight = FontWeight.SemiBold)
                     }
                 }
@@ -267,12 +290,12 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, onLook: () ->
                     lang = lang,
                     canGet = canInstall && !busy && row.latest != null,
                     canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
-                    onInstall = { vm.install(row) },
+                    onInstall = { onInstall(row) },
                     onOpen = { actions.open(row.app.packageName) },
                     onAppSettings = { actions.appSettings(row.app.packageName) },
-                    onRetry = vm::checkUpdates,
+                    onRetry = onCheck,
                     onContinue = waiting?.let { c -> { actions.start(c.intent) } },
-                    onCancel = vm::cancelInstall,
+                    onCancel = onCancel,
                 )
             }
             item { About() }
@@ -357,12 +380,16 @@ private fun AppCard(
             }
         }
 
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
+        // A copy from another source: said at once when there is nothing to update; otherwise after a try
+        val problem = row.problem ?: Problem.OtherKey.takeIf { row.foreignKey && !row.hasUpdate }
+        val retry = problem == Problem.Network || problem == Problem.RateLimit
+        val idle = row.phase == Phase.Idle || row.phase == Phase.Checking
+        val anyAction = !row.isInstalled || row.hasUpdate || problem == Problem.OtherKey || canOpen || retry
+        val below = problem != null || !idle || anyAction
 
-            // A copy from another source: said at once when there is nothing to update; otherwise after a try
-            val problem = row.problem ?: Problem.OtherKey.takeIf { row.foreignKey && !row.hasUpdate }
+        // Everything below lines up with the name, not with the coloured square
+        Column(Modifier.padding(start = 68.dp, end = 16.dp, top = if (below) 10.dp else 0.dp, bottom = 14.dp)) {
             problem?.let {
-                Spacer(Modifier.height(4.dp))
                 // A sign as well as the colour: in red themes the error and the accent are close
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
@@ -378,12 +405,13 @@ private fun AppCard(
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                     )
                 }
+                if (!idle || anyAction) Spacer(Modifier.height(10.dp))
             }
 
-            Spacer(Modifier.height(12.dp))
             when (val phase = row.phase) {
                 is Phase.Downloading -> {
                     LinearProgressIndicator(progress = { phase.fraction }, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(6.dp))
                     val ctx = LocalContext.current
                     val percent = (phase.fraction * 100).toInt()
                     val spoken = stringResource(R.string.downloading_short, percent / 10 * 10)
@@ -409,6 +437,7 @@ private fun AppCard(
                 }
                 is Phase.Installing -> {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(6.dp))
                     Text(
                         stringResource(if (row.app.isSelf) R.string.updating_self else R.string.installing),
                         style = MaterialTheme.typography.bodySmall,
@@ -422,7 +451,7 @@ private fun AppCard(
                         }
                     }
                 }
-                Phase.Checking, Phase.Idle -> FlowRowCompat {
+                Phase.Checking, Phase.Idle -> if (anyAction) FlowRowCompat {
                     val installLabel = stringResource(R.string.install)
                     val updateLabel = stringResource(R.string.update)
                     val openLabel = stringResource(R.string.open)
@@ -447,7 +476,7 @@ private fun AppCard(
                             modifier = Modifier.semantics { contentDescription = "$openLabel $name" },
                         ) { Text(openLabel) }
                     }
-                    if (problem == Problem.Network || problem == Problem.RateLimit) {
+                    if (retry) {
                         TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
                     }
                 }
@@ -504,7 +533,7 @@ private fun problemText(p: Problem): String = stringResource(
 /** "Look": light or dark, and the day and night themes, with a way back. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LookPage(look: Look, onBack: () -> Unit, onChange: (Look) -> Unit) {
+internal fun LookPage(look: Look, onBack: () -> Unit, onChange: (Look) -> Unit) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {

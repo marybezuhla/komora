@@ -67,6 +67,16 @@ class PaletteTest {
     }
 
     @Test
+    fun phoneColoursByDefault() {
+        val look = Look()
+        assertEquals(Mode.AUTO, look.mode)
+        assertEquals(Theme.SYSTEM, look.day)
+        assertEquals(Theme.SYSTEM_DARK, look.night)
+        assertEquals(Theme.SYSTEM, Theme.DAY.first())
+        assertEquals(Theme.SYSTEM_DARK, Theme.NIGHT.first())
+    }
+
+    @Test
     fun contrastMatchesWcag() {
         assertEquals(21.0, contrast(0xFF000000, 0xFFFFFFFF), 0.01)
         assertEquals(1.0, contrast(0xFF777777, 0xFF777777), 0.001)
