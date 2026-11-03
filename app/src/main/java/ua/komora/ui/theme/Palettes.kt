@@ -72,8 +72,9 @@ enum class Theme(val key: String, val dark: Boolean, val palette: Palette?) {
     SYSTEM_DARK("system_dark", true, null);
 
     companion object {
-        val DAY = entries.filter { !it.dark }
-        val NIGHT = entries.filter { it.dark }
+        // The phone's own colours come first: they are the default
+        val DAY = listOf(SYSTEM) + entries.filter { !it.dark && it != SYSTEM }
+        val NIGHT = listOf(SYSTEM_DARK) + entries.filter { it.dark && it != SYSTEM_DARK }
         fun of(key: String?, fallback: Theme) = entries.firstOrNull { it.key == key } ?: fallback
     }
 }
@@ -87,8 +88,8 @@ enum class Mode(val key: String) {
     }
 }
 
-/** What the owner chose. Defaults: as the phone, Chalk by day and Podillia by night, like Pysanka. */
-data class Look(val mode: Mode = Mode.AUTO, val day: Theme = Theme.KREYDA, val night: Theme = Theme.PODILLIA) {
+/** What the owner chose. Defaults: light or dark as the phone, in the phone's own colours (Material You). */
+data class Look(val mode: Mode = Mode.AUTO, val day: Theme = Theme.SYSTEM, val night: Theme = Theme.SYSTEM_DARK) {
     fun current(phoneIsDark: Boolean): Theme = when (mode) {
         Mode.AUTO -> if (phoneIsDark) night else day
         Mode.LIGHT -> day

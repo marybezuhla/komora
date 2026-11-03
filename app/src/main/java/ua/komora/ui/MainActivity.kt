@@ -78,6 +78,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import ua.komora.R
+import ua.komora.install.Confirm
 import ua.komora.install.Installer
 import ua.komora.ui.theme.CardTitle
 import ua.komora.ui.theme.KomoraTheme
@@ -167,7 +168,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private class Actions(
+internal class Actions(
     val allowInstalls: () -> Unit,
     val open: (String) -> Unit,
     val canOpen: (String) -> Boolean,
@@ -181,6 +182,28 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, onLook: () ->
     val rows by vm.rows.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val confirm by Installer.confirm.collectAsStateWithLifecycle()
+    KomoraList(
+        rows, busy, confirm, canInstall, onLook, actions,
+        onCheck = vm::checkUpdates,
+        onInstall = vm::install,
+        onCancel = vm::cancelInstall,
+    )
+}
+
+/** The list itself, from plain values only: what the app shows, and what the screen tests draw. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun KomoraList(
+    rows: List<AppRow>,
+    busy: Boolean,
+    confirm: Confirm?,
+    canInstall: Boolean,
+    onLook: () -> Unit,
+    actions: Actions,
+    onCheck: () -> Unit,
+    onInstall: (AppRow) -> Unit,
+    onCancel: () -> Unit,
+) {
     // Same language as the rest of the screen (Android picks the strings; the catalog follows them)
     val lang = stringResource(R.string.catalog_lang)
     Scaffold(
@@ -255,7 +278,7 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, onLook: () ->
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f).semantics { heading() },
                     )
-                    TextButton(onClick = vm::checkUpdates) {
+                    TextButton(onClick = onCheck) {
                         Text(stringResource(R.string.refresh), fontWeight = FontWeight.SemiBold)
                     }
                 }
@@ -267,12 +290,12 @@ private fun KomoraScreen(vm: KomoraViewModel, canInstall: Boolean, onLook: () ->
                     lang = lang,
                     canGet = canInstall && !busy && row.latest != null,
                     canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
-                    onInstall = { vm.install(row) },
+                    onInstall = { onInstall(row) },
                     onOpen = { actions.open(row.app.packageName) },
                     onAppSettings = { actions.appSettings(row.app.packageName) },
-                    onRetry = vm::checkUpdates,
+                    onRetry = onCheck,
                     onContinue = waiting?.let { c -> { actions.start(c.intent) } },
-                    onCancel = vm::cancelInstall,
+                    onCancel = onCancel,
                 )
             }
             item { About() }
@@ -504,7 +527,7 @@ private fun problemText(p: Problem): String = stringResource(
 /** "Look": light or dark, and the day and night themes, with a way back. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LookPage(look: Look, onBack: () -> Unit, onChange: (Look) -> Unit) {
+internal fun LookPage(look: Look, onBack: () -> Unit, onChange: (Look) -> Unit) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
