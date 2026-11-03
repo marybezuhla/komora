@@ -181,7 +181,8 @@ private fun CauseGroup(@StringRes title: Int, causes: List<Cause>, open: (String
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(cause.name), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
                     Text(stringResource(cause.what), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                    Text(url.removePrefix("https://").removeSuffix("/"), style = MaterialTheme.typography.labelMedium, color = scheme.primary)
+                    // Only the site's name: where it leads, readable at a glance
+                    Text(url.removePrefix("https://").substringBefore('/'), style = MaterialTheme.typography.labelMedium, color = scheme.primary)
                 }
                 Spacer(Modifier.width(8.dp))
                 Icon(painterResource(R.drawable.ic_open), contentDescription = null, tint = scheme.primary, modifier = Modifier.size(20.dp))
