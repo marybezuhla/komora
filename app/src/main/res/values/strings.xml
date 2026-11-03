@@ -89,7 +89,7 @@
     <string name="tab_verified">Verified · %1$d</string>
     <string name="tab_added">Added by you · %1$d</string>
     <string name="added_intro_title">Not checked by Komora</string>
-    <string name="added_intro_text">Komora has not checked these apps. Before the first install it shows the app\'s name, package and signing key; after you agree, only updates signed with the same key are installed.</string>
+    <string name="added_intro_text">Before the first install it shows the app\'s name, package and signing key. If you agree, only updates signed with the same key are installed. Install only what you trust.</string>
     <string name="added_by_you">Added by you</string>
     <string name="details">Details</string>
     <string name="details_added">Added by you. Komora has not checked this app: only that every update is signed with the same key as the first install.</string>

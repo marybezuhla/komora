@@ -208,7 +208,10 @@ private fun LazyListScope.cards(
     onDetails: (AppRow) -> Unit,
 ) {
     items(rows.chunked(columns), key = { chunk -> chunk.first().app.key }) { chunk ->
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Cards side by side get one height; a single card keeps its own (asking a card for its smallest
+        // height can come out too small when its text wraps)
+        val rowModifier = if (columns > 1) Modifier.fillMaxWidth().height(IntrinsicSize.Min) else Modifier.fillMaxWidth()
+        Row(rowModifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             for (row in chunk) {
                 val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
                 AppCard(
@@ -223,7 +226,7 @@ private fun LazyListScope.cards(
                     onContinue = waiting?.let { c -> { actions.start(c.intent) } },
                     onCancel = onCancel,
                     onDetails = { onDetails(row) },
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    modifier = if (columns > 1) Modifier.weight(1f).fillMaxHeight() else Modifier.weight(1f),
                     stretch = columns > 1,
                 )
             }
@@ -509,7 +512,7 @@ private fun AppCard(
                 )
                 Spacer(Modifier.height(6.dp))
                 // The status, and "What's new" beside it (or under it, when there is no room)
-                FlowRowCompat {
+                StatusLine(stacked = !roomy) {
                     StatusPill(row)
                     if (offerNotes && idle) {
                         Text(
@@ -646,6 +649,12 @@ private fun MainAction(
                 modifier = Modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1) }
         }
     }
+}
+
+/** Side by side, wrapping when needed; or one under the other where there is little room. */
+@Composable
+private fun StatusLine(stacked: Boolean, content: @Composable () -> Unit) {
+    if (stacked) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { content() } else FlowRowCompat(content)
 }
 
 /** Buttons wrap to a new line when the font is large or the screen is narrow. */
