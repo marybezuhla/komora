@@ -8,6 +8,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -450,7 +452,23 @@ private fun AppCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(6.dp))
-                StatusPill(row)
+                // The status, and "What's new" beside it when there is something to read
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusPill(row)
+                    if (offerNotes && idle) {
+                        Text(
+                            stringResource(if (showNotes) R.string.hide_whats_new else R.string.whats_new),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = scheme.primary,
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 4.dp)
+                                .clip(RoundedCornerShape(50))
+                                .clickable(role = Role.Button) { showNotes = !showNotes }
+                                .heightIn(min = 32.dp)
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                        )
+                    }
+                }
             }
             if (idle) {
                 Spacer(Modifier.width(8.dp))
@@ -458,8 +476,9 @@ private fun AppCard(
             }
         }
 
-        val secondary = offerNotes || retry || problem == Problem.OtherKey
-        val below = problem != null || !idle || secondary
+        val secondary = retry || problem == Problem.OtherKey
+        val notesOpen = offerNotes && showNotes
+        val below = problem != null || !idle || secondary || notesOpen
         if (stretch) Spacer(Modifier.weight(1f))
         if (!below) return@Card
 
@@ -527,11 +546,6 @@ private fun AppCard(
                         )
                     }
                     if (secondary) FlowRowCompat {
-                        if (offerNotes) {
-                            TextButton(onClick = { showNotes = !showNotes }) {
-                                Text(stringResource(if (showNotes) R.string.hide_whats_new else R.string.whats_new))
-                            }
-                        }
                         if (problem == Problem.OtherKey) {
                             TextButton(onClick = onAppSettings) { Text(stringResource(R.string.app_settings)) }
                         }
