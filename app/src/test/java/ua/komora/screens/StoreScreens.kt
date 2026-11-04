@@ -159,7 +159,9 @@ class StoreScreens {
         shot("03_details", Theme.NEBO, afterIdle = { runCatching { compose.onNodeWithText(if (uk()) "Показати" else "Show").performClick() } }) {
             // The sheet's content on a full page, as it looks pulled up
             androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                DetailsContent(r, lang(), r.app.certSha256, onRemove = null)
+                androidx.compose.foundation.layout.Box(Modifier.padding(top = 28.dp)) {
+                    DetailsContent(r, lang(), r.app.certSha256, onRemove = null)
+                }
             }
         }
     }
