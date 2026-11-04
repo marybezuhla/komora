@@ -1,4 +1,0 @@
-• Automatic updates (off by default)
-• Screenshots in app details
-• Uninstall from app details
-• Share the list of added sources and add several at once

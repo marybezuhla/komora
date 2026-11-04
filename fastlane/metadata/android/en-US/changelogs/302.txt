@@ -1,0 +1,1 @@
+A simple, open and safe collection of apps: installs and updates from GitHub, checks every file, optional automatic updates, themes with Ukrainian names. No ads, no accounts, no tracking.
