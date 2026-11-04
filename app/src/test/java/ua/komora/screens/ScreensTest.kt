@@ -166,10 +166,8 @@ class ScreensTest {
     @Test fun whatsNewOpen() {
         val by = catalog.associateBy { it.packageName }
         val row = AppRow(by.getValue("ua.tarilka"), installedVersion = "1.2.3", latest = release("tarilka", "1.3.0", 48))
-        shot("12-whats-new", Theme.SYSTEM, afterIdle = { compose.onNodeWithText("Що нового").performClick() }) {
-            KomoraList(listOf(row), busy = false, confirm = null, canInstall = true, onLook = {},
-                actions = noActions, onCheck = {}, onInstall = {}, onCancel = {})
-        }
+        // "What's new" is in the details now, opened by tapping the app's row
+        shot("12-whats-new", Theme.SYSTEM) { DetailsSheet(row, "uk", row.app.certSha256, onRemove = null, onDismiss = {}) }
     }
 
     @Test fun settingsWithUpdates() = shot("13-settings-updates-on", Theme.SYSTEM) {

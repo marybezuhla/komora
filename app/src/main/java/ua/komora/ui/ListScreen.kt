@@ -85,6 +85,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ua.komora.R
+import androidx.compose.runtime.key
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.CenterAlignedTopAppBar
 import ua.komora.install.Confirm
@@ -146,6 +149,18 @@ internal fun KomoraList(
                     title = {
                         Text(stringResource(R.string.app_name), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     },
+                    // Check on the left, Settings on the right: the title stands in the middle between them
+                    navigationIcon = {
+                        OutlinedIconButton(
+                            onClick = onCheck,
+                            enabled = !checking,
+                            colors = IconButtonDefaults.outlinedIconButtonColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) {
+                            Icon(painterResource(R.drawable.ic_refresh), contentDescription = stringResource(R.string.refresh))
+                        }
+                    },
                     actions = {
                         // A round, framed button, like a chip
                         OutlinedIconButton(
@@ -166,8 +181,11 @@ internal fun KomoraList(
         // One column on a phone; two on an unfolded Galaxy Fold / Pixel Fold or an upright tablet;
         // three on a tablet held sideways
         // On a big screen the list keeps a comfortable width, in the middle
-        val columns = columnsFor(minOf(LocalConfiguration.current.screenWidthDp, MAX_LIST_WIDTH))
-        val wide = columns > 1
+        val screenWidth = minOf(LocalConfiguration.current.screenWidthDp, MAX_LIST_WIDTH)
+        val columns = if (screenWidth >= 600) 2 else 1
+        // Room for the button beside the text in a row (the phone's text size counts too)
+        val laneWidth = (screenWidth - 32 - 16 * (columns - 1)) / columns
+        val wideRows = laneWidth / LocalDensity.current.fontScale >= 330f
         // Pull the list down to check for updates
         PullToRefreshBox(
             isRefreshing = checking, onRefresh = onCheck,
@@ -186,26 +204,41 @@ internal fun KomoraList(
                 if (!canInstall) item { AllowCard(actions.allowInstalls) }
                 val shown = if (showAdded) addedRows else verifiedRows
                 if (showAdded) item { AddedIntro(onAddSource) }
-                // How this tab's apps stand; "Update all" covers only what is shown
-                if (!showAdded || shown.isNotEmpty()) {
+                // A slim line only when there is something to say: checking, or several updates at once
+                item { Banner(shown, checking, busy, canInstall) { onUpdateAll(shown.map { it.app.key }) } }
+                // Each group is one block with its apps as rows; on a wide screen the blocks stand in two columns
+                val sections = Group.entries.mapNotNull { g -> shown.filter { Group.of(it) == g }.takeIf { it.isNotEmpty() }?.let { g to it } }
+                val section: @Composable (Pair<Group, List<AppRow>>) -> Unit = { (g, list) ->
+                    Section(stringResource(g.title), list, dashed = showAdded) { row ->
+                        val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
+                        AppListRow(
+                            row = row,
+                            lang = lang,
+                            narrow = !wideRows,
+                            canGet = canInstall && !busy && row.latest != null,
+                            canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
+                            onInstall = { onInstall(row) },
+                            onOpen = { actions.open(row.app.packageName) },
+                            onAppSettings = { actions.appSettings(row.app.packageName) },
+                            onRetry = onCheck,
+                            onContinue = waiting?.let { c -> { actions.start(c.intent) } },
+                            onCancel = onCancel,
+                            onDetails = { onDetails(row) },
+                        )
+                    }
+                }
+                if (columns > 1) {
                     item {
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Box(Modifier.widthIn(max = 560.dp)) {
-                                Summary(shown, checking, busy, canInstall, onCheck) { onUpdateAll(shown.map { it.app.key }) }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+                            for (lane in 0 until 2) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    sections.filterIndexed { k, _ -> k % 2 == lane }.forEach { section(it) }
+                                }
                             }
                         }
                     }
-                }
-                if (wide) {
-                    // Side by side, one even grid in the same order (updates first): no half-empty rows;
-                    // each card's label already says where it stands
-                    val ordered = Group.entries.flatMap { g -> shown.filter { Group.of(it) == g } }
-                    if (ordered.isNotEmpty()) cards(ordered, columns, lang, busy, confirm, canInstall, actions, onCheck, onInstall, onCancel, onDetails)
-                } else for (group in Group.entries) {
-                    val inGroup = shown.filter { Group.of(it) == group }
-                    if (inGroup.isEmpty()) continue
-                    item(key = "title-" + group.name) { GroupTitle(stringResource(group.title), inGroup.size) }
-                    cards(inGroup, columns, lang, busy, confirm, canInstall, actions, onCheck, onInstall, onCancel, onDetails)
+                } else {
+                    items(sections, key = { "section-" + it.first.name }) { section(it) }
                 }
                 if (!showAdded) item { About() }
             }
@@ -213,45 +246,6 @@ internal fun KomoraList(
     }
 }
 
-/** Rows of cards; cards side by side share one height, with their buttons at the bottom. */
-private fun LazyListScope.cards(
-    rows: List<AppRow>,
-    columns: Int,
-    lang: String,
-    busy: Boolean,
-    confirm: Confirm?,
-    canInstall: Boolean,
-    actions: Actions,
-    onCheck: () -> Unit,
-    onInstall: (AppRow) -> Unit,
-    onCancel: () -> Unit,
-    onDetails: (AppRow) -> Unit,
-) {
-    items(rows.chunked(columns), key = { chunk -> chunk.first().app.key }) { chunk ->
-        // Each card keeps its own height, aligned at the top: no card is stretched into an empty box
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-            for (row in chunk) {
-                val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
-                AppCard(
-                    row = row,
-                    lang = lang,
-                    canGet = canInstall && !busy && row.latest != null,
-                    canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
-                    onInstall = { onInstall(row) },
-                    onOpen = { actions.open(row.app.packageName) },
-                    onAppSettings = { actions.appSettings(row.app.packageName) },
-                    onRetry = onCheck,
-                    onContinue = waiting?.let { c -> { actions.start(c.intent) } },
-                    onCancel = onCancel,
-                    onDetails = { onDetails(row) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            // An incomplete last row keeps the same card width
-            repeat(columns - chunk.size) { Spacer(Modifier.weight(1f)) }
-        }
-    }
-}
 
 /** The one thing to do first: framed in the accent. */
 @Composable
@@ -271,45 +265,31 @@ private fun AllowCard(onAllow: () -> Unit) {
     }
 }
 
-/** One line on top: how things stand, with "Update all" when there is more than one update. */
+/**
+ * A slim line under the title, only when it says something: "Checking…", or "Updates: 3" with
+ * "Update all". Checking itself is the round button in the top corner, or pulling the list down.
+ */
 @Composable
-private fun Summary(rows: List<AppRow>, checking: Boolean, busy: Boolean, canInstall: Boolean, onCheck: () -> Unit, onUpdateAll: () -> Unit) {
+private fun Banner(rows: List<AppRow>, checking: Boolean, busy: Boolean, canInstall: Boolean, onUpdateAll: () -> Unit) {
     val updates = rows.count { it.hasUpdate && !it.foreignKey && it.latest != null }
     val scheme = MaterialTheme.colorScheme
-    val (text, tint) = when {
-        checking -> stringResource(R.string.summary_checking) to scheme.onSurfaceVariant
-        updates > 0 -> stringResource(R.string.summary_updates, updates) to scheme.primary
-        rows.any { it.isInstalled } && rows.none { it.problem in setOf(Problem.Network, Problem.RateLimit) } ->
-            stringResource(R.string.summary_all_current) to scheme.onSurface
-        else -> stringResource(R.string.summary_tap_check) to scheme.onSurfaceVariant
-    }
-    // In the middle: how things stand, and under it what can be done
-    Column(
-        Modifier.fillMaxWidth()
-            .background(scheme.surface, RoundedCornerShape(20.dp))
-            .border(1.dp, scheme.outlineVariant, RoundedCornerShape(20.dp))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = tint,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally), modifier = Modifier.fillMaxWidth()) {
-            // TalkBack reads the full label
-            val full = stringResource(R.string.refresh)
-            OutlinedButton(
-                onClick = onCheck,
-                enabled = !checking,
-                modifier = Modifier.weight(1f, fill = updates > 1).heightIn(min = 48.dp).semantics { contentDescription = full },
-            ) { Text(stringResource(R.string.check), fontWeight = FontWeight.SemiBold, maxLines = 1) }
-            if (updates > 1) {
-                Button(onClick = onUpdateAll, enabled = canInstall && !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+    AnimatedVisibility(visible = checking || updates > 1) {
+        Row(
+            Modifier.fillMaxWidth()
+                .background(lerp(scheme.surface, scheme.primary, 0.12f), RoundedCornerShape(16.dp))
+                .heightIn(min = 56.dp)
+                .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                if (checking) stringResource(R.string.summary_checking) else stringResource(R.string.banner_updates, updates),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = scheme.onSurface,
+                modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            if (!checking && updates > 1) {
+                Button(onClick = onUpdateAll, enabled = canInstall && !busy, modifier = Modifier.heightIn(min = 44.dp)) {
                     Text(stringResource(R.string.update_all), fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
             }
@@ -317,22 +297,36 @@ private fun Summary(rows: List<AppRow>, checking: Boolean, busy: Boolean, canIns
     }
 }
 
+/**
+ * One group as one block: its title in the middle above, then the apps as rows, each separated by a
+ * thin line that starts where the text starts.
+ */
 @Composable
-private fun GroupTitle(title: String, count: Int) {
-    val line = MaterialTheme.colorScheme.outlineVariant
-    // In the middle, between two thin lines, like the motif under the page title
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.weight(1f).height(1.dp).background(Brush.horizontalGradient(listOf(line.copy(alpha = 0f), line))))
+private fun Section(title: String, rows: List<AppRow>, dashed: Boolean, row: @Composable (AppRow) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth()) {
         Text(
-            "$title · $count",
-            style = MaterialTheme.typography.titleMedium,
+            "$title · ${rows.size}",
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 12.dp).semantics { heading() },
+            color = scheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp).semantics { heading() },
         )
-        Box(Modifier.weight(1f).height(1.dp).background(Brush.horizontalGradient(listOf(line, line.copy(alpha = 0f)))))
+        Column(
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(scheme.surface)
+                .then(if (dashed) Modifier.dashedBorder(scheme.error, 20.dp) else Modifier.border(1.dp, scheme.outlineVariant, RoundedCornerShape(20.dp))),
+        ) {
+            rows.forEachIndexed { i, r ->
+                if (i > 0) HorizontalDivider(Modifier.padding(start = TEXT_EDGE, end = 16.dp), color = scheme.outlineVariant)
+                key(r.app.key) { row(r) }
+            }
+        }
     }
 }
+
 
 @Composable
 private fun About() {
@@ -395,7 +389,7 @@ private val APP_ICONS = mapOf(
     "ua.svitlyna" to R.drawable.app_icon_svitlyna,
 )
 
-private val ICON = 56.dp
+private val ICON = 48.dp
 
 /**
  * The app's icon. Once installed, it comes from the app itself on this phone, so a new icon shows as
@@ -427,35 +421,25 @@ private fun AppIcon(packageName: String, name: String, color: Long, installedVer
     }
 }
 
-/** Where an app stands, as a small coloured label: seen at a glance. */
+/** Where an app stands, in one short coloured line: the accent when there is something new. */
 @Composable
-private fun StatusPill(row: AppRow) {
+private fun StatusText(row: AppRow) {
     val scheme = MaterialTheme.colorScheme
     val ctx = LocalContext.current
     val size = row.latest?.let { Formatter.formatShortFileSize(ctx, it.apk.size) }
     val latest = row.latestVersion
-    val (text, bg, fg) = when {
-        row.phase == Phase.Checking -> Triple(stringResource(R.string.checking), scheme.surfaceVariant, scheme.onSurfaceVariant)
-        row.hasUpdate && latest != null && size != null ->
-            Triple(stringResource(R.string.pill_update, latest, size), scheme.primaryContainer, scheme.onPrimaryContainer)
+    val (text, color) = when {
+        row.phase == Phase.Checking -> stringResource(R.string.checking) to scheme.onSurfaceVariant
+        row.hasUpdate && latest != null && size != null -> stringResource(R.string.pill_update, latest, size) to scheme.primary
         row.isInstalled && latest != null ->
-            Triple("✓ " + stringResource(R.string.pill_current, row.installedVersion.orEmpty().ifEmpty { latest }), scheme.secondaryContainer, scheme.onSecondaryContainer)
-        row.isInstalled -> Triple(
-            if (row.installedVersion.isNullOrEmpty()) stringResource(R.string.installed) else stringResource(R.string.pill_installed, row.installedVersion),
-            scheme.surfaceVariant, scheme.onSurfaceVariant,
-        )
-        size != null -> Triple(stringResource(R.string.pill_available, latest.orEmpty(), size), scheme.surfaceVariant, scheme.onSurfaceVariant)
-        else -> Triple(stringResource(R.string.not_installed), scheme.surfaceVariant, scheme.onSurfaceVariant)
+            ("✓ " + stringResource(R.string.pill_current, row.installedVersion.orEmpty().ifEmpty { latest })) to scheme.onSurfaceVariant
+        row.isInstalled -> (if (row.installedVersion.isNullOrEmpty()) stringResource(R.string.installed)
+            else stringResource(R.string.pill_installed, row.installedVersion)) to scheme.onSurfaceVariant
+        size != null -> stringResource(R.string.pill_available, latest.orEmpty(), size) to scheme.onSurfaceVariant
+        else -> stringResource(R.string.not_installed) to scheme.onSurfaceVariant
     }
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = fg,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.background(bg, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp)
-            .semantics { liveRegion = LiveRegionMode.Polite },
-    )
+    Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = color,
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
 }
 
 /** Wider than this, the list stays this wide, in the middle. */
@@ -467,10 +451,20 @@ private fun columnsFor(width: Int) = when {
     else -> 1
 }
 
+/** Where every line of text in a row starts: after the icon. The dividers start here too. */
+private val TEXT_EDGE = 78.dp
+
+/**
+ * One app as one row: icon | name, what it is, where it stands | its one button. The text always
+ * starts at the same edge and the buttons stand in one column, so the eye runs straight down.
+ * When the text needs the room (a narrow screen or a large font) the button goes under the text.
+ * Tapping the row opens the details, with what is new in the latest version.
+ */
 @Composable
-private fun AppCard(
+private fun AppListRow(
     row: AppRow,
     lang: String,
+    narrow: Boolean,
     canGet: Boolean,
     canOpen: Boolean,
     onInstall: () -> Unit,
@@ -479,10 +473,7 @@ private fun AppCard(
     onRetry: () -> Unit,
     onContinue: (() -> Unit)?,
     onCancel: () -> Unit,
-    onDetails: () -> Unit = {},
-    modifier: Modifier = Modifier,
-    /** In a row of cards of one height: the lower part goes to the bottom. */
-    stretch: Boolean = false,
+    onDetails: () -> Unit,
 ) {
     val name = row.app.name(lang)
     val scheme = MaterialTheme.colorScheme
@@ -490,109 +481,69 @@ private fun AppCard(
     // A copy from another source: said at once when there is nothing to update; otherwise after a try
     val problem = row.problem ?: Problem.OtherKey.takeIf { row.foreignKey && !row.hasUpdate }
     val retry = problem == Problem.Network || problem == Problem.RateLimit
-    // The release's description, before installing or updating
-    val notes = row.latest?.notes.orEmpty()
-    val offerNotes = notes.isNotBlank() && (!row.isInstalled || row.hasUpdate)
-    var showNotes by rememberSaveable(row.app.key) { mutableStateOf(false) }
-    val added = row.app.added
-
-    // Komora's own apps: a plain thin frame. Added by the owner: a dashed frame in the warning colour, never mistaken
-    val frame = scheme.error
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = scheme.surface),
-        border = if (added) null else BorderStroke(1.dp, scheme.outlineVariant),
-        modifier = modifier.fillMaxWidth().then(if (added) Modifier.dashedBorder(frame, 16.dp) else Modifier),
-    ) {
-        // Top: the icon beside the name and where the app stands. Then what it is, across the whole card.
-        // Then the buttons, side by side and the same width, so the card is even from edge to edge.
-        val details = stringResource(R.string.details)
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 14.dp)) {
-            Row(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(onClickLabel = details, onClick = onDetails)
-                    .semantics(mergeDescendants = true) {},
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (added) {
-                        // Said in words too, not only by the frame
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(painterResource(R.drawable.ic_warning), contentDescription = null, tint = scheme.error, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.added_by_you), style = MaterialTheme.typography.labelMedium,
-                                color = scheme.error, fontWeight = FontWeight.SemiBold)
-                        }
+    val hasAction = idle && (!row.isInstalled || row.hasUpdate || canOpen)
+    val details = stringResource(R.string.details)
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable(onClickLabel = details, onClick = onDetails)
+                .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
+            Spacer(Modifier.width(TEXT_EDGE - 16.dp - ICON))
+            // One swipe reads the app: name, what it is, where it stands
+            Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                if (row.app.added) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(R.drawable.ic_warning), contentDescription = null, tint = scheme.error, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.added_by_you), style = MaterialTheme.typography.labelMedium,
+                            color = scheme.error, fontWeight = FontWeight.SemiBold)
                     }
-                    Text(name, style = CardTitle, color = scheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.semantics { heading() })
-                    StatusPill(row)
+                }
+                Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+                Text(
+                    row.app.summary(lang),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant,
+                    // An added app's line is its repository: one line, never broken at "/"
+                    maxLines = if (row.app.added) 1 else 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                StatusText(row)
+                if (hasAction && narrow) {
+                    Spacer(Modifier.height(8.dp))
+                    MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen, Modifier.heightIn(min = 44.dp))
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                row.app.summary(lang),
-                style = MaterialTheme.typography.bodyMedium,
-                color = scheme.onSurfaceVariant,
-                // An added app's line is its repository: one line, cut at the end, never broken at "/"
-                maxLines = if (row.app.added) 1 else 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val hasAction = !row.isInstalled || row.hasUpdate || canOpen
-            val notesButton = offerNotes && idle
-            if (idle && (hasAction || notesButton)) {
-                Spacer(Modifier.height(14.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (notesButton) {
-                        OutlinedButton(
-                            onClick = { showNotes = !showNotes },
-                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp),
-                        ) {
-                            Text(stringResource(if (showNotes) R.string.hide_whats_new else R.string.whats_new), maxLines = 1,
-                                overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                    if (hasAction) {
-                        MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen, Modifier.weight(1f).heightIn(min = 48.dp))
-                    }
-                }
+            if (hasAction && !narrow) {
+                Spacer(Modifier.width(12.dp))
+                MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen, Modifier.widthIn(min = 112.dp).heightIn(min = 44.dp))
             }
         }
 
         val secondary = retry || problem == Problem.OtherKey
-        val notesOpen = offerNotes && showNotes
-        val below = problem != null || !idle || secondary || notesOpen
-        if (stretch) Spacer(Modifier.weight(1f))
-        if (!below) return@Card
-
-        // Everything below uses the whole width, like the text above
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
+        if (problem == null && idle && !secondary) return@Column
+        // Under the text, at the same edge
+        Column(Modifier.padding(start = TEXT_EDGE, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             problem?.let {
-                // A block of its own across the card: a sign as well as the colour, since in red themes
-                // the error and the accent are close
+                // A sign as well as the colour: in red themes the error and the accent are close
                 Row(
                     Modifier.fillMaxWidth().background(scheme.errorContainer, RoundedCornerShape(12.dp)).padding(12.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
-                    Icon(
-                        painterResource(R.drawable.ic_warning),
-                        contentDescription = null,
-                        tint = scheme.error,
-                        modifier = Modifier.padding(top = 2.dp, end = 10.dp).size(18.dp),
-                    )
+                    Icon(painterResource(R.drawable.ic_warning), contentDescription = null, tint = scheme.error,
+                        modifier = Modifier.padding(top = 2.dp, end = 10.dp).size(18.dp))
                     Text(problemText(it), style = MaterialTheme.typography.bodyMedium, color = scheme.onErrorContainer,
                         modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite })
                 }
-                Spacer(Modifier.height(8.dp))
             }
             when (val phase = row.phase) {
                 is Phase.Downloading -> {
                     LinearProgressIndicator(progress = { phase.fraction }, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(6.dp))
                     val ctx = LocalContext.current
                     val percent = (phase.fraction * 100).toInt()
                     val spoken = stringResource(R.string.downloading_short, percent / 10 * 10)
@@ -609,43 +560,32 @@ private fun AppCard(
                         },
                     )
                     Text(stringResource(R.string.keep_open), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                    Spacer(Modifier.height(6.dp))
-                    OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+                    OutlinedButton(onClick = onCancel, modifier = Modifier.heightIn(min = 44.dp)) { Text(stringResource(R.string.cancel)) }
                 }
                 is Phase.Installing -> {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(6.dp))
                     Text(stringResource(if (row.app.isSelf) R.string.updating_self else R.string.installing), style = MaterialTheme.typography.bodyMedium)
                     // Android is waiting for the owner's answer on its own screen
                     if (onContinue != null) {
-                        Spacer(Modifier.height(6.dp))
-                        FlowRowCompat {
-                            Button(onClick = onContinue) { Text(stringResource(R.string.continue_install)) }
-                            OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onContinue, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) {
+                                Text(stringResource(R.string.continue_install), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) {
+                                Text(stringResource(R.string.cancel), maxLines = 1)
+                            }
                         }
                     }
                 }
                 Phase.Checking, Phase.Idle -> {
-                    AnimatedVisibility(visible = offerNotes && showNotes) {
-                        Text(
-                            notes,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = scheme.onSurface,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
-                                .background(scheme.surfaceVariant, RoundedCornerShape(12.dp))
-                                .padding(12.dp),
-                        )
+                    // The way out of a problem
+                    if (problem == Problem.OtherKey) {
+                        OutlinedButton(onClick = onAppSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
+                            Text(stringResource(R.string.app_settings), fontWeight = FontWeight.SemiBold)
+                        }
                     }
-                    // The way out of a problem: a full-width button, like the ones above
-                    if (secondary) Column(Modifier.fillMaxWidth().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (problem == Problem.OtherKey) {
-                            OutlinedButton(onClick = onAppSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                                Text(stringResource(R.string.app_settings), fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                        if (retry) OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                            Text(stringResource(R.string.retry), fontWeight = FontWeight.SemiBold)
-                        }
+                    if (retry) OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
+                        Text(stringResource(R.string.retry), fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
