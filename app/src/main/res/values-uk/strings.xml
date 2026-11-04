@@ -164,4 +164,7 @@
     <string name="theme_kalyna">Калина</string>
     <string name="theme_zoriana_nich">Зоряна ніч</string>
     <string name="banner_updates">Оновлень: %1$d</string>
+    <string name="details_technical">Технічні дані</string>
+    <string name="show_key">Показати</string>
+    <string name="hide_key">Сховати</string>
 </resources>
