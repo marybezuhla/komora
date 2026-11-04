@@ -21,6 +21,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.LineBreak
 
 /** Material colours from one of Komora's themes; the phone's own (Material You) for the system ones. */
 fun colorScheme(theme: Theme, context: Context): ColorScheme {
@@ -73,15 +75,23 @@ fun KomoraTheme(theme: Theme, content: @Composable () -> Unit) {
  * setting still scales all of it.
  */
 private val KomoraType = androidx.compose.material3.Typography().run {
+    // Body text: lines broken evenly over the whole paragraph (no ragged, chopped right edge), whole words
+    fun body(t: TextStyle, size: Int, line: Int) = t.copy(
+        fontSize = size.sp, lineHeight = line.sp, letterSpacing = 0.sp,
+        lineBreak = LineBreak.Paragraph, hyphens = Hyphens.None,
+    )
+    // Labels and titles: the letters at their natural spacing (Material spreads them apart)
+    fun label(t: TextStyle, size: Int, line: Int) = t.copy(fontSize = size.sp, lineHeight = line.sp, letterSpacing = 0.sp)
     copy(
-        bodyLarge = bodyLarge.copy(fontSize = 18.sp, lineHeight = 26.sp),
-        bodyMedium = bodyMedium.copy(fontSize = 17.sp, lineHeight = 24.sp, letterSpacing = 0.15.sp),
-        bodySmall = bodySmall.copy(fontSize = 15.sp, lineHeight = 21.sp),
-        labelLarge = labelLarge.copy(fontSize = 16.sp, lineHeight = 22.sp),
-        labelMedium = labelMedium.copy(fontSize = 15.sp, lineHeight = 20.sp),
-        labelSmall = labelSmall.copy(fontSize = 14.sp, lineHeight = 18.sp),
-        titleMedium = titleMedium.copy(fontSize = 19.sp, lineHeight = 26.sp),
-        titleLarge = titleLarge.copy(fontSize = 24.sp, lineHeight = 30.sp),
+        bodyLarge = body(bodyLarge, 18, 26),
+        bodyMedium = body(bodyMedium, 17, 24),
+        bodySmall = body(bodySmall, 15, 21),
+        labelLarge = label(labelLarge, 16, 22),
+        labelMedium = label(labelMedium, 15, 20),
+        labelSmall = label(labelSmall, 14, 18),
+        titleSmall = label(titleSmall, 16, 22),
+        titleMedium = label(titleMedium, 19, 26),
+        titleLarge = label(titleLarge, 24, 30),
     )
 }
 
