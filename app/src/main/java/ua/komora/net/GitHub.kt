@@ -108,13 +108,17 @@ object GitHub {
             val base = "fastlane/metadata/android"
             val langs = list(base) ?: return null
             val have = (0 until langs.length()).mapNotNull { langs.optJSONObject(it)?.takeIf { o -> o.optString("type") == "dir" }?.optString("name") }
-            val dir = Rules.screenshotDirs(lang).firstOrNull { d -> d.removePrefix("$base/").substringBefore('/') in have } ?: return emptyList()
-            if (isCancelled()) return null
-            val a = list(dir) ?: return null
-            val files = (0 until a.length()).mapNotNull { i ->
-                val o = a.optJSONObject(i) ?: return@mapNotNull null
-                val name = o.optString("name"); val url = o.optString("download_url"); val size = o.optLong("size")
-                if (o.optString("type") == "file" && Rules.isScreenshot(name, url, size, repo)) Triple(name, url, size) else null
+            // The language shown first; the next one only if that one has no pictures
+            var files = emptyList<Triple<String, String, Long>>()
+            for (dir in Rules.screenshotDirs(lang).filter { d -> d.removePrefix("$base/").substringBefore('/') in have }) {
+                if (isCancelled()) return null
+                val a = list(dir) ?: return null
+                files = (0 until a.length()).mapNotNull { i ->
+                    val o = a.optJSONObject(i) ?: return@mapNotNull null
+                    val name = o.optString("name"); val url = o.optString("download_url"); val size = o.optLong("size")
+                    if (o.optString("type") == "file" && Rules.isScreenshot(name, url, size, repo)) Triple(name, url, size) else null
+                }
+                if (files.isNotEmpty()) break
             }
             // In their own order: 1, 2, … 10
             files.sortedWith(compareBy({ it.first.takeWhile { c -> c.isDigit() }.toIntOrNull() ?: Int.MAX_VALUE }, { it.first }))

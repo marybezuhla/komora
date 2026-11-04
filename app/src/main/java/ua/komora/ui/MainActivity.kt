@@ -286,7 +286,12 @@ class MainActivity : ComponentActivity() {
 
     /** An app removed or replaced while Komora is open (Android's uninstaller closes before it is done) */
     private val packagesChanged = object : android.content.BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = vm.refreshInstalled()
+        override fun onReceive(context: Context, intent: Intent) {
+            // An update sends removed, added and replaced: only "replaced" counts then
+            val replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+            if (replacing && intent.action != Intent.ACTION_PACKAGE_REPLACED) return
+            vm.refreshInstalled()
+        }
     }
 
     override fun onStart() {

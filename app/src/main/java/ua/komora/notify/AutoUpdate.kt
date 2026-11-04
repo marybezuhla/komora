@@ -153,8 +153,7 @@ object AutoUpdate {
                     continue
                 }
                 if (stopped()) return true
-                val id = try { Installer.prepare(context, file, app.packageName) } catch (_: Exception) { continue }
-                Installer.backgroundSessions += id
+                val id = try { Installer.prepare(context, file, app.packageName, background = true) } catch (_: Exception) { continue }
                 try {
                     Installer.commitInBackground(context, id, "${app.name(lang)} $latest")
                 } catch (_: Exception) {

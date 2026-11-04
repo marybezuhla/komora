@@ -283,12 +283,15 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         failedAdds.clear()
         // Only what reads as a repository; the same one twice counts once
         val repos = words.mapNotNull { Sources.parseRepo(it) }.distinctBy { it.lowercase() }
-        batch = repos.size > 1
+        // Words that look like links but are not a repository are said, not dropped silently
+        val bad = words.filter { "/" in it && Sources.parseRepo(it) == null }.map { it.take(60) }
+        batch = repos.size > 1 || (repos.isNotEmpty() && bad.isNotEmpty())
         if (!batch) {
             val repo = repos.singleOrNull() ?: return run { _adding.value = AddState.Failed(AddError.BadLink) }
             addOne(repo)
             return
         }
+        failedAdds += bad
         repos.forEach { pendingAdds.addLast(it) }
         nextAdd()
     }
@@ -527,6 +530,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         }
         // A cancelled download returns the row to where it was, with no error
         current.job?.invokeOnCompletion { cause ->
+            // Directly, not in a new coroutine: when the screen is gone for good, that one would never run
+            if (cause is CancellationException && active === current) Installer.foregroundBusy = false
             if (cause is CancellationException) viewModelScope.launch {
                 answerTrust(null, false)
                 if (active === current) {
@@ -565,6 +570,12 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         answerTrust(null, false)
         val id = a.sessionId
         if (id == null) a.job?.cancel() else Installer.cancel(ctx, id)
+    }
+
+    override fun onCleared() {
+        // The screen is gone: automatic updates may run again
+        if (active != null) Installer.foregroundBusy = false
+        super.onCleared()
     }
 
     private fun finish(a: Active) {

@@ -53,7 +53,7 @@ object Installer {
      * Step 1: copies an already verified APK into a new install session and returns its id.
      * Nothing is installed yet; the APK file may be deleted afterwards.
      */
-    fun prepare(context: Context, apk: File, packageName: String): Int = wrap {
+    fun prepare(context: Context, apk: File, packageName: String, background: Boolean = false): Int = wrap {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(packageName)
@@ -66,6 +66,8 @@ object Installer {
             if (Build.VERSION.SDK_INT >= 34) setRequestUpdateOwnership(true)
         }
         val id = installer.createSession(params)
+        // Protected from being dropped as a leftover from the very start (the caller removes it once committed)
+        if (background) backgroundSessions += id
         try {
             installer.openSession(id).use { session ->
                 apk.inputStream().use { input ->
@@ -77,6 +79,7 @@ object Installer {
             }
         } catch (e: Exception) {
             runCatching { installer.abandonSession(id) }
+            backgroundSessions -= id
             throw e
         }
         id
