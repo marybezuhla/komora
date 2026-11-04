@@ -615,11 +615,16 @@ private fun AppCard(
                                 .padding(12.dp),
                         )
                     }
-                    if (secondary) FlowRowCompat {
+                    // The way out of a problem: a full-width button, like the ones above
+                    if (secondary) Column(Modifier.fillMaxWidth().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (problem == Problem.OtherKey) {
-                            TextButton(onClick = onAppSettings) { Text(stringResource(R.string.app_settings)) }
+                            OutlinedButton(onClick = onAppSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                Text(stringResource(R.string.app_settings), fontWeight = FontWeight.SemiBold)
+                            }
                         }
-                        if (retry) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                        if (retry) OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.retry), fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }
