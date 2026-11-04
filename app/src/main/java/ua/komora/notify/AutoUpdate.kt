@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit
  * only, or any connection, as chosen; on the charger if asked), Komora updates the apps it installed
  * itself, with exactly the same checks as a tap on "Update": the pinned key, the package, a newer
  * version. Android lets it do so without asking only for apps Komora installed; any other app, and
- * Komora itself, is left for the owner (a notice says so).
+ * Komora itself, is left for the owner, who updates them in Komora as before.
  */
 object AutoUpdate {
     private const val FILE = "auto_update"
@@ -102,8 +102,10 @@ object AutoUpdate {
         val context = AppLanguage.wrap(base)
         if (!settings(context).enabled) return true
         val pm = context.packageManager
-        // Komora open and installing, or a session of its own still waiting: not now
-        if (Installer.confirm.value != null || pm.packageInstaller.mySessions.isNotEmpty()) return true
+        // Komora open and installing, or waiting for the owner's answer: not now
+        if (Installer.foregroundBusy || Installer.confirm.value != null) return true
+        // Leftovers of a run stopped half way (never handed to Android)
+        runCatching { Installer.dropUncommitted(context) }
         val lang = context.getString(R.string.catalog_lang)
         val builtIn = Catalog.parse(context.assets.open("catalog.json").bufferedReader().use { it.readText() })
         val taken = builtIn.map { it.packageName }.toSet() + context.packageName
@@ -113,15 +115,20 @@ object AutoUpdate {
         dir.listFiles()?.forEach { it.delete() }
         var waiting = false
         for (app in builtIn + added) {
-            if (stopped()) return true
+            if (stopped() || Installer.foregroundBusy) return true
             // Komora itself: updating it would end this very run; the owner does that in Komora
             if (app.isSelf || app.packageName == context.packageName) continue
             val installed = ApkVerifier.installedInfo(pm, app.packageName) ?: continue
             if (!installedByKomora(context, app.packageName)) continue
+            // Signed with another key: the update would be refused anyway, so it is not even downloaded
+            if (!ApkVerifier.installedMatchesPin(context, app, installed)) continue
             val release = try {
                 GitHub.latestRelease(app)
             } catch (_: RateLimitException) {
                 return true
+            } catch (_: ua.komora.net.NoReleaseException) {
+                // No release (yet, or any more): this app only
+                continue
             } catch (e: IOException) {
                 if (app.added) continue
                 return false
@@ -147,10 +154,13 @@ object AutoUpdate {
                 }
                 if (stopped()) return true
                 val id = try { Installer.prepare(context, file, app.packageName) } catch (_: Exception) { continue }
+                Installer.backgroundSessions += id
                 try {
                     Installer.commitInBackground(context, id, "${app.name(lang)} $latest")
                 } catch (_: Exception) {
                     continue
+                } finally {
+                    Installer.backgroundSessions -= id
                 }
                 waiting = true
             } finally {
@@ -175,7 +185,7 @@ object AutoUpdate {
     /** "Updated automatically: Tarilka 1.3.0, …", one notice that grows during the day. */
     internal fun noticeDone(base: Context, what: String) {
         val context = AppLanguage.wrap(base)
-        if (!UpdateCheck.canNotify(context)) return
+        if (!UpdateCheck.canNotify(context, CHANNEL)) return
         val p = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         val today = System.currentTimeMillis() / TimeUnit.DAYS.toMillis(1)
         val list = (if (p.getLong("done_day", -1) == today) p.getString("done", "").orEmpty().split('\n') else emptyList())
@@ -187,8 +197,10 @@ object AutoUpdate {
     /** Android wants the owner's own yes for this one: Komora asks them to open it. */
     internal fun noticeAsk(base: Context, what: String) {
         val context = AppLanguage.wrap(base)
-        if (!UpdateCheck.canNotify(context)) return
-        notify(context, NOTICE_ASK, context.getString(R.string.auto_ask_title), context.getString(R.string.auto_ask_text, what))
+        if (!UpdateCheck.canNotify(context, CHANNEL)) return
+        // One notice per app, so none hides another
+        notify(context, NOTICE_ASK + (what.substringBeforeLast(' ').hashCode() and 0xFFFF), context.getString(R.string.auto_ask_title),
+            context.getString(R.string.auto_ask_text, what))
     }
 
     private fun notify(context: Context, id: Int, title: String, text: String) {

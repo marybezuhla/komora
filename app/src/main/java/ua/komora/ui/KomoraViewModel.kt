@@ -46,6 +46,8 @@ enum class Problem {
 sealed class AddState {
     object Idle : AddState()
     object Working : AddState()
+    /** Everything asked for is added: the dialog closes. */
+    object Done : AddState()
     /** The release has several APKs: the owner picks one, once. */
     /** [names] are shown; [all] are every APK in the release, so the pattern can be checked against them. */
     data class Choose(val repo: String, val names: List<String>, val all: List<String> = names) : AddState()
@@ -276,19 +278,18 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
      * APKs in each newest release, one repository after another.
      */
     fun addSource(input: String) {
-        val lines = input.split('\n', ',', ' ', '\t').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        val words = input.split('\n', ',', ' ', '\t').map { it.trim() }.filter { it.isNotEmpty() }
         pendingAdds.clear()
         failedAdds.clear()
-        batch = lines.size > 1
+        // Only what reads as a repository; the same one twice counts once
+        val repos = words.mapNotNull { Sources.parseRepo(it) }.distinctBy { it.lowercase() }
+        batch = repos.size > 1
         if (!batch) {
-            val repo = Sources.parseRepo(input) ?: return run { _adding.value = AddState.Failed(AddError.BadLink) }
+            val repo = repos.singleOrNull() ?: return run { _adding.value = AddState.Failed(AddError.BadLink) }
             addOne(repo)
             return
         }
-        lines.take(Sources.MAX).forEach { line ->
-            val repo = Sources.parseRepo(line)
-            if (repo == null) failedAdds += line.take(60) else pendingAdds.addLast(repo)
-        }
+        repos.forEach { pendingAdds.addLast(it) }
         nextAdd()
     }
 
@@ -298,7 +299,14 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         if (repo != null) return addOne(repo)
         currentAdd = null
         batch = false
-        _adding.value = if (failedAdds.isEmpty()) AddState.Idle else AddState.Failed(AddError.SomeFailed, failedAdds.toList())
+        _adding.value = if (failedAdds.isEmpty()) AddState.Done else AddState.Failed(AddError.SomeFailed, failedAdds.toList())
+    }
+
+    /** "Cancel" on the choice of APK: in a list, only that repository is skipped. */
+    fun skipChoice() {
+        if (!batch) return dismissAdding()
+        currentAdd?.let { failedAdds += it }
+        nextAdd()
     }
 
     /** One repository finished (added, failed, or needing a choice): go on with the rest, if several. */
@@ -308,16 +316,17 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         // Already added counts as done when moving a list over
-        if (result is AddState.Failed && result.reason != AddError.Exists) currentAdd?.let { failedAdds += it }
+        if (result is AddState.Failed && result.reason != AddError.Exists && result.reason != AddError.InKomora) currentAdd?.let { failedAdds += it }
         nextAdd()
     }
 
     private fun addOne(repo: String) {
         currentAdd = repo
         when {
-            sources.size >= Sources.MAX -> return finishOne(AddState.Failed(AddError.TooMany))
+            // Already there first: moving a list over counts those as done, even when the list is full
             sources.any { it.repo.equals(repo, ignoreCase = true) } -> return finishOne(AddState.Failed(AddError.Exists))
             verified.any { it.repo.equals(repo, ignoreCase = true) } -> return finishOne(AddState.Failed(AddError.InKomora))
+            sources.size >= Sources.MAX -> return finishOne(AddState.Failed(AddError.TooMany))
         }
         _adding.value = AddState.Working
         addJob?.cancel()
@@ -386,7 +395,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         sources = next
         rebuildRows()
         viewModelScope.launch { check(source.toApp()) }
-        return AddState.Idle
+        return AddState.Done
     }
 
     /** Removes an added source from Komora (the app itself, if installed, stays on the phone). */
@@ -454,6 +463,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         val current = Active(row.app.key)
         active = current
         _busy.value = true
+        Installer.foregroundBusy = true
         current.job = viewModelScope.launch {
             set(current.key) { it.copy(phase = Phase.Downloading(0, release.apk.size), problem = null) }
             val prepared = withContext(Dispatchers.IO) {
@@ -561,6 +571,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         if (active === a) {
             active = null
             _busy.value = false
+            Installer.foregroundBusy = false
         }
     }
 

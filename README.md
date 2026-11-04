@@ -8,20 +8,19 @@
 
 **Інші джерела** (за замовчуванням вимкнено). У налаштуваннях можна дозволити додавати будь-який публічний репозиторій GitHub, після попередження про ризики й згоди. Комора такі застосунки не перевіряє: перед першим встановленням вона показує назву, пакет і ключ підпису, і далі приймає лише оновлення з тим самим ключем. Додані застосунки позначено окремою вкладкою й червоною рамкою. Щоб знати, чи доданий застосунок встановлено, Комора бачить застосунки з іконкою на головному екрані, але нікуди їх не надсилає й не зберігає.
 
-**Автоматичні оновлення** (за замовчуванням вимкнено). Раз на день Комора може сама встановлювати нові версії застосунків, які вона встановила, з тими самими перевірками; через Wi-Fi або будь-який інтернет, за бажанням лише на зарядці. Саму Комору й застосунки, встановлені деінде, оновлюєте ви.
+**Автоматичні оновлення** (за замовчуванням вимкнено). Приблизно раз на день Комора може сама встановлювати нові версії застосунків, які вона встановила, з тими самими перевірками; через Wi-Fi або будь-який інтернет, за бажанням лише на зарядці. Саму Комору й застосунки, встановлені деінде, оновлюєте ви.
 
 **Встановлення.** Завантажте .apk з останнього випуску на телефоні й відкрийте його. Браузер чи Android попросять дозволити встановлення з цього джерела. Потрібен Android 12 або новіший.
 
-**Приватність.** Акаунтів, аналітики й реклами немає. Під час кожного запуску Комора питає GitHub про нові випуски, тому GitHub бачить адресу телефона, як і для будь-якого сайту. Якщо в налаштуваннях увімкнено сповіщення чи автоматичні оновлення, ті самі питання ставляться й у фоні. Знімки екрана застосунку завантажуються з його репозиторію лише тоді, коли ви відкриваєте його подробиці.
+**Приватність.** Акаунтів, аналітики й реклами немає. Під час кожного запуску Комора питає GitHub про нові випуски, тому GitHub бачить адресу телефона, як і для будь-якого сайту. Якщо в налаштуваннях увімкнено сповіщення чи автоматичні оновлення, ті самі питання ставляться й у фоні. Знімки екрана застосунку завантажуються з його репозиторію лише тоді, коли ви відкриваєте його подробиці, тож GitHub може бачити, який застосунок ви переглядали.
 
 ---
 
-A simple open-source app store for Android. Installs and updates the apps in its catalog straight from GitHub. Every file is checked before installing: the right app, signed with the key pinned in Komora for that app, newer than the installed one. Connects only to GitHub, only over HTTPS; GitHub sees the phone's address when Komora checks for updates at each start, and once a day or once a week in the background if update notices are turned on in Settings.
+A simple open-source app store for Android. Installs and updates the apps in its catalog straight from GitHub. Every file is checked before installing: the right app, signed with the key pinned in Komora for that app, newer than the installed one. Connects only to GitHub, only over HTTPS. GitHub sees the phone's address when Komora checks for updates at each start, in the background if update notices or automatic updates are turned on, and when an app's details are opened (its screenshots are fetched then, so GitHub can see which app was looked at).
 
 Other sources (off by default): after a warning and the owner's agreement, any public GitHub repository can be added. Komora does not check those apps: before the first install it shows the app's name, package and signing key, and afterwards accepts only updates with the same key. To tell whether an added app is installed, Komora can see apps that have a home-screen icon; it never sends or keeps that list.
 
-Automatic updates (off by default): once a day Komora can install new versions of the apps it installed, with the same checks; over Wi-Fi or any connection, optionally only while charging. Screenshots come from an app's own repository, only when its details are opened.
-
+Automatic updates (off by default): about once a day Komora can install new versions of the apps it installed, with the same checks; over Wi-Fi or any connection, optionally only while charging. 
 Install: download the .apk from the latest release on your phone and open it. Requires Android 12 or newer.
 
 ## Ліцензія · License

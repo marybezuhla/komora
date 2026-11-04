@@ -152,9 +152,10 @@ class MainActivity : ComponentActivity() {
     private val askNotifyForAuto = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     private fun setAuto(s: AutoUpdate.Settings) {
+        val turningOn = s.enabled && !auto.value.enabled
         AutoUpdate.apply(this, s)
         auto.value = AutoUpdate.settings(this)
-        if (auto.value.enabled && Build.VERSION.SDK_INT >= 33 &&
+        if (turningOn && auto.value.enabled && Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) askNotifyForAuto.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
@@ -282,6 +283,27 @@ class MainActivity : ComponentActivity() {
         notifyDenied.value = updates.value.enabled && !UpdateCheck.canNotify(this)
         vm.refreshInstalled()
     }
+
+    /** An app removed or replaced while Komora is open (Android's uninstaller closes before it is done) */
+    private val packagesChanged = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = vm.refreshInstalled()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        androidx.core.content.ContextCompat.registerReceiver(this, packagesChanged, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
+    override fun onStop() {
+        runCatching { unregisterReceiver(packagesChanged) }
+        super.onStop()
+    }
 }
 
 internal class Actions(
@@ -311,11 +333,12 @@ private fun KomoraScreen(
     val trust by vm.trust.collectAsStateWithLifecycle()
     var showAdd by rememberSaveable { mutableStateOf(false) }
     var detailsKey by rememberSaveable { mutableStateOf<String?>(null) }
-    // The add dialog closes by itself once the source is added
-    var submitted by remember { mutableStateOf(false) }
+    // The add dialog closes by itself once everything asked for is added
     LaunchedEffect(adding) {
-        if (adding is AddState.Working || adding is AddState.Choose) submitted = true
-        else if (adding is AddState.Idle && submitted) { submitted = false; showAdd = false }
+        if (adding is AddState.Done) {
+            showAdd = false
+            vm.dismissAdding()
+        }
     }
     KomoraList(
         rows, busy, confirm, canInstall, onLook, actions,
@@ -336,9 +359,8 @@ private fun KomoraScreen(
         addedListState = addedListState,
     )
     if (showAdd) {
-        AddSourceDialog(adding, onAdd = vm::addSource, onChoose = vm::chooseApk) {
+        AddSourceDialog(adding, onAdd = vm::addSource, onChoose = vm::chooseApk, onSkipChoice = vm::skipChoice) {
             vm.dismissAdding()
-            submitted = false
             showAdd = false
         }
     }

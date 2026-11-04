@@ -2,6 +2,6 @@ Komora installs and updates free apps straight from GitHub. No accounts, no ads,
 
 • Every file is checked before installing: the right app, signed with the pinned key, newer than the installed one.
 • New version notices and automatic updates, if you want them; off by default.
-• Screenshots, what's new and technical details for every app.
+• Screenshots (when the app's repository has them), what's new and technical details.
 • Other sources: optionally any public GitHub repository, with an honest warning and a key remembered at the first install.
 • Ukrainian and English, light and dark themes with Ukrainian names, or the phone's own colours.

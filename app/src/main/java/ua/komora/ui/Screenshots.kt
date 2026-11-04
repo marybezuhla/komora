@@ -35,12 +35,13 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import ua.komora.R
 import ua.komora.net.GitHub
@@ -63,11 +64,12 @@ private fun decode(bytes: ByteArray): ImageBitmap? = try {
     val w = bounds.outWidth; val h = bounds.outHeight
     if (w <= 0 || h <= 0 || w > 8000 || h > 8000) null
     else {
+        // No side larger than a phone screen needs
         var sample = 1
-        while (h / (sample * 2) >= 1200) sample *= 2
+        while (maxOf(w, h) / (sample * 2) >= 1600) sample *= 2
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply {
             inSampleSize = sample
-            inPreferredConfig = Bitmap.Config.RGB_565
+            inPreferredConfig = Bitmap.Config.ARGB_8888
         })?.asImageBitmap()
     }
 } catch (_: Throwable) {
@@ -85,9 +87,10 @@ fun Screenshots(repo: String, lang: String) {
     LaunchedEffect(key) {
         if (shots != null) return@LaunchedEffect
         val loaded = withContext(Dispatchers.IO) {
-            runCatching { GitHub.screenshots(repo, lang) }.getOrDefault(emptyList()).mapNotNull { decode(it.second) }
+            // Stops between requests once the details are closed; a failure is not remembered, so it is tried again
+            runCatching { GitHub.screenshots(repo, lang) { !isActive } }.getOrNull()?.mapNotNull { decode(it) }
+                ?.also { ScreenshotCache.put(key, it) }
         }
-        ScreenshotCache.put(key, loaded)
         shots = loaded
     }
     val list = shots.orEmpty()
@@ -107,7 +110,7 @@ fun Screenshots(repo: String, lang: String) {
                 modifier = Modifier.height(260.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
-                    .clickable { open = i },
+                    .clickable(role = Role.Image, onClickLabel = stringResource(R.string.open_fullscreen)) { open = i },
             )
         }
     }
@@ -123,7 +126,7 @@ fun Screenshots(repo: String, lang: String) {
                     "${pager.currentPage + 1} / ${list.size}",
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp).semantics { contentDescription = "" },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp).clearAndSetSemantics { },
                 )
             }
         }

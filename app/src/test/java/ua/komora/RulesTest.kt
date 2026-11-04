@@ -28,7 +28,10 @@ class RulesTest {
         assertFalse(Rules.isAllowedUrl("https://github.com:8443/a"))
         assertFalse(Rules.isAllowedUrl("file:///sdcard/a.apk"))
         assertFalse(Rules.isAllowedUrl("not a url"))
-        assertTrue(Rules.isAllowedUrl("https://raw.githubusercontent.com/a/b/main/x.png"))
+        // Pictures only for screenshots: an app file can never come from there
+        assertFalse(Rules.isAllowedUrl("https://raw.githubusercontent.com/a/b/main/x.apk"))
+        assertTrue(Rules.isAllowedUrl("https://raw.githubusercontent.com/a/b/main/x.png", Rules.SCREENSHOT_HOSTS))
+        assertFalse(Rules.isAllowedUrl("https://github.com/a/b/releases/download/v1/x.apk", Rules.SCREENSHOT_HOSTS))
     }
 
     @Test
@@ -37,6 +40,8 @@ class RulesTest {
         assertTrue(Rules.isScreenshot("1.png", ok, 1000, "Marybezu/sprotyv"))
         assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/other/x/main/1.png", 1000, "Marybezu/sprotyv"))
         assertFalse(Rules.isScreenshot("1.svg", ok, 1000, "Marybezu/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/Marybezu/sprotyv-evil/main/1.png", 1000, "Marybezu/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/Marybezu/sprotyv/../x/1.png", 1000, "Marybezu/sprotyv"))
         assertFalse(Rules.isScreenshot("../1.png", ok, 1000, "Marybezu/sprotyv"))
         assertFalse(Rules.isScreenshot("1.png", ok, Rules.MAX_IMAGE_BYTES + 1L, "Marybezu/sprotyv"))
         assertEquals("fastlane/metadata/android/uk/images/phoneScreenshots", Rules.screenshotDirs("uk").first())

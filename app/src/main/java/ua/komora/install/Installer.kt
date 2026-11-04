@@ -103,6 +103,12 @@ object Installer {
 
     const val EXTRA_WHAT = "ua.komora.extra.WHAT"
 
+    /** True while Komora's own screen downloads or installs: the automatic run then waits for another day. */
+    @Volatile var foregroundBusy = false
+
+    /** Sessions the automatic run prepared and is about to hand to Android: never dropped as leftovers. */
+    val backgroundSessions: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     /** Step 2 for an automatic update: the answer goes to [ua.komora.notify.AutoInstallReceiver], with [what] for the notice. */
     fun commitInBackground(context: Context, sessionId: Int, what: String) = wrap {
         val installer = context.packageManager.packageInstaller
@@ -138,7 +144,8 @@ object Installer {
     /** Drops sessions Komora prepared but never handed to Android (e.g. it was closed in between). */
     fun dropUncommitted(context: Context) {
         val installer = context.packageManager.packageInstaller
-        installer.mySessions.filter { !it.isCommitted }.forEach { runCatching { installer.abandonSession(it.sessionId) } }
+        installer.mySessions.filter { !it.isCommitted && it.sessionId !in backgroundSessions }
+            .forEach { runCatching { installer.abandonSession(it.sessionId) } }
     }
 
     private inline fun <T> wrap(block: () -> T): T = try {

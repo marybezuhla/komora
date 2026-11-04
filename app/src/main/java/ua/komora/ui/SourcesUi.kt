@@ -74,10 +74,17 @@ fun formatKey(sha256: String): String =
 
 /** "Add a source": a GitHub link or owner/name; the steps after it come from [state]. */
 @Composable
-fun AddSourceDialog(state: AddState, onAdd: (String) -> Unit, onChoose: (String, String) -> Unit, onDismiss: () -> Unit) {
+fun AddSourceDialog(
+    state: AddState,
+    onAdd: (String) -> Unit,
+    onChoose: (String, String) -> Unit,
+    onSkipChoice: () -> Unit = {},
+    onDismiss: () -> Unit,
+) {
     var text by rememberSaveable { mutableStateOf("") }
     if (state is AddState.Choose) {
-        ChooseApkDialog(state, onChoose, onDismiss)
+        // Closing the choice skips only this repository when several are being added
+        ChooseApkDialog(state, onChoose, onSkipChoice)
         return
     }
     val working = state is AddState.Working
@@ -133,6 +140,9 @@ private fun ChooseApkDialog(state: AddState.Choose, onChoose: (String, String) -
         title = { Text(stringResource(R.string.choose_apk)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
+                // Which repository this is about (several may be added one after another)
+                Text("github.com/${state.repo}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
                 Text(stringResource(R.string.choose_apk_text), style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(8.dp))
                 for (name in state.names) {
@@ -163,7 +173,7 @@ private fun addErrorText(e: AddError): String = stringResource(
         AddError.Network -> R.string.err_network
         AddError.RateLimit -> R.string.err_rate_limit
         AddError.Storage -> R.string.add_err_storage
-        AddError.SomeFailed -> R.string.add_err_storage
+        AddError.SomeFailed -> R.string.add_err_link
     },
 )
 
