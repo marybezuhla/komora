@@ -210,7 +210,7 @@ internal fun KomoraList(
                 // Each group is one block with its apps as rows; on a wide screen the blocks stand in two columns
                 val sections = Group.entries.mapNotNull { g -> shown.filter { Group.of(it) == g }.takeIf { it.isNotEmpty() }?.let { g to it } }
                 val section: @Composable (Pair<Group, List<AppRow>>) -> Unit = { (g, list) ->
-                    Section(stringResource(g.title), list, dashed = showAdded) { row ->
+                    Section(stringResource(g.title), list, dashed = showAdded, group = g) { row ->
                         val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
                         AppListRow(
                             row = row,
@@ -304,8 +304,17 @@ private fun Banner(rows: List<AppRow>, checking: Boolean, busy: Boolean, canInst
  * thin line that starts where the text starts.
  */
 @Composable
-private fun Section(title: String, rows: List<AppRow>, dashed: Boolean, row: @Composable (AppRow) -> Unit) {
+private fun Section(title: String, rows: List<AppRow>, dashed: Boolean, group: Group, row: @Composable (AppRow) -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    // Each group its own soft shade from the theme, told apart at a glance: updates in the accent,
+    // installed in the second colour, the rest a lighter accent
+    val (tint, amount) = when (group) {
+        Group.UPDATES -> scheme.primary to 0.18f
+        Group.INSTALLED -> scheme.secondary to 0.13f
+        Group.AVAILABLE -> scheme.primary to 0.07f
+    }
+    val fill = lerp(scheme.surface, tint, amount)
+    val edge = lerp(scheme.surface, tint, 0.45f)
     Column(Modifier.fillMaxWidth()) {
         Text(
             "$title · ${rows.size}",
@@ -318,11 +327,11 @@ private fun Section(title: String, rows: List<AppRow>, dashed: Boolean, row: @Co
         Column(
             Modifier.fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(scheme.surface)
-                .then(if (dashed) Modifier.dashedBorder(scheme.error, 20.dp) else Modifier.border(1.dp, scheme.outlineVariant, RoundedCornerShape(20.dp))),
+                .background(fill)
+                .then(if (dashed) Modifier.dashedBorder(scheme.error, 20.dp) else Modifier.border(1.dp, edge, RoundedCornerShape(20.dp))),
         ) {
             rows.forEachIndexed { i, r ->
-                if (i > 0) HorizontalDivider(Modifier.padding(start = TEXT_EDGE, end = 16.dp), color = scheme.outlineVariant)
+                if (i > 0) HorizontalDivider(Modifier.padding(start = TEXT_EDGE, end = 16.dp), color = edge.copy(alpha = 0.6f))
                 key(r.app.key) { row(r) }
             }
         }
