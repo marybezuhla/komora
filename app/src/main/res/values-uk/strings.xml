@@ -182,4 +182,5 @@
     <string name="share_sources">Поділитися списком</string>
     <string name="add_err_some">Не вдалося додати: %1$s</string>
     <string name="open_fullscreen">відкрити на весь екран</string>
+    <string name="uninstall">Видалити</string>
 </resources>
