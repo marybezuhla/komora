@@ -439,7 +439,9 @@ private fun SwitchRow(title: String, summary: String?, checked: Boolean, onChang
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            // A title: whole words, not justified
+            Text(title, style = MaterialTheme.typography.bodyLarge.copy(
+                textAlign = androidx.compose.ui.text.style.TextAlign.Start, hyphens = androidx.compose.ui.text.style.Hyphens.None), color = MaterialTheme.colorScheme.onSurface)
             if (summary != null) {
                 Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
