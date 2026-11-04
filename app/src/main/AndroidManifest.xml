@@ -63,9 +63,11 @@
         </activity>
 
         <!-- No emoji font is fetched at start: Komora connects only to GitHub -->
+        <!-- Lint cannot see this class through the library merge; it is androidx.startup's own (from Compose) -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
+            tools:ignore="MissingClass"
             tools:node="merge">
             <meta-data
                 android:name="androidx.emoji2.text.EmojiCompatInitializer"

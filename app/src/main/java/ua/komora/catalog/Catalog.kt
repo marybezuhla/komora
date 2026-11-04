@@ -19,6 +19,8 @@ data class CatalogApp(
     val added: Boolean = false,
     /** For added sources: the APK's name in a release, as a pattern (versions as digits). */
     val apkPattern: String? = null,
+    /** The lowest version Komora installs, so an old, flawed version cannot be published again as new. */
+    val minVersion: String? = null,
 ) {
     val isSelf: Boolean get() = certSha256 == SELF
 
@@ -43,6 +45,7 @@ object Catalog {
     private val PREFIX = Regex("^[a-z0-9][a-z0-9_-]{0,40}$")
     private val SHA256 = Regex("^[0-9a-f]{64}$")
     private val BADGE = Regex("^#[0-9A-Fa-f]{6}$")
+    private val VERSION = Regex("^[0-9]{1,9}(\\.[0-9]{1,9}){0,3}$")
     private const val DEFAULT_BADGE = "#5A5048"
 
     /** Reads and strictly checks the catalog. Anything unexpected stops it, rather than being skipped quietly. */
@@ -63,6 +66,9 @@ object Catalog {
                 },
                 names = o.getJSONObject("name").toMap(),
                 summaries = o.getJSONObject("summary").toMap(),
+                minVersion = if (o.has("minVersion")) o.getString("minVersion").also { v ->
+                    require(VERSION.matches(v)) { "Bad minVersion: $v" }
+                } else null,
             )
             require(PACKAGE.matches(app.packageName)) { "Bad package name: ${app.packageName}" }
             require(REPO.matches(app.repo)) { "Bad repo: ${app.repo}" }

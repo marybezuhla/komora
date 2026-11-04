@@ -56,6 +56,8 @@ object AutoUpdate {
         val jobs = context.getSystemService(JobScheduler::class.java) ?: return false
         val saved = if (!s.enabled) {
             jobs.cancel(JOB_ID)
+            // Nothing half downloaded is left behind
+            runCatching { folder(context).deleteRecursively() }
             s
         } else {
             val job = JobInfo.Builder(JOB_ID, ComponentName(context, AutoUpdateJob::class.java))
@@ -87,6 +89,19 @@ object AutoUpdate {
         if (s.enabled && context.getSystemService(JobScheduler::class.java)?.getPendingJob(JOB_ID) == null) apply(context, s)
     }
 
+    /** The version of [pkg] Android last refused to update without the owner, if any. */
+    private fun refused(context: Context, pkg: String): String? =
+        runCatching { context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString("refused_$pkg", null) }.getOrNull()
+
+    /** Remembers that this version needs the owner, so it is not downloaded again every day. */
+    internal fun rememberRefused(context: Context, pkg: String, version: String) {
+        if (pkg.isEmpty() || version.isEmpty()) return
+        runCatching { context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString("refused_$pkg", version.take(40)).apply() }
+    }
+
+    /** Where the run keeps a download; emptied when the run starts and when automatic updates are turned off. */
+    private fun folder(context: Context) = File(context.noBackupFilesDir, "auto")
+
     /** True when Komora is the installer of record, so Android lets it update without asking. */
     private fun installedByKomora(context: Context, pkg: String): Boolean = try {
         context.packageManager.getInstallSourceInfo(pkg).installingPackageName == context.packageName
@@ -111,7 +126,7 @@ object AutoUpdate {
         val taken = builtIn.map { it.packageName }.toSet() + context.packageName
         val added = if (!Sources.enabled(context)) emptyList() else Sources.load(context)
             .filter { it.trusted && it.packageName !in taken }.map { it.toApp() }
-        val dir = File(context.noBackupFilesDir, "auto").apply { mkdirs() }
+        val dir = folder(context).apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         var waiting = false
         for (app in builtIn + added) {
@@ -137,6 +152,10 @@ object AutoUpdate {
             }
             val latest = Rules.normalizeVersion(release.tag)
             if ((Rules.compareVersions(latest, installed.versionName ?: continue) ?: 0) <= 0) continue
+            // Only a release that has been out for two days: time to notice and pull a bad one
+            if (!Rules.oldEnough(release.published, System.currentTimeMillis())) continue
+            // Android already refused this very version without the owner: left for the owner, not fetched again
+            if (refused(context, app.packageName) == latest) continue
             if (dir.usableSpace < release.apk.size * 2) continue
             val file = File.createTempFile("apk", ".apk", dir)
             try {
@@ -152,10 +171,15 @@ object AutoUpdate {
                 } catch (_: Exception) {
                     continue
                 }
-                if (stopped()) return true
+                if (stopped() || Installer.foregroundBusy) return true
                 val id = try { Installer.prepare(context, file, app.packageName, background = true) } catch (_: Exception) { continue }
                 try {
-                    Installer.commitInBackground(context, id, "${app.name(lang)} $latest")
+                    // The owner started an install meanwhile: theirs goes first
+                    if (Installer.foregroundBusy) {
+                        runCatching { context.packageManager.packageInstaller.abandonSession(id) }
+                        return true
+                    }
+                    Installer.commitInBackground(context, id, "${app.name(lang)} $latest", app.packageName, latest)
                 } catch (_: Exception) {
                     continue
                 } finally {
@@ -250,14 +274,19 @@ class AutoInstallReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
         val what = intent.getStringExtra(Installer.EXTRA_WHAT).orEmpty().take(80)
+        val pkg = intent.getStringExtra(Installer.EXTRA_PACKAGE).orEmpty()
+        val version = intent.getStringExtra(Installer.EXTRA_VERSION).orEmpty()
         when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_SUCCESS -> AutoUpdate.noticeDone(context, what)
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 // Nothing is ever opened from the background: the session is dropped and the owner asked
                 if (id != -1) runCatching { context.packageManager.packageInstaller.abandonSession(id) }
+                AutoUpdate.rememberRefused(context, pkg, version)
                 AutoUpdate.noticeAsk(context, what)
             }
-            // A failed update is simply tried again in Komora; nothing to say
+            // This version cannot be installed on this phone: not downloaded again every day
+            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> AutoUpdate.rememberRefused(context, pkg, version)
+            // Anything else (space, a passing conflict) is simply tried again next time
             else -> Unit
         }
     }

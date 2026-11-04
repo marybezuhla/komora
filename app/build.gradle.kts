@@ -17,6 +17,14 @@ val appVersionCode = appVersion.split(".").map { it.toInt() }.also {
 }
 
 android {
+    // Lint runs in CI; any error stops the build, and the report goes with the build log
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = true
+        textReport = true
+        textOutput = file("build/reports/lint-results-release.txt")
+    }
+
     namespace = "ua.komora"
     compileSdk = 36
 

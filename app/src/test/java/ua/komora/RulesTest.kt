@@ -17,21 +17,21 @@ class RulesTest {
 
     @Test
     fun onlyGitHubOverHttps() {
-        assertTrue(Rules.isAllowedUrl("https://api.github.com/repos/a/b/releases/latest"))
-        assertTrue(Rules.isAllowedUrl("https://release-assets.githubusercontent.com/x?y=1"))
-        assertTrue(Rules.isAllowedUrl("https://GitHub.com/a"))
-        assertFalse(Rules.isAllowedUrl("http://github.com/a"))
-        assertFalse(Rules.isAllowedUrl("https://github.com.evil.example/a"))
-        assertFalse(Rules.isAllowedUrl("https://github.com./a"))
-        assertFalse(Rules.isAllowedUrl("https://evil.example/github.com"))
-        assertFalse(Rules.isAllowedUrl("https://user@github.com/a"))
-        assertFalse(Rules.isAllowedUrl("https://github.com:8443/a"))
-        assertFalse(Rules.isAllowedUrl("file:///sdcard/a.apk"))
-        assertFalse(Rules.isAllowedUrl("not a url"))
+        assertTrue(Rules.allowedUri("https://api.github.com/repos/a/b/releases/latest") != null)
+        assertTrue(Rules.allowedUri("https://release-assets.githubusercontent.com/x?y=1") != null)
+        assertTrue(Rules.allowedUri("https://GitHub.com/a") != null)
+        assertFalse(Rules.allowedUri("http://github.com/a") != null)
+        assertFalse(Rules.allowedUri("https://github.com.evil.example/a") != null)
+        assertFalse(Rules.allowedUri("https://github.com./a") != null)
+        assertFalse(Rules.allowedUri("https://evil.example/github.com") != null)
+        assertFalse(Rules.allowedUri("https://user@github.com/a") != null)
+        assertFalse(Rules.allowedUri("https://github.com:8443/a") != null)
+        assertFalse(Rules.allowedUri("file:///sdcard/a.apk") != null)
+        assertFalse(Rules.allowedUri("not a url") != null)
         // Pictures only for screenshots: an app file can never come from there
-        assertFalse(Rules.isAllowedUrl("https://raw.githubusercontent.com/a/b/main/x.apk"))
-        assertTrue(Rules.isAllowedUrl("https://raw.githubusercontent.com/a/b/main/x.png", Rules.SCREENSHOT_HOSTS))
-        assertFalse(Rules.isAllowedUrl("https://github.com/a/b/releases/download/v1/x.apk", Rules.SCREENSHOT_HOSTS))
+        assertFalse(Rules.allowedUri("https://raw.githubusercontent.com/a/b/main/x.apk") != null)
+        assertTrue(Rules.allowedUri("https://raw.githubusercontent.com/a/b/main/x.png", Rules.SCREENSHOT_HOSTS) != null)
+        assertFalse(Rules.allowedUri("https://github.com/a/b/releases/download/v1/x.apk", Rules.SCREENSHOT_HOSTS) != null)
     }
 
     @Test
@@ -108,5 +108,23 @@ class RulesTest {
         assertEquals(0, Rules.compareVersions("1.2", "1.2.0"))
         assertNull(Rules.compareVersions("latest", "1.0"))
         assertNull(Rules.compareVersions("1.0", ""))
+        // Test versions come before the final one, then by kind and number
+        assertEquals(1, Rules.compareVersions("v1.0.0", "1.0.0-beta"))
+        assertEquals(-1, Rules.compareVersions("1.0.0-rc.1", "1.0.0"))
+        assertEquals(1, Rules.compareVersions("1.0.0-rc.2", "1.0.0-rc.1"))
+        assertEquals(1, Rules.compareVersions("1.0.0-rc1", "1.0.0-beta3"))
+        assertEquals(1, Rules.compareVersions("1.0.0-preview", "1.0.0-pre.9"))
+        assertEquals(0, Rules.compareVersions("1.0.0-BETA", "1.0.0-beta.0"))
+        assertEquals(1, Rules.compareVersions("1.0.1-alpha", "1.0.0"))
+    }
+
+    @Test
+    fun automaticUpdatesWait() {
+        val now = 10L * Rules.AUTO_UPDATE_WAIT_MS
+        assertFalse(Rules.oldEnough(null, now))
+        assertFalse(Rules.oldEnough(now - Rules.AUTO_UPDATE_WAIT_MS + 1, now))
+        assertTrue(Rules.oldEnough(now - Rules.AUTO_UPDATE_WAIT_MS, now))
+        // A date in the future (a wrong clock) is not old enough either
+        assertFalse(Rules.oldEnough(now + 1000, now))
     }
 }

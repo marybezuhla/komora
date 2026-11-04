@@ -91,7 +91,7 @@ class StoreScreens {
         row("ua.tarilka", "1.2.4", "1.3.0", 48),
         row("ua.mandat", "0.1.185", "0.1.190", 61,
             if (downloading) Phase.Downloading(38L * 1024 * 1024, 61L * 1024 * 1024) else Phase.Idle),
-        row("ua.komora", "0.3.1", "0.3.1", 3),
+        row("ua.komora", "1.0.0", "1.0.0", 3),
         row("ua.sprotyv", "1.1.2", "1.1.2", 13),
         row("ua.pysanka", null, "0.24.0", 106),
         row("ua.svitlyna", null, "0.6.1", 57),
@@ -155,7 +155,10 @@ class StoreScreens {
 
     // 3. What is special: every app checked against its pinned key
     private fun s3() {
-        val r = home().first()
+        // An app not yet on the phone, with short notes: the whole key fits on the picture
+        val r = row("ua.pysanka", null, "0.24.0", 106).let {
+            it.copy(latest = it.latest!!.copy(notes = notes(it.app.name(lang()), "0.24.0").lines().take(3).joinToString("\n")))
+        }
         shot("03_details", Theme.NEBO, afterIdle = { runCatching { compose.onNodeWithText(if (uk()) "Показати" else "Show").performClick() } }) {
             // The sheet's content on a full page, as it looks pulled up
             androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainerLow) {

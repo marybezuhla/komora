@@ -16,6 +16,7 @@ sealed class ApkRejected : Exception() {
     object WrongPackage : ApkRejected()
     object WrongSigner : ApkRejected()
     object NotNewer : ApkRejected()
+    object TooOld : ApkRejected()
     object InstalledByOtherKey : ApkRejected()
 }
 
@@ -26,7 +27,7 @@ object ApkVerifier {
      * Checks a downloaded APK before Android ever sees it:
      *  - it is the app the catalog names (same package),
      *  - it is signed by exactly one certificate, and that certificate is the pinned one,
-     *  - it is newer than what is installed (no downgrades),
+     *  - it is not older than the catalog's lowest accepted version, and newer than what is installed (no downgrades),
      *  - the installed copy (if any) is the pinned key, or a key the new APK names as its own past key
      *    (Android's key rotation), so a planned key change still reaches people who have the app.
      * Android then checks the APK signature itself while installing.
@@ -39,6 +40,10 @@ object ApkVerifier {
         val pinned = pinnedCert(context, app)
         val signing = archive.signingInfo ?: throw ApkRejected.WrongSigner
         if (currentSigner(signing) != pinned) throw ApkRejected.WrongSigner
+        // Never older than Komora's list allows, even on a phone without the app (no going back to an old, flawed version)
+        app.minVersion?.let { min ->
+            if ((Rules.compareVersions(archive.versionName ?: "", min) ?: -1) < 0) throw ApkRejected.TooOld
+        }
 
         val installed = installedInfo(pm, app.packageName) ?: return
         val installedSigner = installed.signingInfo?.let(::currentSigner)

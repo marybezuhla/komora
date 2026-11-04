@@ -59,6 +59,9 @@ fun colorScheme(theme: Theme, context: Context): ColorScheme {
         outline = c(p.onSurfaceVariant),
         outlineVariant = c(mix(p.surfaceVariant, p.onSurfaceVariant, 0.3)),
         error = c(p.error),
+        // The box a problem is told in: a pale wash of the error colour, ordinary text on it (PaletteTest)
+        errorContainer = c(mix(p.surface, p.error, if (theme.dark) 0.25 else 0.12)),
+        onErrorContainer = c(p.onSurface),
     )
 }
 

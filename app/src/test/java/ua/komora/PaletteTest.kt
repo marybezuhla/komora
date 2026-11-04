@@ -5,6 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import ua.komora.ui.theme.Look
 import ua.komora.ui.theme.Mode
+import ua.komora.ui.theme.Shade
 import ua.komora.ui.theme.Theme
 import ua.komora.ui.theme.contrast
 import ua.komora.ui.theme.mix
@@ -36,6 +37,25 @@ class PaletteTest {
                 val r = contrast(c.first, c.second)
                 assertTrue("${t.key} $name is $r", r >= 4.5)
             }
+        }
+    }
+
+    @Test
+    fun textOnGroupsIsReadable() {
+        for (t in themes) {
+            val p = t.palette!!
+            for (shade in Shade.entries) {
+                val fill = mix(p.surface, if (shade.second) p.secondary else p.primary, shade.amount(t.dark).toDouble())
+                for ((name, text) in listOf("primary" to p.primary, "onSurface" to p.onSurface,
+                    "onSurfaceVariant" to p.onSurfaceVariant, "error" to p.error)) {
+                    val r = contrast(text, fill)
+                    assertTrue("${t.key} $name on ${shade.name} is $r", r >= 4.5)
+                }
+            }
+            // Problems: dark red text on its pale red box, and white on the error colour
+            val errorContainer = mix(p.surface, p.error, if (t.dark) 0.25 else 0.12)
+            assertTrue("${t.key} onSurface/errorContainer", contrast(p.onSurface, errorContainer) >= 4.5)
+            assertTrue("${t.key} error/errorContainer", contrast(p.error, errorContainer) >= 4.5)
         }
     }
 

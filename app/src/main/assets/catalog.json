@@ -7,6 +7,7 @@
       "repo": "Marybezu/komora",
       "assetPrefix": "komora",
       "certSha256": "self",
+      "minVersion": "0.3.2",
       "name": { "uk": "Комора", "en": "Komora" },
       "summary": { "uk": "Сама Комора: оновлюється звідси ж.", "en": "Komora itself: updates from here too." }
     },
@@ -16,6 +17,7 @@
       "repo": "Marybezu/tarilka",
       "assetPrefix": "tarilka",
       "certSha256": "64eaf973ec74aa88ab62a6b32b9552cc8713042385fa3d749f66698bcdb25c60",
+      "minVersion": "1.2.4",
       "name": { "uk": "Тарілка", "en": "Tarilka" },
       "summary": { "uk": "Приватний офлайн-трекер харчування.", "en": "Private offline food tracker." }
     },
@@ -25,6 +27,7 @@
       "repo": "Marybezu/mandat",
       "assetPrefix": "mandat",
       "certSha256": "a7065316672ac15bc387a68c2ea296ec8ea279420913d69ec50205bb548d773e",
+      "minVersion": "0.1.177",
       "name": { "uk": "Мандат", "en": "Mandat" },
       "summary": { "uk": "Приватний офлайн-органайзер із шифруванням.", "en": "Private offline organizer, all encrypted." }
     },
@@ -34,6 +37,7 @@
       "repo": "Marybezu/sprotyv",
       "assetPrefix": "sprotyv",
       "certSha256": "d00241499cd44d0859c5762a0b4cc317862358c8df3210fc3a0e9473e038a1ac",
+      "minVersion": "1.1.2",
       "name": { "uk": "Спротив", "en": "Sprotyv" },
       "summary": { "uk": "Що робити, коли небезпечно, і як підготуватися.", "en": "What to do when it is dangerous, and how to prepare." }
     },
@@ -43,6 +47,7 @@
       "repo": "Marybezu/pysanka",
       "assetPrefix": "pysanka",
       "certSha256": "ea082ca6d8620c201948d08a9572c0b74a75101eb71b2752ceddcb4807d038ce",
+      "minVersion": "0.23.0",
       "name": { "uk": "Писанка", "en": "Pysanka" },
       "summary": { "uk": "Приватна клавіатура без інтернету.", "en": "Private keyboard with no internet." }
     },
@@ -52,6 +57,7 @@
       "repo": "Marybezu/svitlyna",
       "assetPrefix": "svitlyna",
       "certSha256": "53027b1a87085eb9e40a74820ff2aa067dd3350a0e3010a8f6c559e04a628630",
+      "minVersion": "0.6.0",
       "name": { "uk": "Світлина", "en": "Svitlyna" },
       "summary": { "uk": "Приватна офлайн-галерея з локальним ШІ.", "en": "Private offline gallery with on-device AI." }
     }
