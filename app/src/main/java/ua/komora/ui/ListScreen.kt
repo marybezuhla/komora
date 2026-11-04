@@ -487,7 +487,7 @@ private fun AppListRow(
         Row(
             Modifier.fillMaxWidth()
                 .clickable(onClickLabel = details, onClick = onDetails)
-                .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
@@ -504,31 +504,35 @@ private fun AppListRow(
                 }
                 Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface,
                     maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
-                Text(
-                    row.app.summary(lang),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant,
-                    // An added app's line is its repository: one line, never broken at "/"
-                    maxLines = if (row.app.added) 1 else 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
                 StatusText(row)
-                if (hasAction && narrow) {
-                    Spacer(Modifier.height(8.dp))
-                    MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen, Modifier.heightIn(min = 44.dp))
-                }
             }
             if (hasAction && !narrow) {
                 Spacer(Modifier.width(12.dp))
                 MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen, Modifier.widthIn(min = 112.dp).heightIn(min = 44.dp))
             }
         }
+        // What the app is: under the name, at the same edge, across the rest of the row (never squeezed by the button)
+        Text(
+            row.app.summary(lang),
+            style = MaterialTheme.typography.bodyMedium,
+            color = scheme.onSurfaceVariant,
+            // An added app's line is its repository: one line, never broken at "/"
+            maxLines = if (row.app.added) 1 else 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+                .clickable(onClickLabel = details, onClick = onDetails)
+                .padding(start = if (narrow) 16.dp else TEXT_EDGE, end = 16.dp, bottom = 14.dp),
+        )
+        if (hasAction && narrow) {
+            MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen,
+                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp).fillMaxWidth().heightIn(min = 44.dp))
+        }
 
         val secondary = retry || problem == Problem.OtherKey
         if (problem == null && idle && !secondary) return@Column
         // Under the text, at the same edge
-        Column(Modifier.padding(start = TEXT_EDGE, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Under the text, at the same edge; on a narrow screen across the whole row
+        Column(Modifier.padding(start = if (narrow) 16.dp else TEXT_EDGE, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             problem?.let {
                 // A sign as well as the colour: in red themes the error and the accent are close
                 Row(
