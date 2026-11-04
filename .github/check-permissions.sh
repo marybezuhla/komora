@@ -6,7 +6,7 @@ AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
 "$AAPT" dump permissions "$APK" > permissions.txt
 cat permissions.txt
 grep -q '^package:' permissions.txt || { echo "::error::Could not read permissions"; exit 1; }
-ALLOWED=" android.permission.INTERNET android.permission.REQUEST_INSTALL_PACKAGES \
+ALLOWED=" android.permission.INTERNET android.permission.REQUEST_INSTALL_PACKAGES android.permission.REQUEST_DELETE_PACKAGES \
 android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION android.permission.ENFORCE_UPDATE_OWNERSHIP \
 android.permission.POST_NOTIFICATIONS android.permission.RECEIVE_BOOT_COMPLETED android.permission.ACCESS_NETWORK_STATE \
 ua.komora.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION "

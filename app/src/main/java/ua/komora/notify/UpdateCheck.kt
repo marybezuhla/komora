@@ -89,13 +89,13 @@ object UpdateCheck {
     }
 
     /** Whether a notice from Komora would actually be seen: allowed by Android and not silenced. */
-    fun canNotify(context: Context): Boolean {
+    fun canNotify(context: Context, channelId: String = CHANNEL): Boolean {
         if (Build.VERSION.SDK_INT >= 33 &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return false
         val nm = context.getSystemService(NotificationManager::class.java) ?: return false
         if (!nm.areNotificationsEnabled()) return false
-        val channel = nm.getNotificationChannel(CHANNEL)
+        val channel = nm.getNotificationChannel(channelId)
         return channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
     }
 

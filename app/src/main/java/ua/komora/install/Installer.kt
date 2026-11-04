@@ -53,7 +53,7 @@ object Installer {
      * Step 1: copies an already verified APK into a new install session and returns its id.
      * Nothing is installed yet; the APK file may be deleted afterwards.
      */
-    fun prepare(context: Context, apk: File, packageName: String): Int = wrap {
+    fun prepare(context: Context, apk: File, packageName: String, background: Boolean = false): Int = wrap {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(packageName)
@@ -66,6 +66,8 @@ object Installer {
             if (Build.VERSION.SDK_INT >= 34) setRequestUpdateOwnership(true)
         }
         val id = installer.createSession(params)
+        // Protected from being dropped as a leftover from the very start (the caller removes it once committed)
+        if (background) backgroundSessions += id
         try {
             installer.openSession(id).use { session ->
                 apk.inputStream().use { input ->
@@ -77,6 +79,7 @@ object Installer {
             }
         } catch (e: Exception) {
             runCatching { installer.abandonSession(id) }
+            backgroundSessions -= id
             throw e
         }
         id
@@ -89,6 +92,35 @@ object Installer {
             installer.openSession(sessionId).use { session ->
                 val intent = Intent(context, InstallReceiver::class.java).setPackage(context.packageName)
                 // Mutable is required: Android fills in the result. The intent is explicit, to Komora's own receiver.
+                val pending = PendingIntent.getBroadcast(
+                    context, sessionId, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+                )
+                session.commit(pending.intentSender)
+            }
+        } catch (e: Exception) {
+            runCatching { installer.abandonSession(sessionId) }
+            throw e
+        }
+    }
+
+    const val EXTRA_WHAT = "ua.komora.extra.WHAT"
+
+    /** True while Komora's own screen downloads or installs: the automatic run then waits for another day. */
+    @Volatile var foregroundBusy = false
+
+    /** Sessions the automatic run prepared and is about to hand to Android: never dropped as leftovers. */
+    val backgroundSessions: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /** Step 2 for an automatic update: the answer goes to [ua.komora.notify.AutoInstallReceiver], with [what] for the notice. */
+    fun commitInBackground(context: Context, sessionId: Int, what: String) = wrap {
+        val installer = context.packageManager.packageInstaller
+        try {
+            installer.openSession(sessionId).use { session ->
+                val intent = Intent(context, ua.komora.notify.AutoInstallReceiver::class.java)
+                    .setPackage(context.packageName)
+                    .putExtra(EXTRA_WHAT, what)
+                // Mutable is required: Android fills in the result. Explicit, to Komora's own receiver.
                 val pending = PendingIntent.getBroadcast(
                     context, sessionId, intent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
@@ -115,7 +147,8 @@ object Installer {
     /** Drops sessions Komora prepared but never handed to Android (e.g. it was closed in between). */
     fun dropUncommitted(context: Context) {
         val installer = context.packageManager.packageInstaller
-        installer.mySessions.filter { !it.isCommitted }.forEach { runCatching { installer.abandonSession(it.sessionId) } }
+        installer.mySessions.filter { !it.isCommitted && it.sessionId !in backgroundSessions }
+            .forEach { runCatching { installer.abandonSession(it.sessionId) } }
     }
 
     private inline fun <T> wrap(block: () -> T): T = try {

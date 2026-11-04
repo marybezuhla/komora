@@ -46,13 +46,16 @@ enum class Problem {
 sealed class AddState {
     object Idle : AddState()
     object Working : AddState()
+    /** Everything asked for is added: the dialog closes. */
+    object Done : AddState()
     /** The release has several APKs: the owner picks one, once. */
     /** [names] are shown; [all] are every APK in the release, so the pattern can be checked against them. */
     data class Choose(val repo: String, val names: List<String>, val all: List<String> = names) : AddState()
-    data class Failed(val reason: AddError) : AddState()
+    /** [repos]: when several were added at once, the ones that could not be. */
+    data class Failed(val reason: AddError, val repos: List<String> = emptyList()) : AddState()
 }
 
-enum class AddError { BadLink, Exists, InKomora, TooMany, NoRelease, NoApk, Network, RateLimit, Storage }
+enum class AddError { BadLink, Exists, InKomora, TooMany, NoRelease, NoApk, Network, RateLimit, Storage, SomeFailed }
 
 /** Shown before the first install from an added source: what the file is, and whether to trust it. */
 data class TrustRequest(val repo: String, val identity: ApkVerifier.Identity)
@@ -264,13 +267,69 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Step 1: a link or "owner/name"; finds the APKs in its newest release. */
+    /** Several repositories added at once (a shared list): the ones still to do, and those that failed. */
+    private val pendingAdds = ArrayDeque<String>()
+    private val failedAdds = mutableListOf<String>()
+    private var currentAdd: String? = null
+    private var batch = false
+
+    /**
+     * Step 1: a link or "owner/name", or several (one per line, as "Share the list" gives them); finds the
+     * APKs in each newest release, one repository after another.
+     */
     fun addSource(input: String) {
-        val repo = Sources.parseRepo(input) ?: return run { _adding.value = AddState.Failed(AddError.BadLink) }
+        val words = input.split('\n', ',', ' ', '\t').map { it.trim() }.filter { it.isNotEmpty() }
+        pendingAdds.clear()
+        failedAdds.clear()
+        // Only what reads as a repository; the same one twice counts once
+        val repos = words.mapNotNull { Sources.parseRepo(it) }.distinctBy { it.lowercase() }
+        // Words that look like links but are not a repository are said, not dropped silently
+        val bad = words.filter { "/" in it && Sources.parseRepo(it) == null }.map { it.take(60) }
+        batch = repos.size > 1 || (repos.isNotEmpty() && bad.isNotEmpty())
+        if (!batch) {
+            val repo = repos.singleOrNull() ?: return run { _adding.value = AddState.Failed(AddError.BadLink) }
+            addOne(repo)
+            return
+        }
+        failedAdds += bad
+        repos.forEach { pendingAdds.addLast(it) }
+        nextAdd()
+    }
+
+    /** The next repository of several, or the end: Idle, or which ones could not be added. */
+    private fun nextAdd() {
+        val repo = pendingAdds.removeFirstOrNull()
+        if (repo != null) return addOne(repo)
+        currentAdd = null
+        batch = false
+        _adding.value = if (failedAdds.isEmpty()) AddState.Done else AddState.Failed(AddError.SomeFailed, failedAdds.toList())
+    }
+
+    /** "Cancel" on the choice of APK: in a list, only that repository is skipped. */
+    fun skipChoice() {
+        if (!batch) return dismissAdding()
+        currentAdd?.let { failedAdds += it }
+        nextAdd()
+    }
+
+    /** One repository finished (added, failed, or needing a choice): go on with the rest, if several. */
+    private fun finishOne(result: AddState) {
+        if (!batch || result is AddState.Choose) {
+            _adding.value = result
+            return
+        }
+        // Already added counts as done when moving a list over
+        if (result is AddState.Failed && result.reason != AddError.Exists && result.reason != AddError.InKomora) currentAdd?.let { failedAdds += it }
+        nextAdd()
+    }
+
+    private fun addOne(repo: String) {
+        currentAdd = repo
         when {
-            sources.size >= Sources.MAX -> return run { _adding.value = AddState.Failed(AddError.TooMany) }
-            sources.any { it.repo.equals(repo, ignoreCase = true) } -> return run { _adding.value = AddState.Failed(AddError.Exists) }
-            verified.any { it.repo.equals(repo, ignoreCase = true) } -> return run { _adding.value = AddState.Failed(AddError.InKomora) }
+            // Already there first: moving a list over counts those as done, even when the list is full
+            sources.any { it.repo.equals(repo, ignoreCase = true) } -> return finishOne(AddState.Failed(AddError.Exists))
+            verified.any { it.repo.equals(repo, ignoreCase = true) } -> return finishOne(AddState.Failed(AddError.InKomora))
+            sources.size >= Sources.MAX -> return finishOne(AddState.Failed(AddError.TooMany))
         }
         _adding.value = AddState.Working
         addJob?.cancel()
@@ -278,7 +337,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             val found = withContext(Dispatchers.IO) { catching { GitHub.latestApks(repo) } }
             // Closed or started again meanwhile: this answer is no longer wanted
             ensureActive()
-            _adding.value = found.fold(
+            finishOne(found.fold(
                 onSuccess = { (canonical, apks) ->
                     val names = apks.map { it.name }
                     when {
@@ -299,19 +358,33 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                         },
                     )
                 },
-            )
+            ))
         }
     }
+
+    /** The added sources as links, one per line, to move them to another phone. */
+    fun sourcesAsText(): String = sources.joinToString("\n") { "https://github.com/${it.repo}" }
 
     /** Step 2, when there were several APKs: the one to take from now on. */
     fun chooseApk(repo: String, name: String) {
         val all = (_adding.value as? AddState.Choose)?.all ?: listOf(name)
-        _adding.value = saveSource(repo, name, all)
+        val result = saveSource(repo, name, all)
+        // One of several: on with the rest
+        if (batch) {
+            if (result is AddState.Failed) currentAdd?.let { failedAdds += it }
+            nextAdd()
+        } else {
+            _adding.value = result
+        }
     }
 
     fun dismissAdding() {
         addJob?.cancel()
         addJob = null
+        pendingAdds.clear()
+        failedAdds.clear()
+        currentAdd = null
+        batch = false
         _adding.value = AddState.Idle
     }
 
@@ -325,7 +398,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         sources = next
         rebuildRows()
         viewModelScope.launch { check(source.toApp()) }
-        return AddState.Idle
+        return AddState.Done
     }
 
     /** Removes an added source from Komora (the app itself, if installed, stays on the phone). */
@@ -393,6 +466,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         val current = Active(row.app.key)
         active = current
         _busy.value = true
+        Installer.foregroundBusy = true
         current.job = viewModelScope.launch {
             set(current.key) { it.copy(phase = Phase.Downloading(0, release.apk.size), problem = null) }
             val prepared = withContext(Dispatchers.IO) {
@@ -456,6 +530,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         }
         // A cancelled download returns the row to where it was, with no error
         current.job?.invokeOnCompletion { cause ->
+            // Directly, not in a new coroutine: when the screen is gone for good, that one would never run
+            if (cause is CancellationException && active === current) Installer.foregroundBusy = false
             if (cause is CancellationException) viewModelScope.launch {
                 answerTrust(null, false)
                 if (active === current) {
@@ -496,10 +572,17 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         if (id == null) a.job?.cancel() else Installer.cancel(ctx, id)
     }
 
+    override fun onCleared() {
+        // The screen is gone: automatic updates may run again
+        if (active != null) Installer.foregroundBusy = false
+        super.onCleared()
+    }
+
     private fun finish(a: Active) {
         if (active === a) {
             active = null
             _busy.value = false
+            Installer.foregroundBusy = false
         }
     }
 

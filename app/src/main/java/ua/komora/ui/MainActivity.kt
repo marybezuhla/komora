@@ -64,6 +64,7 @@ import ua.komora.ui.theme.SectionTitle
 import ua.komora.ui.theme.Group
 import ua.komora.ui.theme.Segments
 import ua.komora.notify.UpdateCheck
+import ua.komora.notify.AutoUpdate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.HorizontalDivider
@@ -144,6 +145,21 @@ class MainActivity : ComponentActivity() {
         if (granted) setUpdates(updates.value.copy(enabled = true)) else notifyDenied.value = true
     }
 
+    /** Automatic updates (off by default). */
+    private val auto = mutableStateOf(AutoUpdate.Settings())
+
+    /** Asked once when automatic updates are turned on, so the owner can hear what was updated; they work either way. */
+    private val askNotifyForAuto = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    private fun setAuto(s: AutoUpdate.Settings) {
+        val turningOn = s.enabled && !auto.value.enabled
+        AutoUpdate.apply(this, s)
+        auto.value = AutoUpdate.settings(this)
+        if (turningOn && auto.value.enabled && Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) askNotifyForAuto.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     private fun setUpdates(s: UpdateCheck.Settings) {
         if (s.enabled && !UpdateCheck.canNotify(this)) {
             // Android asks only before the first refusal; after that, the note offers its settings
@@ -170,6 +186,8 @@ class MainActivity : ComponentActivity() {
         look.value = LookStore.load(this)
         updates.value = UpdateCheck.settings(this)
         UpdateCheck.ensure(this)
+        auto.value = AutoUpdate.settings(this)
+        AutoUpdate.ensure(this)
         UpdateCheck.createChannel(this)
         // Android's confirmation screen opens only while Komora is in front
         lifecycleScope.launch {
@@ -215,6 +233,8 @@ class MainActivity : ComponentActivity() {
                         updates = updates.value,
                         notifyDenied = notifyDenied.value,
                         onUpdates = ::setUpdates,
+                        auto = auto.value,
+                        onAuto = ::setAuto,
                         onNotifySettings = {
                             start(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
                         },
@@ -263,6 +283,32 @@ class MainActivity : ComponentActivity() {
         notifyDenied.value = updates.value.enabled && !UpdateCheck.canNotify(this)
         vm.refreshInstalled()
     }
+
+    /** An app removed or replaced while Komora is open (Android's uninstaller closes before it is done) */
+    private val packagesChanged = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            // An update sends removed, added and replaced: only "replaced" counts then
+            val replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+            if (replacing && intent.action != Intent.ACTION_PACKAGE_REPLACED) return
+            vm.refreshInstalled()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        androidx.core.content.ContextCompat.registerReceiver(this, packagesChanged, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
+    override fun onStop() {
+        runCatching { unregisterReceiver(packagesChanged) }
+        super.onStop()
+    }
 }
 
 internal class Actions(
@@ -292,11 +338,12 @@ private fun KomoraScreen(
     val trust by vm.trust.collectAsStateWithLifecycle()
     var showAdd by rememberSaveable { mutableStateOf(false) }
     var detailsKey by rememberSaveable { mutableStateOf<String?>(null) }
-    // The add dialog closes by itself once the source is added
-    var submitted by remember { mutableStateOf(false) }
+    // The add dialog closes by itself once everything asked for is added
     LaunchedEffect(adding) {
-        if (adding is AddState.Working || adding is AddState.Choose) submitted = true
-        else if (adding is AddState.Idle && submitted) { submitted = false; showAdd = false }
+        if (adding is AddState.Done) {
+            showAdd = false
+            vm.dismissAdding()
+        }
     }
     KomoraList(
         rows, busy, confirm, canInstall, onLook, actions,
@@ -307,15 +354,18 @@ private fun KomoraScreen(
         onUpdateAll = vm::updateAll,
         sourcesEnabled = sourcesOn,
         onAddSource = { vm.dismissAdding(); showAdd = true },
+        onShareSources = {
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, vm.sourcesAsText())
+            actions.start(Intent.createChooser(send, null))
+        },
         onDetails = { detailsKey = it.app.key },
         addedTab = addedTab.value,
         onTab = { addedTab.value = it },
         addedListState = addedListState,
     )
     if (showAdd) {
-        AddSourceDialog(adding, onAdd = vm::addSource, onChoose = vm::chooseApk) {
+        AddSourceDialog(adding, onAdd = vm::addSource, onChoose = vm::chooseApk, onSkipChoice = vm::skipChoice) {
             vm.dismissAdding()
-            submitted = false
             showAdd = false
         }
     }
@@ -346,6 +396,8 @@ internal fun LookPage(
     updates: UpdateCheck.Settings = UpdateCheck.Settings(),
     notifyDenied: Boolean = false,
     onUpdates: (UpdateCheck.Settings) -> Unit = {},
+    auto: AutoUpdate.Settings = AutoUpdate.Settings(),
+    onAuto: (AutoUpdate.Settings) -> Unit = {},
     onNotifySettings: () -> Unit = {},
     sourcesEnabled: Boolean = false,
     onSources: (Boolean) -> Unit = {},
@@ -379,7 +431,7 @@ internal fun LookPage(
                 look, onChange, language, onLanguage,
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
             ) {
-                UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings)
+                UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings, auto, onAuto)
                 SourcesSettings(sourcesEnabled, onSources)
                 AboutRow(onAbout)
             }
@@ -394,6 +446,8 @@ private fun UpdateSettings(
     denied: Boolean,
     onChange: (UpdateCheck.Settings) -> Unit,
     onNotifySettings: () -> Unit,
+    auto: AutoUpdate.Settings,
+    onAuto: (AutoUpdate.Settings) -> Unit,
 ) {
     Spacer(Modifier.height(8.dp))
     SectionTitle(stringResource(R.string.updates_title))
@@ -424,6 +478,26 @@ private fun UpdateSettings(
                 ) { onChange(s.copy(weekly = it)) }
                 Spacer(Modifier.height(8.dp))
                 SwitchRow(stringResource(R.string.wifi_only), null, s.wifiOnly) { onChange(s.copy(wifiOnly = it)) }
+            }
+        }
+    }
+    // Automatic updates: a block of its own, under the notices
+    Spacer(Modifier.height(12.dp))
+    Group {
+        Column {
+            SwitchRow(stringResource(R.string.auto_update), stringResource(R.string.auto_update_summary), auto.enabled) {
+                onAuto(auto.copy(enabled = it))
+            }
+            if (auto.enabled) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text(stringResource(R.string.auto_network), style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 8.dp))
+                Segments(
+                    options = listOf(true to R.string.auto_wifi, false to R.string.auto_any_network),
+                    chosen = auto.wifiOnly,
+                ) { onAuto(auto.copy(wifiOnly = it)) }
+                Spacer(Modifier.height(8.dp))
+                SwitchRow(stringResource(R.string.auto_charging), null, auto.charging) { onAuto(auto.copy(charging = it)) }
             }
         }
     }

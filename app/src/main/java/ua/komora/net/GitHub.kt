@@ -86,6 +86,55 @@ object GitHub {
     }
 
     /**
+     * The screenshots an app keeps in its repository for F-Droid, in the language shown if it has them,
+     * as image bytes: two requests to GitHub's API (which languages, then which files), then one per
+     * picture. Empty when there are none; null when GitHub could not be asked (to try again later).
+     * [isCancelled] stops it between requests.
+     */
+    fun screenshots(repo: String, lang: String, isCancelled: () -> Boolean): List<ByteArray>? {
+        fun list(path: String): org.json.JSONArray? = try {
+            val body = open("https://api.github.com/repos/$repo/contents/$path", api = true, hosts = Rules.SCREENSHOT_HOSTS)
+                .use { readLimited(it.inputStream, Rules.MAX_JSON_BYTES) }
+            org.json.JSONArray(String(body, Charsets.UTF_8))
+        } catch (_: NoReleaseException) {
+            // 404: not there
+            org.json.JSONArray()
+        } catch (_: JSONException) {
+            org.json.JSONArray()
+        } catch (_: StackOverflowError) {
+            org.json.JSONArray()
+        }
+        return try {
+            val base = "fastlane/metadata/android"
+            val langs = list(base) ?: return null
+            val have = (0 until langs.length()).mapNotNull { langs.optJSONObject(it)?.takeIf { o -> o.optString("type") == "dir" }?.optString("name") }
+            // The language shown first; the next one only if that one has no pictures
+            var files = emptyList<Triple<String, String, Long>>()
+            for (dir in Rules.screenshotDirs(lang).filter { d -> d.removePrefix("$base/").substringBefore('/') in have }) {
+                if (isCancelled()) return null
+                val a = list(dir) ?: return null
+                files = (0 until a.length()).mapNotNull { i ->
+                    val o = a.optJSONObject(i) ?: return@mapNotNull null
+                    val name = o.optString("name"); val url = o.optString("download_url"); val size = o.optLong("size")
+                    if (o.optString("type") == "file" && Rules.isScreenshot(name, url, size, repo)) Triple(name, url, size) else null
+                }
+                if (files.isNotEmpty()) break
+            }
+            // In their own order: 1, 2, … 10
+            files.sortedWith(compareBy({ it.first.takeWhile { c -> c.isDigit() }.toIntOrNull() ?: Int.MAX_VALUE }, { it.first }))
+                .take(Rules.MAX_SCREENSHOTS)
+                .mapNotNull { (_, url, size) ->
+                    if (isCancelled()) return null
+                    runCatching {
+                        open(url, api = false, hosts = Rules.SCREENSHOT_HOSTS).use { readLimited(it.inputStream, size.toInt()) }
+                    }.getOrNull()?.takeIf { it.size.toLong() == size }
+                }
+        } catch (_: IOException) {
+            null
+        }
+    }
+
+    /**
      * Downloads [asset] into [target], never more than its stated size, and checks GitHub's checksum when given.
      * [onProgress] gets the bytes so far; [isCancelled] stops the download between chunks.
      */
@@ -131,10 +180,10 @@ object GitHub {
     }
 
     /** An open connection after any redirects, each one checked against the allowed hosts. */
-    private fun open(start: String, api: Boolean): Connection {
+    private fun open(start: String, api: Boolean, hosts: Set<String> = Rules.APP_HOSTS): Connection {
         var url = start
         repeat(MAX_REDIRECTS + 1) {
-            val uri = Rules.allowedUri(url) ?: throw IOException("Refused to connect outside GitHub")
+            val uri = Rules.allowedUri(url, hosts) ?: throw IOException("Refused to connect outside GitHub")
             val conn = uri.toURL().openConnection() as HttpsURLConnection
             try {
                 conn.instanceFollowRedirects = false

@@ -23,7 +23,7 @@
     <string name="allow_button">Allow</string>
     <string name="footer">Every file is checked before installing: it must be signed with the key Komora knows for that app. A file signed by anyone else is refused.</string>
     <string name="about_title">About</string>
-    <string name="about_text">© Komora authors. Free software under the GNU GPL, version 3 or (at your option) any later version, without any warranty. Uses AndroidX and Kotlin libraries (Apache 2.0). Apps are downloaded from GitHub, which sees the address of the phone that asks.</string>
+    <string name="about_text">© Komora authors. Free software under the GNU GPL, version 3 or (at your option) any later version, without any warranty. Uses AndroidX and Kotlin libraries (Apache 2.0). Apps are downloaded from GitHub, which sees the address of the phone that asks. Opening an app\'s details asks GitHub for its screenshots, so GitHub can see which app was looked at.</string>
     <string name="source_code">Source code</string>
     <string name="license">License</string>
     <string name="err_network">No connection to GitHub. Check the internet and try again.</string>
@@ -54,7 +54,7 @@
     <string name="theme_chornozem">Black earth</string>
     <string name="theme_system">Phone colours</string>
     <string name="theme_system_dark">Phone colours</string>
-    <string name="footer_permissions">It needs the internet (GitHub only) and permission to install apps; notifications only if you turn on update notices. No accounts, no ads, no tracking.</string>
+    <string name="footer_permissions">It needs the internet (GitHub only), permission to install apps and, when you ask, to remove them; notifications only if you turn on notices or automatic updates. No accounts, no ads, no tracking.</string>
     <string name="theme_glyna">Clay</string>
     <string name="theme_zhar">Embers</string>
     <string name="app_language">Language</string>
@@ -95,7 +95,7 @@
     <string name="details_added">Added by you. Komora has not checked this app: only that every update is signed with the same key as the first install.</string>
     <string name="details_verified">From Komora\'s own list. The key is built into Komora; an APK with any other key is refused.</string>
     <string name="add_source">Add a source</string>
-    <string name="add_source_text">A link to a public GitHub repository that publishes APK files in its Releases.</string>
+    <string name="add_source_text">A link to a public GitHub repository that publishes APK files in its Releases. You can paste several links, one per line, to add them all.</string>
     <string name="add_source_field">Repository</string>
     <string name="add_source_looking">Looking at the latest release…</string>
     <string name="add">Add</string>
@@ -169,4 +169,19 @@
     <string name="details_technical">Technical details</string>
     <string name="show_key">Show</string>
     <string name="hide_key">Hide</string>
+    <string name="auto_update">Update automatically</string>
+    <string name="auto_update_summary">About once a day Komora installs new versions of the apps it installed, with all the usual checks. Komora itself and apps installed elsewhere are left for you.</string>
+    <string name="auto_network">Download over</string>
+    <string name="auto_wifi">Wi-Fi only</string>
+    <string name="auto_any_network">Any internet</string>
+    <string name="auto_charging">Only while charging</string>
+    <string name="auto_channel">Automatic updates</string>
+    <string name="auto_done_title">Updated automatically</string>
+    <string name="auto_ask_title">An update needs you</string>
+    <string name="auto_ask_text">Android wants your confirmation for %1$s. Open Komora and tap Update.</string>
+    <string name="screenshot">Screenshot</string>
+    <string name="uninstall_app">Uninstall the app</string>
+    <string name="share_sources">Share the list</string>
+    <string name="add_err_some">Could not add: %1$s</string>
+    <string name="open_fullscreen">open full screen</string>
 </resources>

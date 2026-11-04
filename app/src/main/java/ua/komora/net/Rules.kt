@@ -8,12 +8,37 @@ class BadReleaseException(message: String) : Exception(message)
 /** Plain rules with no Android code, so they can be tested on a computer. */
 object Rules {
     /** The only places Komora ever connects to: GitHub's API and the hosts GitHub serves release files from. */
-    val ALLOWED_HOSTS = setOf(
+    val APP_HOSTS = setOf(
         "api.github.com",
         "github.com",
         "objects.githubusercontent.com",
         "release-assets.githubusercontent.com",
     )
+
+    /** Screenshots: the list from GitHub's API, the pictures from the repository itself. Nothing else. */
+    val SCREENSHOT_HOSTS = setOf("api.github.com", "raw.githubusercontent.com")
+
+    /** Every host Komora may ever connect to. */
+    val ALLOWED_HOSTS = APP_HOSTS + SCREENSHOT_HOSTS
+
+    /** A screenshot is never bigger than this; a larger file is left out. */
+    const val MAX_IMAGE_BYTES: Int = 3 * 1024 * 1024
+
+    /** At most this many screenshots per app. */
+    const val MAX_SCREENSHOTS = 8
+
+    /** Where an app keeps its screenshots, as F-Droid reads them; the language shown first. */
+    fun screenshotDirs(lang: String): List<String> {
+        val order = if (lang == "uk") listOf("uk", "uk-UA", "en-US", "en") else listOf("en-US", "en", "uk", "uk-UA")
+        return order.map { "fastlane/metadata/android/$it/images/phoneScreenshots" }
+    }
+
+    /** A screenshot of [repo]: an image file in its own repository, nothing else. */
+    fun isScreenshot(name: String, url: String, size: Long, repo: String): Boolean =
+        Regex("(?i)^[A-Za-z0-9._-]{1,80}\\.(png|jpe?g|webp)$").matches(name) &&
+            url.startsWith("https://raw.githubusercontent.com/$repo/", ignoreCase = true) &&
+            !url.contains("/.") && !url.contains("%2e", ignoreCase = true) && !url.contains("%2f", ignoreCase = true) &&
+            size in 1..MAX_IMAGE_BYTES.toLong()
 
     /** Big enough for an app with a bundled model, small enough that a bad release cannot fill the phone. */
     const val MAX_APK_BYTES: Long = 600L * 1024 * 1024
@@ -24,16 +49,16 @@ object Rules {
     val SHA256_HEX = Regex("^[0-9a-f]{64}$")
 
     /** Parses [url] once; the same object is then used to connect, so the check and the connection agree. */
-    fun allowedUri(url: String): URI? {
+    fun allowedUri(url: String, hosts: Set<String> = APP_HOSTS): URI? {
         val uri = try { URI(url) } catch (_: Exception) { return null }
         val ok = uri.scheme == "https" &&
-            uri.host != null && uri.host.lowercase() in ALLOWED_HOSTS &&
+            uri.host != null && uri.host.lowercase() in hosts &&
             uri.rawUserInfo == null &&
             (uri.port == -1 || uri.port == 443)
         return uri.takeIf { ok }
     }
 
-    fun isAllowedUrl(url: String): Boolean = allowedUri(url) != null
+    fun isAllowedUrl(url: String, hosts: Set<String> = APP_HOSTS): Boolean = allowedUri(url, hosts) != null
 
     data class Asset(val name: String, val url: String, val size: Long, val sha256: String?)
 
