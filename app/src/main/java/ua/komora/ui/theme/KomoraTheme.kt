@@ -76,12 +76,11 @@ fun KomoraTheme(theme: Theme, content: @Composable () -> Unit) {
  * setting still scales all of it.
  */
 private val KomoraType = androidx.compose.material3.Typography().run {
-    // Body text: justified, so a paragraph has two straight edges; lines broken evenly over the whole
-    // paragraph, and long words hyphenated, so no line gets wide gaps. Text set in the middle on purpose
-    // (headings, the letter in "About") says so itself and is not touched.
+    // Body text as in Sprotyv: left-aligned, whole words (no hyphens), lines broken evenly over the
+    // whole paragraph so the right edge has no chopped bits. Text set in the middle says so itself.
     fun body(t: TextStyle, size: Int, line: Int) = t.copy(
         fontSize = size.sp, lineHeight = line.sp, letterSpacing = 0.sp,
-        textAlign = TextAlign.Justify, lineBreak = LineBreak.Paragraph, hyphens = Hyphens.Auto,
+        textAlign = TextAlign.Start, lineBreak = LineBreak.Paragraph, hyphens = Hyphens.None,
     )
     // Labels and titles: the letters at their natural spacing (Material spreads them apart)
     fun label(t: TextStyle, size: Int, line: Int) = t.copy(fontSize = size.sp, lineHeight = line.sp, letterSpacing = 0.sp)
