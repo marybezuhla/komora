@@ -85,6 +85,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ua.komora.R
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material3.CenterAlignedTopAppBar
 import ua.komora.install.Confirm
 import ua.komora.ui.theme.CardTitle
 import ua.komora.ui.theme.Ornament
@@ -139,7 +141,8 @@ internal fun KomoraList(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Column(Modifier.background(MaterialTheme.colorScheme.background)) {
-                TopAppBar(
+                // The name in the middle, over the motif
+                CenterAlignedTopAppBar(
                     title = {
                         Text(stringResource(R.string.app_name), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     },
@@ -154,7 +157,7 @@ internal fun KomoraList(
                             Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.look))
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 )
                 Ornament(Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
             }
@@ -266,27 +269,35 @@ private fun Summary(rows: List<AppRow>, checking: Boolean, busy: Boolean, canIns
             stringResource(R.string.summary_all_current) to scheme.onSurface
         else -> stringResource(R.string.summary_tap_check) to scheme.onSurfaceVariant
     }
-    Row(
+    // In the middle: how things stand, and under it what can be done
+    Column(
         Modifier.fillMaxWidth()
-            .background(scheme.surface, RoundedCornerShape(16.dp))
-            .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
-            .heightIn(min = 48.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .background(scheme.surface, RoundedCornerShape(20.dp))
+            .border(1.dp, scheme.outlineVariant, RoundedCornerShape(20.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = tint,
-            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
-        if (updates > 1) {
-            Button(onClick = onUpdateAll, enabled = canInstall && !busy) { Text(stringResource(R.string.update_all), maxLines = 1) }
-        } else {
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally), modifier = Modifier.fillMaxWidth()) {
             // TalkBack reads the full label
             val full = stringResource(R.string.refresh)
-            TextButton(onClick = onCheck, enabled = !checking, modifier = Modifier.semantics { contentDescription = full }) {
-                Text(stringResource(R.string.check), fontWeight = FontWeight.SemiBold, maxLines = 1)
+            OutlinedButton(
+                onClick = onCheck,
+                enabled = !checking,
+                modifier = Modifier.weight(1f, fill = updates > 1).heightIn(min = 48.dp).semantics { contentDescription = full },
+            ) { Text(stringResource(R.string.check), fontWeight = FontWeight.SemiBold, maxLines = 1) }
+            if (updates > 1) {
+                Button(onClick = onUpdateAll, enabled = canInstall && !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.update_all), fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
             }
         }
     }
@@ -294,13 +305,19 @@ private fun Summary(rows: List<AppRow>, checking: Boolean, busy: Boolean, canIns
 
 @Composable
 private fun GroupTitle(title: String, count: Int) {
-    Text(
-        "$title · $count",
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, top = 8.dp).semantics { heading() },
-    )
+    val line = MaterialTheme.colorScheme.outlineVariant
+    // In the middle, between two thin lines, like the motif under the page title
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f).height(1.dp).background(Brush.horizontalGradient(listOf(line.copy(alpha = 0f), line))))
+        Text(
+            "$title · $count",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 12.dp).semantics { heading() },
+        )
+        Box(Modifier.weight(1f).height(1.dp).background(Brush.horizontalGradient(listOf(line, line.copy(alpha = 0f)))))
+    }
 }
 
 @Composable
@@ -364,7 +381,7 @@ private val APP_ICONS = mapOf(
     "ua.svitlyna" to R.drawable.app_icon_svitlyna,
 )
 
-private val ICON = 48.dp
+private val ICON = 56.dp
 
 /**
  * The app's icon. Once installed, it comes from the app itself on this phone, so a new icon shows as
@@ -470,72 +487,62 @@ private fun AppCard(
         border = if (added) null else BorderStroke(1.dp, scheme.outlineVariant),
         modifier = modifier.fillMaxWidth().then(if (added) Modifier.dashedBorder(frame, 16.dp) else Modifier),
     ) {
-        // The icon, what the app is, and its one main action on the right, as in app stores. On a narrow
-        // screen or with a large font there is no room beside the text: the action goes under it instead
-        // (Worked out from the screen: a card's own size cannot be asked for in a row of cards of one height)
-        val screen = LocalConfiguration.current.screenWidthDp
-        val cols = columnsFor(screen)
-        val cardWidth = (screen - 32 - 10 * (cols - 1)) / cols
-        val roomy = cardWidth / LocalDensity.current.fontScale >= 320f
-        Row(Modifier.padding(start = 14.dp, end = 12.dp, top = 14.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
-            Spacer(Modifier.width(14.dp))
-            // One swipe reads one app
-            val details = stringResource(R.string.details)
-            Column(
-                Modifier.weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
+        // Top: the icon beside the name and where the app stands. Then what it is, across the whole card.
+        // Then the buttons, side by side and the same width, so the card is even from edge to edge.
+        val details = stringResource(R.string.details)
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 14.dp)) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
                     .clickable(onClickLabel = details, onClick = onDetails)
                     .semantics(mergeDescendants = true) {},
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (added) {
-                    // Said in words too, not only by the frame
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(painterResource(R.drawable.ic_warning), contentDescription = null, tint = scheme.error, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            stringResource(R.string.added_by_you),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = scheme.error,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (added) {
+                        // Said in words too, not only by the frame
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(R.drawable.ic_warning), contentDescription = null, tint = scheme.error, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.added_by_you), style = MaterialTheme.typography.labelMedium,
+                                color = scheme.error, fontWeight = FontWeight.SemiBold)
+                        }
                     }
-                }
-                Text(name, style = CardTitle, color = scheme.onSurface, modifier = Modifier.semantics { heading() })
-                Text(
-                    row.app.summary(lang),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant,
-                    // An added app's line is its repository: one line, cut at the end, never broken at "/"
-                    maxLines = if (row.app.added) 1 else 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(6.dp))
-                // The status, and "What's new" beside it (or under it, when there is no room)
-                StatusLine(stacked = !roomy) {
+                    Text(name, style = CardTitle, color = scheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.semantics { heading() })
                     StatusPill(row)
-                    if (offerNotes && idle) {
-                        Text(
-                            stringResource(if (showNotes) R.string.hide_whats_new else R.string.whats_new),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = scheme.primary,
-                            maxLines = 1,
-                            modifier = Modifier.padding(start = 4.dp)
-                                .clip(RoundedCornerShape(50))
-                                .clickable(role = Role.Button) { showNotes = !showNotes }
-                                .heightIn(min = 32.dp)
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                        )
-                    }
-                }
-                if (idle && !roomy) {
-                    Spacer(Modifier.height(8.dp))
-                    MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen)
                 }
             }
-            if (idle && roomy) {
-                Spacer(Modifier.width(8.dp))
-                MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                row.app.summary(lang),
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurfaceVariant,
+                // An added app's line is its repository: one line, cut at the end, never broken at "/"
+                maxLines = if (row.app.added) 1 else 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val hasAction = !row.isInstalled || row.hasUpdate || canOpen
+            val notesButton = offerNotes && idle
+            if (idle && (hasAction || notesButton)) {
+                Spacer(Modifier.height(14.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (notesButton) {
+                        OutlinedButton(
+                            onClick = { showNotes = !showNotes },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                        ) {
+                            Text(stringResource(if (showNotes) R.string.hide_whats_new else R.string.whats_new), maxLines = 1,
+                                overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    if (hasAction) {
+                        MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen, Modifier.weight(1f).heightIn(min = 48.dp))
+                    }
+                }
             }
         }
 
@@ -545,8 +552,8 @@ private fun AppCard(
         if (stretch) Spacer(Modifier.weight(1f))
         if (!below) return@Card
 
-        // Everything below lines up with the name, not with the icon
-        Column(Modifier.padding(start = 76.dp, end = 14.dp, bottom = 12.dp)) {
+        // Everything below uses the whole width, like the text above
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
             problem?.let {
                 // A sign as well as the colour: in red themes the error and the accent are close
                 Row(verticalAlignment = Alignment.Top) {
@@ -630,32 +637,28 @@ private fun MainAction(
     problem: Problem?,
     onInstall: () -> Unit,
     onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val padding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
     when {
         !row.isInstalled -> {
             val label = stringResource(R.string.install)
             Button(onClick = onInstall, enabled = canGet, contentPadding = padding,
-                modifier = Modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1) }
+                modifier = modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) }
         }
         row.hasUpdate -> {
             val label = stringResource(R.string.update)
             Button(onClick = onInstall, enabled = canGet, contentPadding = padding,
-                modifier = Modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1) }
+                modifier = modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) }
         }
         canOpen -> {
             val label = stringResource(R.string.open)
             OutlinedButton(onClick = onOpen, contentPadding = padding, colors = ButtonDefaults.outlinedButtonColors(),
-                modifier = Modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1) }
+                modifier = modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
 
-/** Side by side, wrapping when needed; or one under the other where there is little room. */
-@Composable
-private fun StatusLine(stacked: Boolean, content: @Composable () -> Unit) {
-    if (stacked) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { content() } else FlowRowCompat(content)
-}
 
 /** Buttons wrap to a new line when the font is large or the screen is narrow. */
 @OptIn(ExperimentalLayoutApi::class)

@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.ButtonDefaults
@@ -355,14 +356,15 @@ internal fun LookPage(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Column(Modifier.background(MaterialTheme.colorScheme.background)) {
-                TopAppBar(
+                // Every page has its title in the middle, over the motif
+                CenterAlignedTopAppBar(
                     title = { Text(stringResource(R.string.look), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 )
                 Ornament(Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
             }
