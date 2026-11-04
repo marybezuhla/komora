@@ -61,8 +61,8 @@
     <string name="whats_new">Що нового</string>
     <string name="hide_whats_new">Сховати</string>
     <string name="updates_title">Оновлення</string>
-    <string name="notify_updates">Повідомляти про оновлення</string>
-    <string name="notify_updates_summary">Раз на день Комора у фоні питає GitHub і повідомляє, коли для застосунку на цьому телефоні є нова версія. Встановлення — як і раніше, тут.</string>
+    <string name="notify_updates">Сповіщення про нові версії</string>
+    <string name="notify_updates_summary">Комора перевіряє, чи вийшли нові версії ваших застосунків, і надсилає сповіщення. Оновлюєте ви самі, як завжди.</string>
     <string name="wifi_only">Лише через Wi-Fi</string>
     <string name="notify_denied">Android не дозволяє Коморі показувати сповіщення. Їх можна дозволити в налаштуваннях телефона.</string>
     <string name="notification_channel">Оновлення застосунків</string>
@@ -158,4 +158,9 @@
     <string name="org_nbu_what">Рахунок для збору коштів на потреби армії, відкритий 24 лютого 2022 року; НБУ щомісяця звітує</string>
     <string name="org_nbu_url">https://bank.gov.ua/ua/news/all/natsionalniy-bank-vidkriv-spetsrahunok-dlya-zboru-koshtiv-na-potrebi-armiyi</string>
     <string name="support_any">Підтримати можна й будь-який перевірений фонд, волонтерів чи підрозділ, яким ви довіряєте. Перевіряйте збори: офіційні реквізити й звіти.</string>
+    <string name="notify_how_often">Як часто</string>
+    <string name="notify_daily">Щодня</string>
+    <string name="notify_weekly">Щотижня</string>
+    <string name="theme_kalyna">Калина</string>
+    <string name="theme_zoriana_nich">Зоряна ніч</string>
 </resources>

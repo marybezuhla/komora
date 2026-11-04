@@ -293,4 +293,19 @@ class ScreensTest {
     @Test fun settingsAboutRow() = shot("36-settings-about-row", Theme.SYSTEM) {
         LookPage(Look(), onBack = {}, sourcesEnabled = true) {}
     }
+
+    // The new pair: Viburnum by day, Starry night by night
+    @Test fun listKalyna() = list("37-list-kalyna", Theme.KALYNA)
+
+    @Config(qualifiers = "+night")
+    @Test fun listZorianaNich() = list("38-list-zoriana-nich", Theme.ZORIANA_NICH)
+
+    @Test fun listNeboHoney() = list("39-list-nebo-honey", Theme.NEBO)
+
+    @Test fun aboutTitle() = shot("40-about-title", Theme.SYSTEM) { AboutPage(onBack = {}) }
+
+    @Config(qualifiers = "uk-w400dp-h2400dp-xhdpi")
+    @Test fun settingsWeekly() = shot("41-settings-weekly", Theme.SYSTEM) {
+        LookPage(Look(), onBack = {}, updates = UpdateCheck.Settings(enabled = true, weekly = true)) {}
+    }
 }

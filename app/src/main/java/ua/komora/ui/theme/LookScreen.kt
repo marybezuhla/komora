@@ -72,6 +72,8 @@ fun themeName(theme: Theme): String = stringResource(
         Theme.VISK -> R.string.theme_visk
         Theme.NEBO -> R.string.theme_nebo
         Theme.GLYNA -> R.string.theme_glyna
+        Theme.KALYNA -> R.string.theme_kalyna
+        Theme.ZORIANA_NICH -> R.string.theme_zoriana_nich
         Theme.SYSTEM -> R.string.theme_system
         Theme.PODILLIA -> R.string.theme_podillia
         Theme.HUTSULSHCHYNA -> R.string.theme_hutsulshchyna
@@ -111,7 +113,8 @@ fun LookSettings(
         ) { onChange(look.copy(mode = it)) }
         Spacer(Modifier.height(8.dp))
         SectionTitle(stringResource(R.string.day_theme))
-        Group { ThemeRow(Theme.DAY, look.day) { onChange(look.copy(day = it)) } }
+        // Choosing a day theme brings its night pair along; the night can still be chosen on its own below
+        Group { ThemeRow(Theme.DAY, look.day) { onChange(look.copy(day = it, night = Theme.pairOf(it))) } }
         Spacer(Modifier.height(8.dp))
         SectionTitle(stringResource(R.string.night_theme))
         Group { ThemeRow(Theme.NIGHT, look.night) { onChange(look.copy(night = it)) } }
@@ -131,7 +134,7 @@ internal fun Group(content: @Composable () -> Unit) {
 
 /** A pill split into choices; the chosen one is raised in the card colour. Read as radio buttons. */
 @Composable
-private fun <T> Segments(options: List<Pair<T, Int>>, chosen: T, onChoose: (T) -> Unit) {
+internal fun <T> Segments(options: List<Pair<T, Int>>, chosen: T, onChoose: (T) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Row(
         Modifier.fillMaxWidth().background(scheme.surfaceVariant, RoundedCornerShape(50)).padding(4.dp).selectableGroup(),

@@ -10,11 +10,11 @@
 
 **Встановлення.** Завантажте .apk з останнього випуску на телефоні й відкрийте його. Браузер чи Android попросять дозволити встановлення з цього джерела. Потрібен Android 12 або новіший.
 
-**Приватність.** Акаунтів, аналітики й реклами немає. Під час кожного запуску Комора питає GitHub про нові випуски, тому GitHub бачить адресу телефона, як і для будь-якого сайту. Якщо в налаштуваннях увімкнено сповіщення про оновлення, ті самі питання (про всі застосунки зі списку) ставляться раз на день у фоні.
+**Приватність.** Акаунтів, аналітики й реклами немає. Під час кожного запуску Комора питає GitHub про нові випуски, тому GitHub бачить адресу телефона, як і для будь-якого сайту. Якщо в налаштуваннях увімкнено сповіщення про оновлення, ті самі питання (про всі застосунки зі списку) ставляться у фоні раз на день або раз на тиждень, як оберете.
 
 ---
 
-A simple open-source app store for Android. Installs and updates the apps in its catalog straight from GitHub. Every file is checked before installing: the right app, signed with the key pinned in Komora for that app, newer than the installed one. Connects only to GitHub, only over HTTPS; GitHub sees the phone's address when Komora checks for updates at each start, and once a day in the background if update notices are turned on in Settings.
+A simple open-source app store for Android. Installs and updates the apps in its catalog straight from GitHub. Every file is checked before installing: the right app, signed with the key pinned in Komora for that app, newer than the installed one. Connects only to GitHub, only over HTTPS; GitHub sees the phone's address when Komora checks for updates at each start, and once a day or once a week in the background if update notices are turned on in Settings.
 
 Other sources (off by default): after a warning and the owner's agreement, any public GitHub repository can be added. Komora does not check those apps: before the first install it shows the app's name, package and signing key, and afterwards accepts only updates with the same key. To tell whether an added app is installed, Komora can see apps that have a home-screen icon; it never sends or keeps that list.
 

@@ -1,8 +1,8 @@
 package ua.komora.ui.theme
 
 /**
- * Komora's colours, after Pysanka's themes: three for the day, three for the night, and the phone's
- * own colours (Material You). Plain numbers (ARGB), so they can be checked for contrast on a computer.
+ * Komora's colours, after Pysanka's themes: five for the day, five for the night, in pairs, and the
+ * phone's own colours (Material You). Plain numbers (ARGB), so they can be checked for contrast on a computer.
  */
 class Palette(
     val primary: Long,
@@ -34,7 +34,8 @@ enum class Theme(val key: String, val dark: Boolean, val palette: Palette?) {
         onSurface = 0xFF2E2116, onSurfaceVariant = 0xFF64503C, error = 0xFF9C1F17,
     )),
     NEBO("nebo", false, Palette(
-        primary = 0xFF3D5F94, onPrimary = 0xFFFFFFFF, secondary = 0xFFA3392C,
+        // Blue with honey, never with red: blue, white and red together read as another flag
+        primary = 0xFF3D5F94, onPrimary = 0xFFFFFFFF, secondary = 0xFFA67200,
         background = 0xFFD9E0E7, surface = 0xFFF1F4F7, surfaceVariant = 0xFFE1E7EE,
         onSurface = 0xFF1E2A3C, onSurfaceVariant = 0xFF4A596D, error = 0xFFB3261E,
     )),
@@ -43,6 +44,12 @@ enum class Theme(val key: String, val dark: Boolean, val palette: Palette?) {
         primary = 0xFF9C4524, onPrimary = 0xFFFFF8F2, secondary = 0xFF8A5A2B,
         background = 0xFFF4EEE5, surface = 0xFFFFFFFF, surfaceVariant = 0xFFEFE7DC,
         onSurface = 0xFF2A211C, onSurfaceVariant = 0xFF6B5D52, error = 0xFFA8201A,
+    )),
+    KALYNA("kalyna", false, Palette(
+        // Viburnum: berry red and a green leaf on warm cream
+        primary = 0xFFA3263A, onPrimary = 0xFFFFF8F6, secondary = 0xFF3F6B3A,
+        background = 0xFFF3E6E3, surface = 0xFFFFFAF8, surfaceVariant = 0xFFF1E3DF,
+        onSurface = 0xFF2A1E1F, onSurfaceVariant = 0xFF62504F, error = 0xFF8C1D18,
     )),
     SYSTEM("system", false, null),
 
@@ -69,12 +76,22 @@ enum class Theme(val key: String, val dark: Boolean, val palette: Palette?) {
         background = 0xFF1C1A18, surface = 0xFF26231F, surfaceVariant = 0xFF34302B,
         onSurface = 0xFFF0E8DE, onSurfaceVariant = 0xFFB8ADA0, error = 0xFFFFB4A9,
     )),
+    ZORIANA_NICH("zoriana_nich", true, Palette(
+        // Starry night: deep blue with golden stars, Sky's pair
+        primary = 0xFF93A9EA, onPrimary = 0xFF0F1733, secondary = 0xFFE6C15A,
+        background = 0xFF0B1020, surface = 0xFF161E36, surfaceVariant = 0xFF222B47,
+        onSurface = 0xFFE8ECF6, onSurfaceVariant = 0xFFA9B2C9, error = 0xFFFFB4A9,
+    )),
     SYSTEM_DARK("system_dark", true, null);
 
     companion object {
         // The phone's own colours come first: they are the default
-        val DAY = listOf(SYSTEM) + entries.filter { !it.dark && it != SYSTEM }
-        val NIGHT = listOf(SYSTEM_DARK) + entries.filter { it.dark && it != SYSTEM_DARK }
+        // In pairs: each day theme stands right above its night theme
+        val DAY = listOf(SYSTEM, NEBO, KALYNA, KREYDA, VISK, GLYNA)
+        val NIGHT = listOf(SYSTEM_DARK, ZORIANA_NICH, PODILLIA, CHORNOZEM, HUTSULSHCHYNA, ZHAR)
+        /** A day theme's night pair (and the other way round): sky and starry night, chalk and black earth... */
+        fun pairOf(t: Theme): Theme = DAY.indexOf(t).takeIf { it >= 0 }?.let { NIGHT[it] } ?: DAY[NIGHT.indexOf(t).coerceAtLeast(0)]
+
         fun of(key: String?, fallback: Theme) = entries.firstOrNull { it.key == key } ?: fallback
     }
 }
