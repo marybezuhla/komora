@@ -46,7 +46,7 @@ ALLOWED = {"ua.komora.ui.MainActivity"}
 for e in elems:
     if e["tag"] not in ("activity", "activity-alias", "service", "receiver", "provider"):
         continue
-    name = e["attrs"].get("name", "").strip('"').split(" ")[0]
+    name = e["attrs"].get("name", "").split(" ")[0].strip('"')
     exported = val(e["attrs"].get("exported")) in ("true", "0xffffffff")
     if exported and name not in ALLOWED and "permission" not in e["attrs"]:
         errors.append(f"{e['tag']} {name} is exported without a permission")
