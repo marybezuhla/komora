@@ -54,7 +54,7 @@
     <string name="theme_chornozem">Чорнозем</string>
     <string name="theme_system">Кольори телефона</string>
     <string name="theme_system_dark">Кольори телефона</string>
-    <string name="footer_permissions">Потрібні інтернет (тільки GitHub) і дозвіл встановлювати застосунки; сповіщення — лише якщо ви ввімкнете повідомлення про оновлення. Без акаунтів, реклами й стеження.</string>
+    <string name="footer_permissions">Їй потрібні інтернет (лише GitHub), дозвіл встановлювати застосунки й, коли ви попросите, видаляти їх; сповіщення — лише якщо ви їх увімкнете. Без акаунтів, реклами й стеження.</string>
     <string name="theme_glyna">Глина</string>
     <string name="theme_zhar">Жар</string>
     <string name="app_language">Мова</string>
@@ -93,7 +93,7 @@
     <string name="details_added">Додано вами. Комора не перевіряла цей застосунок, лише стежить, щоб кожне оновлення мало той самий ключ, що й перше встановлення.</string>
     <string name="details_verified">Із власного списку Комори. Ключ вшитий у Комору; APK з іншим ключем буде відхилено.</string>
     <string name="add_source">Додати джерело</string>
-    <string name="add_source_text">Посилання на публічний репозиторій GitHub, який публікує APK-файли в розділі Releases.</string>
+    <string name="add_source_text">Посилання на публічний репозиторій GitHub, який публікує APK-файли в розділі Releases. Кілька посилань, по одному в рядку, додадуться всі.</string>
     <string name="add_source_field">Репозиторій</string>
     <string name="add_source_looking">Дивлюся останній випуск…</string>
     <string name="add">Додати</string>
@@ -167,4 +167,18 @@
     <string name="details_technical">Технічні дані</string>
     <string name="show_key">Показати</string>
     <string name="hide_key">Сховати</string>
+    <string name="auto_update">Оновлювати автоматично</string>
+    <string name="auto_update_summary">Раз на день Комора встановлює нові версії застосунків, які вона встановила, з усіма звичними перевірками. Саму Комору й застосунки, встановлені деінде, оновлюєте ви.</string>
+    <string name="auto_network">Завантажувати через</string>
+    <string name="auto_wifi">Лише Wi-Fi</string>
+    <string name="auto_any_network">Будь-який інтернет</string>
+    <string name="auto_charging">Лише на зарядці</string>
+    <string name="auto_channel">Автоматичні оновлення</string>
+    <string name="auto_done_title">Оновлено автоматично</string>
+    <string name="auto_ask_title">Оновлення чекає на вас</string>
+    <string name="auto_ask_text">Android просить вашого підтвердження для %1$s. Відкрийте Комору й натисніть «Оновити».</string>
+    <string name="screenshot">Знімок екрана</string>
+    <string name="uninstall_app">Видалити застосунок</string>
+    <string name="share_sources">Поділитися списком</string>
+    <string name="add_err_some">Не вдалося додати: %1$s</string>
 </resources>

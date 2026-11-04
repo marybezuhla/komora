@@ -49,10 +49,11 @@ sealed class AddState {
     /** The release has several APKs: the owner picks one, once. */
     /** [names] are shown; [all] are every APK in the release, so the pattern can be checked against them. */
     data class Choose(val repo: String, val names: List<String>, val all: List<String> = names) : AddState()
-    data class Failed(val reason: AddError) : AddState()
+    /** [repos]: when several were added at once, the ones that could not be. */
+    data class Failed(val reason: AddError, val repos: List<String> = emptyList()) : AddState()
 }
 
-enum class AddError { BadLink, Exists, InKomora, TooMany, NoRelease, NoApk, Network, RateLimit, Storage }
+enum class AddError { BadLink, Exists, InKomora, TooMany, NoRelease, NoApk, Network, RateLimit, Storage, SomeFailed }
 
 /** Shown before the first install from an added source: what the file is, and whether to trust it. */
 data class TrustRequest(val repo: String, val identity: ApkVerifier.Identity)
@@ -264,13 +265,59 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Step 1: a link or "owner/name"; finds the APKs in its newest release. */
+    /** Several repositories added at once (a shared list): the ones still to do, and those that failed. */
+    private val pendingAdds = ArrayDeque<String>()
+    private val failedAdds = mutableListOf<String>()
+    private var currentAdd: String? = null
+    private var batch = false
+
+    /**
+     * Step 1: a link or "owner/name", or several (one per line, as "Share the list" gives them); finds the
+     * APKs in each newest release, one repository after another.
+     */
     fun addSource(input: String) {
-        val repo = Sources.parseRepo(input) ?: return run { _adding.value = AddState.Failed(AddError.BadLink) }
+        val lines = input.split('\n', ',', ' ', '\t').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        pendingAdds.clear()
+        failedAdds.clear()
+        batch = lines.size > 1
+        if (!batch) {
+            val repo = Sources.parseRepo(input) ?: return run { _adding.value = AddState.Failed(AddError.BadLink) }
+            addOne(repo)
+            return
+        }
+        lines.take(Sources.MAX).forEach { line ->
+            val repo = Sources.parseRepo(line)
+            if (repo == null) failedAdds += line.take(60) else pendingAdds.addLast(repo)
+        }
+        nextAdd()
+    }
+
+    /** The next repository of several, or the end: Idle, or which ones could not be added. */
+    private fun nextAdd() {
+        val repo = pendingAdds.removeFirstOrNull()
+        if (repo != null) return addOne(repo)
+        currentAdd = null
+        batch = false
+        _adding.value = if (failedAdds.isEmpty()) AddState.Idle else AddState.Failed(AddError.SomeFailed, failedAdds.toList())
+    }
+
+    /** One repository finished (added, failed, or needing a choice): go on with the rest, if several. */
+    private fun finishOne(result: AddState) {
+        if (!batch || result is AddState.Choose) {
+            _adding.value = result
+            return
+        }
+        // Already added counts as done when moving a list over
+        if (result is AddState.Failed && result.reason != AddError.Exists) currentAdd?.let { failedAdds += it }
+        nextAdd()
+    }
+
+    private fun addOne(repo: String) {
+        currentAdd = repo
         when {
-            sources.size >= Sources.MAX -> return run { _adding.value = AddState.Failed(AddError.TooMany) }
-            sources.any { it.repo.equals(repo, ignoreCase = true) } -> return run { _adding.value = AddState.Failed(AddError.Exists) }
-            verified.any { it.repo.equals(repo, ignoreCase = true) } -> return run { _adding.value = AddState.Failed(AddError.InKomora) }
+            sources.size >= Sources.MAX -> return finishOne(AddState.Failed(AddError.TooMany))
+            sources.any { it.repo.equals(repo, ignoreCase = true) } -> return finishOne(AddState.Failed(AddError.Exists))
+            verified.any { it.repo.equals(repo, ignoreCase = true) } -> return finishOne(AddState.Failed(AddError.InKomora))
         }
         _adding.value = AddState.Working
         addJob?.cancel()
@@ -278,7 +325,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             val found = withContext(Dispatchers.IO) { catching { GitHub.latestApks(repo) } }
             // Closed or started again meanwhile: this answer is no longer wanted
             ensureActive()
-            _adding.value = found.fold(
+            finishOne(found.fold(
                 onSuccess = { (canonical, apks) ->
                     val names = apks.map { it.name }
                     when {
@@ -299,19 +346,33 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                         },
                     )
                 },
-            )
+            ))
         }
     }
+
+    /** The added sources as links, one per line, to move them to another phone. */
+    fun sourcesAsText(): String = sources.joinToString("\n") { "https://github.com/${it.repo}" }
 
     /** Step 2, when there were several APKs: the one to take from now on. */
     fun chooseApk(repo: String, name: String) {
         val all = (_adding.value as? AddState.Choose)?.all ?: listOf(name)
-        _adding.value = saveSource(repo, name, all)
+        val result = saveSource(repo, name, all)
+        // One of several: on with the rest
+        if (batch) {
+            if (result is AddState.Failed) currentAdd?.let { failedAdds += it }
+            nextAdd()
+        } else {
+            _adding.value = result
+        }
     }
 
     fun dismissAdding() {
         addJob?.cancel()
         addJob = null
+        pendingAdds.clear()
+        failedAdds.clear()
+        currentAdd = null
+        batch = false
         _adding.value = AddState.Idle
     }
 

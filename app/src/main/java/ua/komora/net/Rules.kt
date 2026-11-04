@@ -13,7 +13,27 @@ object Rules {
         "github.com",
         "objects.githubusercontent.com",
         "release-assets.githubusercontent.com",
+        // Screenshots in an app's repository, only when its details are opened
+        "raw.githubusercontent.com",
     )
+
+    /** A screenshot is never bigger than this; a larger file is left out. */
+    const val MAX_IMAGE_BYTES: Int = 3 * 1024 * 1024
+
+    /** At most this many screenshots per app. */
+    const val MAX_SCREENSHOTS = 8
+
+    /** Where an app keeps its screenshots, as F-Droid reads them; the language shown first. */
+    fun screenshotDirs(lang: String): List<String> {
+        val order = if (lang == "uk") listOf("uk", "uk-UA", "en-US", "en") else listOf("en-US", "en", "uk", "uk-UA")
+        return order.map { "fastlane/metadata/android/$it/images/phoneScreenshots" }
+    }
+
+    /** A screenshot of [repo]: an image file in its own repository, nothing else. */
+    fun isScreenshot(name: String, url: String, size: Long, repo: String): Boolean =
+        Regex("(?i)^[A-Za-z0-9._-]{1,80}\\.(png|jpe?g|webp)$").matches(name) &&
+            url.startsWith("https://raw.githubusercontent.com/$repo/", ignoreCase = true) &&
+            size in 1..MAX_IMAGE_BYTES.toLong()
 
     /** Big enough for an app with a bundled model, small enough that a bad release cannot fill the phone. */
     const val MAX_APK_BYTES: Long = 600L * 1024 * 1024

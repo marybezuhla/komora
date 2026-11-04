@@ -47,6 +47,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ua.komora.R
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.ui.text.style.Hyphens
@@ -87,17 +88,22 @@ fun AddSourceDialog(state: AddState, onAdd: (String) -> Unit, onChoose: (String,
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = text,
-                    onValueChange = { text = it.take(200) },
+                    onValueChange = { text = it.take(2000) },
                     label = { Text(stringResource(R.string.add_source_field)) },
                     placeholder = { Text("github.com/owner/name") },
-                    singleLine = true,
+                    // One link, or several pasted from "Share the list"
+                    singleLine = false,
+                    maxLines = 6,
                     enabled = !working,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (state is AddState.Failed) {
                     Spacer(Modifier.height(8.dp))
-                    Text(addErrorText(state.reason), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        if (state.reason == AddError.SomeFailed) stringResource(R.string.add_err_some, state.repos.joinToString(", "))
+                        else addErrorText(state.reason),
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                 }
                 if (working) {
                     Spacer(Modifier.height(12.dp))
@@ -155,6 +161,7 @@ private fun addErrorText(e: AddError): String = stringResource(
         AddError.Network -> R.string.err_network
         AddError.RateLimit -> R.string.err_rate_limit
         AddError.Storage -> R.string.add_err_storage
+        AddError.SomeFailed -> R.string.add_err_storage
     },
 )
 
@@ -218,6 +225,11 @@ fun DetailsSheet(row: AppRow, lang: String, pinnedKey: String?, onRemove: (() ->
             Spacer(Modifier.height(12.dp))
             Text(row.app.summary(lang), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface,
                 modifier = Modifier.fillMaxWidth())
+            // How it looks: only for Komora's own list (pictures from unknown sources are not opened)
+            if (!row.app.added) {
+                Spacer(Modifier.height(12.dp))
+                Screenshots(row.app.repo, lang)
+            }
             // 2. What is new in the latest version, in the language shown
             val notes = ReleaseNotes.forLanguage(row.latest?.notes.orEmpty(), lang)
             if (notes.isNotBlank()) {
@@ -306,6 +318,21 @@ fun DetailsSheet(row: AppRow, lang: String, pinnedKey: String?, onRemove: (() ->
             Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.report_bug_note), style = MaterialTheme.typography.bodySmall,
                 color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            // Android's own "Uninstall?" question; Komora itself is removed in the phone's settings
+            if (row.isInstalled && !row.app.isSelf && row.app.packageName.isNotEmpty()) {
+                val context = LocalContext.current
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent(android.content.Intent.ACTION_DELETE, android.net.Uri.parse("package:${row.app.packageName}")),
+                            )
+                        }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.uninstall_app), color = scheme.error, fontWeight = FontWeight.SemiBold) }
+            }
             if (onRemove != null) {
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = onRemove, modifier = Modifier.heightIn(min = 48.dp)) {

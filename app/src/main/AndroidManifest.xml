@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- To install and update the apps in the catalog (Android asks the owner each time it must) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- For "Uninstall" in an app's details: Android still asks the owner itself -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- Updates to apps Komora installed go through without an extra tap -->
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <!-- Android 14+: another installer must ask the owner before updating apps Komora installed -->
@@ -74,6 +76,17 @@
         <service
             android:name=".notify.UpdateJob"
             android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+
+        <!-- Automatic updates, only when turned on; only Android's job scheduler can start it -->
+        <service
+            android:name=".notify.AutoUpdateJob"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+
+        <!-- Android's answer for an automatic update, through Komora's own PendingIntent -->
+        <receiver
+            android:name=".notify.AutoInstallReceiver"
             android:exported="false" />
 
         <!-- Only Android's installer reports here, through Komora's own PendingIntent -->

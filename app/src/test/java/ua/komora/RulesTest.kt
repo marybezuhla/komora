@@ -28,6 +28,18 @@ class RulesTest {
         assertFalse(Rules.isAllowedUrl("https://github.com:8443/a"))
         assertFalse(Rules.isAllowedUrl("file:///sdcard/a.apk"))
         assertFalse(Rules.isAllowedUrl("not a url"))
+        assertTrue(Rules.isAllowedUrl("https://raw.githubusercontent.com/a/b/main/x.png"))
+    }
+
+    @Test
+    fun screenshotsOnlyFromTheRepository() {
+        val ok = "https://raw.githubusercontent.com/Marybezu/sprotyv/main/fastlane/1.png"
+        assertTrue(Rules.isScreenshot("1.png", ok, 1000, "Marybezu/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/other/x/main/1.png", 1000, "Marybezu/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.svg", ok, 1000, "Marybezu/sprotyv"))
+        assertFalse(Rules.isScreenshot("../1.png", ok, 1000, "Marybezu/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", ok, Rules.MAX_IMAGE_BYTES + 1L, "Marybezu/sprotyv"))
+        assertEquals("fastlane/metadata/android/uk/images/phoneScreenshots", Rules.screenshotDirs("uk").first())
     }
 
     @Test

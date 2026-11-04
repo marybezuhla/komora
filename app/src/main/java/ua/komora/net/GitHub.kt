@@ -86,6 +86,40 @@ object GitHub {
     }
 
     /**
+     * The screenshots an app keeps in its repository for F-Droid, in the language shown if it has them,
+     * as image bytes. Empty when there are none; one request for the list, then one per image.
+     */
+    fun screenshots(repo: String, lang: String): List<Pair<String, ByteArray>> {
+        for (dir in Rules.screenshotDirs(lang)) {
+            val body = try {
+                open("https://api.github.com/repos/$repo/contents/$dir", api = true).use { readLimited(it.inputStream, Rules.MAX_JSON_BYTES) }
+            } catch (_: NoReleaseException) {
+                // 404: not in this language
+                continue
+            }
+            val files = try {
+                val a = org.json.JSONArray(String(body, Charsets.UTF_8))
+                (0 until a.length()).mapNotNull { i ->
+                    val o = a.optJSONObject(i) ?: return@mapNotNull null
+                    val name = o.optString("name"); val url = o.optString("download_url"); val size = o.optLong("size")
+                    if (o.optString("type") == "file" && Rules.isScreenshot(name, url, size, repo)) Triple(name, url, size) else null
+                }
+            } catch (_: JSONException) {
+                emptyList()
+            } catch (_: StackOverflowError) {
+                emptyList()
+            }
+            if (files.isEmpty()) continue
+            // In their own order: 1, 2, … 10
+            val sorted = files.sortedWith(compareBy({ it.first.takeWhile { c -> c.isDigit() }.toIntOrNull() ?: Int.MAX_VALUE }, { it.first }))
+            return sorted.take(Rules.MAX_SCREENSHOTS).mapNotNull { (name, url, size) ->
+                runCatching { name to open(url, api = false).use { readLimited(it.inputStream, size.toInt()) } }.getOrNull()
+            }
+        }
+        return emptyList()
+    }
+
+    /**
      * Downloads [asset] into [target], never more than its stated size, and checks GitHub's checksum when given.
      * [onProgress] gets the bytes so far; [isCancelled] stops the download between chunks.
      */

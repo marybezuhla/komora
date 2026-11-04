@@ -44,6 +44,7 @@ import ua.komora.ui.theme.KomoraTheme
 import ua.komora.ui.theme.Look
 import ua.komora.ui.theme.Theme
 import ua.komora.notify.UpdateCheck
+import ua.komora.notify.AutoUpdate
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import java.io.File
@@ -305,5 +306,11 @@ class ScreensTest {
     @Config(qualifiers = "uk-w400dp-h2400dp-xhdpi")
     @Test fun settingsWeekly() = shot("41-settings-weekly", Theme.SYSTEM) {
         LookPage(Look(), onBack = {}, updates = UpdateCheck.Settings(enabled = true, weekly = true)) {}
+    }
+
+    @Config(qualifiers = "uk-w400dp-h2600dp-xhdpi")
+    @Test fun settingsAutoUpdate() = shot("42-settings-auto-update", Theme.SYSTEM) {
+        LookPage(Look(), onBack = {}, updates = UpdateCheck.Settings(enabled = true),
+            auto = AutoUpdate.Settings(enabled = true, wifiOnly = false)) {}
     }
 }

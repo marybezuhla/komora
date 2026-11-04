@@ -101,6 +101,29 @@ object Installer {
         }
     }
 
+    const val EXTRA_WHAT = "ua.komora.extra.WHAT"
+
+    /** Step 2 for an automatic update: the answer goes to [ua.komora.notify.AutoInstallReceiver], with [what] for the notice. */
+    fun commitInBackground(context: Context, sessionId: Int, what: String) = wrap {
+        val installer = context.packageManager.packageInstaller
+        try {
+            installer.openSession(sessionId).use { session ->
+                val intent = Intent(context, ua.komora.notify.AutoInstallReceiver::class.java)
+                    .setPackage(context.packageName)
+                    .putExtra(EXTRA_WHAT, what)
+                // Mutable is required: Android fills in the result. Explicit, to Komora's own receiver.
+                val pending = PendingIntent.getBroadcast(
+                    context, sessionId, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+                )
+                session.commit(pending.intentSender)
+            }
+        } catch (e: Exception) {
+            runCatching { installer.abandonSession(sessionId) }
+            throw e
+        }
+    }
+
     /**
      * Stops a session that is waiting for the owner's answer. Reported as cancelled only if Android really
      * dropped it; a session Android already holds finishes and reports by itself.

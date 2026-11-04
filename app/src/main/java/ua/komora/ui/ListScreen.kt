@@ -127,6 +127,7 @@ internal fun KomoraList(
     onUpdateAll: (List<String>) -> Unit = {},
     sourcesEnabled: Boolean = false,
     onAddSource: () -> Unit = {},
+    onShareSources: () -> Unit = {},
     onDetails: (AppRow) -> Unit = {},
     // Two tabs once other sources are turned on: Komora's own list, and what the owner added.
     // Kept by the caller, so the tab and each tab's place in the list survive a visit to Settings.
@@ -203,7 +204,7 @@ internal fun KomoraList(
                 }
                 if (!canInstall) item { AllowCard(actions.allowInstalls) }
                 val shown = if (showAdded) addedRows else verifiedRows
-                if (showAdded) item { AddedIntro(onAddSource) }
+                if (showAdded) item { AddedIntro(onAddSource, onShareSources.takeIf { addedRows.isNotEmpty() }) }
                 // A slim line only when there is something to say: checking, or several updates at once
                 item { Banner(shown, checking, busy, canInstall) { onUpdateAll(shown.map { it.app.key }) } }
                 // Each group is one block with its apps as rows; on a wide screen the blocks stand in two columns
@@ -701,7 +702,7 @@ private fun Tabs(verified: Int, added: Int, addedTab: Boolean, onChoose: (Boolea
 
 /** On the "Added by you" tab: what these are, how Komora checks them, and a way to add one. */
 @Composable
-private fun AddedIntro(onAdd: () -> Unit) {
+private fun AddedIntro(onAdd: () -> Unit, onShare: (() -> Unit)?) {
     val scheme = MaterialTheme.colorScheme
     // A warning, plainly: a reddish background, a sign and a red frame (the theme's own error colours)
     Column(
@@ -719,6 +720,12 @@ private fun AddedIntro(onAdd: () -> Unit) {
         Spacer(Modifier.height(6.dp))
         Text(stringResource(R.string.added_intro_text), style = MaterialTheme.typography.bodyMedium, color = scheme.onErrorContainer)
         Spacer(Modifier.height(12.dp))
-        Button(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.add_source)) }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.add_source)) }
+            // The list as links, to move it to another phone ("Add a source" there takes them all at once)
+            if (onShare != null) OutlinedButton(onClick = onShare, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.share_sources))
+            }
+        }
     }
 }
