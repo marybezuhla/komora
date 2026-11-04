@@ -115,6 +115,18 @@ data class Look(val mode: Mode = Mode.AUTO, val day: Theme = Theme.SYSTEM, val n
 }
 
 /** WCAG contrast between two colours (1 to 21); text needs at least 4.5. */
+/**
+ * How much of the accent (or, for [second], the second colour) each group of the list is shaded with,
+ * by day and by night: light enough that every text on it stays at least 4.5:1 (checked in PaletteTest).
+ */
+enum class Shade(val second: Boolean, private val day: Float, private val night: Float) {
+    UPDATES(false, 0.14f, 0.07f),
+    INSTALLED(true, 0.13f, 0.06f),
+    AVAILABLE(false, 0.06f, 0.03f);
+
+    fun amount(dark: Boolean): Float = if (dark) night else day
+}
+
 fun contrast(a: Long, b: Long): Double {
     fun channel(c: Long, shift: Int): Double {
         val v = ((c shr shift) and 0xFF) / 255.0

@@ -91,7 +91,7 @@ class StoreScreens {
         row("ua.tarilka", "1.2.4", "1.3.0", 48),
         row("ua.mandat", "0.1.185", "0.1.190", 61,
             if (downloading) Phase.Downloading(38L * 1024 * 1024, 61L * 1024 * 1024) else Phase.Idle),
-        row("ua.komora", "0.3.1", "0.3.1", 3),
+        row("ua.komora", "1.0.0", "1.0.0", 3),
         row("ua.sprotyv", "1.1.2", "1.1.2", 13),
         row("ua.pysanka", null, "0.24.0", 106),
         row("ua.svitlyna", null, "0.6.1", 57),

@@ -1,0 +1,1 @@
+Komora 1.0. Automatic updates only take releases that have been out for two days. A removed source can be brought back. An app older than allowed is not installed. Better contrast, larger buttons, clearer texts. Requires Android 12 or newer.

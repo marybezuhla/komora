@@ -23,9 +23,9 @@
     <string name="allow_button">Allow</string>
     <string name="footer">Every file is checked before installing: it must be signed with the key Komora knows for that app. A file signed by anyone else is refused.</string>
     <string name="about_title">About</string>
-    <string name="about_text">© Komora authors. Free software under the GNU GPL, version 3 or (at your option) any later version (GPL-3.0-or-later), without any warranty. Uses AndroidX and Kotlin libraries (Apache 2.0). Apps are downloaded from GitHub, which sees the address of the phone that asks. Opening an app\'s details asks GitHub for its screenshots, so GitHub can see which app was looked at.</string>
+    <string name="about_text">© Komora authors. Free software under the GNU GPL, version 3 or (at your option) any later version (GPL-3.0-or-later), without any warranty. The code was written with AI (Claude, Anthropic), directed and tested by the author.\n\nLibraries: Jetpack Compose, Material 3 and other AndroidX libraries (Google, Apache 2.0); Kotlin and kotlinx.coroutines (JetBrains, Apache 2.0). The list is in NOTICE.md in the code.\n\nApps are downloaded from GitHub, which sees the address of the phone that asks. Opening an app\'s details asks GitHub for its screenshots, so GitHub can see which app was looked at. To tell whether an app you added is installed, Komora can see apps that have a home-screen icon; it never sends or keeps that list.</string>
     <string name="source_code">Source code</string>
-    <string name="license">License</string>
+    <string name="license">Licence</string>
     <string name="err_network">No connection to GitHub. Check the internet and try again.</string>
     <string name="err_rate_limit">GitHub asks to wait (too many checks). Try again in an hour.</string>
     <string name="err_no_release">No release published yet.</string>
@@ -54,27 +54,22 @@
     <string name="theme_chornozem">Black earth</string>
     <string name="theme_system">Phone colours</string>
     <string name="theme_system_dark">Phone colours</string>
-    <string name="footer_permissions">It needs the internet (GitHub only), permission to install apps and, when you ask, to remove them; notifications only if you turn on notices or automatic updates. No accounts, no ads, no tracking.</string>
+    <string name="footer_permissions">Komora needs the internet (GitHub only), permission to install apps and, when you ask, to remove them; notifications only if you turn on new version notifications or automatic updates. No accounts, no ads, no tracking.</string>
     <string name="theme_glyna">Clay</string>
     <string name="theme_zhar">Embers</string>
     <string name="app_language">Language</string>
     <string name="lang_uk" translatable="false">Українська</string>
     <string name="lang_en" translatable="false">English</string>
     <string name="whats_new">What\'s new</string>
-    <string name="hide_whats_new">Hide</string>
     <string name="updates_title">Updates</string>
-    <string name="notify_updates">New version notices</string>
-    <string name="notify_updates_summary">Komora checks whether your apps have new versions and sends a notice. You update them yourself, as always.</string>
+    <string name="notify_updates">New version notifications</string>
+    <string name="notify_updates_summary">Komora checks whether your apps have new versions and sends a notification.</string>
     <string name="wifi_only">Only over Wi-Fi</string>
     <string name="notify_denied">Android does not allow Komora\'s notifications. They can be allowed in the phone\'s settings.</string>
     <string name="notification_channel">App updates</string>
     <string name="notification_title">Updates are ready</string>
     <string name="notify_settings">Notification settings</string>
-    <string name="check">Check</string>
     <string name="summary_checking">Checking for updates…</string>
-    <string name="summary_updates">Updates available: %1$d</string>
-    <string name="summary_all_current">Everything is up to date</string>
-    <string name="summary_tap_check">Pull down or tap Check</string>
     <string name="update_all">Update all</string>
     <string name="group_updates">Updates</string>
     <string name="group_installed">Installed</string>
@@ -121,7 +116,7 @@
     <string name="field_latest">Latest</string>
     <string name="key_unknown_yet">Not known yet: it is shown before the first install and remembered when you agree.</string>
     <string name="open_repository">Open on GitHub</string>
-    <string name="remove_source">Remove</string>
+    <string name="remove_source">Remove from list</string>
     <string name="add_err_storage">Could not save on this phone. Try again.</string>
     <string name="sources_warn_title">Apps that nobody checked</string>
     <string name="sources_warn_text">Apps from other sources are not checked by Komora. An app can steal your data, spy on you, show ads or harm the phone, and an author can hand a repository over to someone else. Komora only makes sure that updates come with the same key as the first install: it cannot tell whether an app is honest.\n\nInstall only apps whose authors you know and trust.</string>
@@ -170,7 +165,7 @@
     <string name="show_key">Show</string>
     <string name="hide_key">Hide</string>
     <string name="auto_update">Update automatically</string>
-    <string name="auto_update_summary">About once a day Komora installs new versions of the apps it installed, with all the usual checks. Komora itself and apps installed elsewhere are left for you.</string>
+    <string name="auto_update_summary">About once a day Komora installs new versions of the apps it installed, with all the usual checks. Only releases that have been out for two days, so there is time to notice and pull a bad one. Komora itself and apps installed elsewhere are left for you.</string>
     <string name="auto_network">Download over</string>
     <string name="auto_wifi">Wi-Fi only</string>
     <string name="auto_any_network">Any internet</string>
@@ -180,9 +175,10 @@
     <string name="auto_ask_title">An update needs you</string>
     <string name="auto_ask_text">Android wants your confirmation for %1$s. Open Komora and tap Update.</string>
     <string name="screenshot">Screenshot</string>
-    <string name="uninstall_app">Uninstall the app</string>
     <string name="share_sources">Share the list</string>
     <string name="add_err_some">Could not add: %1$s</string>
     <string name="open_fullscreen">open full screen</string>
     <string name="uninstall">Uninstall</string>
+    <string name="source_removed">Removed from the list: %1$s</string>
+    <string name="undo">Undo</string>
 </resources>

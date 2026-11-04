@@ -124,7 +124,8 @@ object UpdateCheck {
             val release = try {
                 GitHub.latestRelease(app)
             } catch (_: RateLimitException) {
-                break
+                // Only part of the answers: no notice from that; tomorrow again
+                return true
             } catch (_: NoReleaseException) {
                 continue
             } catch (e: IOException) {
@@ -135,11 +136,19 @@ object UpdateCheck {
                 continue
             }
             // Asked about every app; only those on this phone are reported
-            val installed = ApkVerifier.installedInfo(context.packageManager, app.packageName)?.versionName ?: continue
+            val info = ApkVerifier.installedInfo(context.packageManager, app.packageName) ?: continue
+            val installed = info.versionName ?: continue
+            // Signed with another key: Komora could not update it, so it is not offered
+            if (!ApkVerifier.installedMatchesPin(context, app, info)) continue
             val latest = Rules.normalizeVersion(release.tag)
             if ((Rules.compareVersions(latest, installed) ?: 0) > 0) {
                 updates += Triple("told_" + app.packageName, latest, "${app.name(lang)} $latest")
             }
+        }
+        // Everything up to date: an old notice is taken away
+        if (updates.isEmpty()) {
+            dismiss(context)
+            return true
         }
         // A notice only when something is new since the last one; it then lists every update waiting
         val anyNew = updates.any { (key, version, _) -> prefs.getString(key, null) != version }
@@ -149,6 +158,11 @@ object UpdateCheck {
             edit.apply()
         }
         return true
+    }
+
+    /** Takes the "Updates available" notice away (nothing left to update, or Komora was opened). */
+    fun dismiss(context: Context) {
+        runCatching { context.getSystemService(NotificationManager::class.java)?.cancel(NOTICE_ID) }
     }
 
     /** Forgets what was last told about [packageName] (when its source is removed). */

@@ -63,10 +63,13 @@ jobs:
           # Every library is checked against gradle/verification-metadata.xml (refreshed only by deps.yml);
           # the build fails on any changed library, and without the file.
           test -f gradle/verification-metadata.xml || { echo "gradle/verification-metadata.xml is missing" | tee build.log; exit 1; }
-          gradle --no-daemon testReleaseUnitTest assembleRelease 2>&1 | tee build.log
+          gradle --no-daemon testReleaseUnitTest lintRelease assembleRelease 2>&1 | tee build.log
 
       - name: Check permissions (only what is expected)
         run: bash .github/check-permissions.sh app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Check the manifest (no backups, no plain HTTP, not debuggable, nothing open to other apps)
+        run: bash .github/check-manifest.sh app/build/outputs/apk/release/app-release-unsigned.apk
 
       - name: Record the APK checksum
         id: sum
@@ -79,6 +82,7 @@ jobs:
           mkdir -p log
           { echo "run ${{ github.run_number }} ${{ job.status }}"; grep -E "^e: |error:|FAILED|What went wrong|Dependency verification" -A3 build.log | head -300; echo ----; tail -150 build.log; cat permissions.txt 2>/dev/null; } > log/build.log || true
           find app/build/test-results -name "*.xml" -exec cp {} log/ \; 2>/dev/null || true
+          cp app/build/reports/lint-results-release.txt log/ 2>/dev/null || true
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()

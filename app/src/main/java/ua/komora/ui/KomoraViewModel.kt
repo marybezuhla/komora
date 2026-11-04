@@ -401,16 +401,44 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         return AddState.Done
     }
 
+    /** The source just removed, kept (with its key) until the owner's chance to undo has passed. */
+    private var lastRemoved: List<Source> = emptyList()
+    private val _removed = MutableStateFlow<String?>(null)
+    /** The name of the source just removed, for "Removed · Undo"; null when there is nothing to undo. */
+    val removed: StateFlow<String?> = _removed
+
     /** Removes an added source from Komora (the app itself, if installed, stays on the phone). */
     fun removeSource(repo: String) {
         if (active?.key?.let { k -> _rows.value.any { it.app.key == k && it.app.repo == repo } } == true) return
         val gone = sources.filter { it.repo == repo }
+        if (gone.isEmpty()) return
         val next = sources - gone.toSet()
         if (!Sources.save(ctx, next)) return
+        // An earlier removal not undone is final now
+        forgetRemoved()
         sources = next
-        // Nothing about it is left behind, not even the last version told about
-        for (s in gone) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
+        lastRemoved = gone
+        _removed.value = gone.first().let { it.name.ifEmpty { it.repo } }
         rebuildRows()
+    }
+
+    /** "Undo": the source comes back as it was, with the same key, at the same place in the list. */
+    fun undoRemove() {
+        val back = lastRemoved.filter { r -> sources.none { it.repo.equals(r.repo, ignoreCase = true) } }
+        lastRemoved = emptyList()
+        _removed.value = null
+        if (back.isEmpty() || sources.size + back.size > Sources.MAX) return
+        val next = (sources + back).sortedBy { it.addedAt }
+        if (!Sources.save(ctx, next)) return
+        sources = next
+        rebuildRows()
+    }
+
+    /** The chance to undo has passed: nothing about the source is left behind, not even the last version told about. */
+    fun forgetRemoved() {
+        for (s in lastRemoved) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
+        lastRemoved = emptyList()
+        _removed.value = null
     }
 
     /** The owner's answer, counted only for the question it was given to. */

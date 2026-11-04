@@ -189,6 +189,8 @@ class MainActivity : ComponentActivity() {
         auto.value = AutoUpdate.settings(this)
         AutoUpdate.ensure(this)
         UpdateCheck.createChannel(this)
+        // Komora is open: its list says the same, so the notice is not needed any more
+        UpdateCheck.dismiss(this)
         // Android's confirmation screen opens only while Komora is in front
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -341,6 +343,17 @@ private fun KomoraScreen(
     val trust by vm.trust.collectAsStateWithLifecycle()
     var showAdd by rememberSaveable { mutableStateOf(false) }
     var detailsKey by rememberSaveable { mutableStateOf<String?>(null) }
+    // A source removed from the list can be brought back at once, with its key; only then is it gone for good
+    val snackbar = remember { androidx.compose.material3.SnackbarHostState() }
+    val removed by vm.removed.collectAsStateWithLifecycle()
+    val removedText = removed?.let { stringResource(R.string.source_removed, it) }
+    val undo = stringResource(R.string.undo)
+    LaunchedEffect(removed) {
+        val text = removedText ?: return@LaunchedEffect
+        val answer = snackbar.showSnackbar(text, actionLabel = undo, withDismissAction = true,
+            duration = androidx.compose.material3.SnackbarDuration.Long)
+        if (answer == androidx.compose.material3.SnackbarResult.ActionPerformed) vm.undoRemove() else vm.forgetRemoved()
+    }
     // The add dialog closes by itself once everything asked for is added
     LaunchedEffect(adding) {
         if (adding is AddState.Done) {
@@ -365,6 +378,7 @@ private fun KomoraScreen(
         addedTab = addedTab.value,
         onTab = { addedTab.value = it },
         addedListState = addedListState,
+        snackbar = snackbar,
     )
     if (showAdd) {
         AddSourceDialog(adding, onAdd = vm::addSource, onChoose = vm::chooseApk, onSkipChoice = vm::skipChoice) {
@@ -602,6 +616,11 @@ internal fun SourcesWarning(onAgree: () -> Unit, onDismiss: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = scheme.error, contentColor = scheme.onError),
             ) { Text(stringResource(R.string.sources_warn_yes)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        // Ordinary text on the warning: the accent is too faint there at night
+        dismissButton = {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = scheme.onErrorContainer)) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
     )
 }

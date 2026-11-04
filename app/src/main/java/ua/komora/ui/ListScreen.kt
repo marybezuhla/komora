@@ -68,6 +68,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
+import ua.komora.ui.theme.Shade
+import ua.komora.net.Rules
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -98,8 +101,10 @@ internal const val SOURCE_URL = "https://github.com/Marybezu/komora"
 internal const val LICENSE_URL = "$SOURCE_URL/blob/main/LICENSE"
 
 /** The three groups of the list, in the order shown: what needs doing first. */
-private enum class Group(val title: Int) {
-    UPDATES(R.string.group_updates), INSTALLED(R.string.group_installed), AVAILABLE(R.string.group_available);
+private enum class Group(val title: Int, val shade: Shade) {
+    UPDATES(R.string.group_updates, Shade.UPDATES),
+    INSTALLED(R.string.group_installed, Shade.INSTALLED),
+    AVAILABLE(R.string.group_available, Shade.AVAILABLE);
 
     companion object {
         fun of(row: AppRow): Group = when {
@@ -134,6 +139,8 @@ internal fun KomoraList(
     addedTab: Boolean = false,
     onTab: (Boolean) -> Unit = {},
     addedListState: LazyListState = rememberLazyListState(),
+    /** Short messages at the bottom, such as "Removed from the list · Undo". */
+    snackbar: androidx.compose.material3.SnackbarHostState? = null,
 ) {
     val showAdded = sourcesEnabled && addedTab
     val verifiedRows = rows.filter { !it.app.added }
@@ -143,6 +150,7 @@ internal fun KomoraList(
     val checking = rows.any { it.phase == Phase.Checking }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { snackbar?.let { androidx.compose.material3.SnackbarHost(it) } },
         topBar = {
             Column(Modifier.background(MaterialTheme.colorScheme.background)) {
                 // The name in the middle, over the motif
@@ -291,7 +299,7 @@ private fun Banner(rows: List<AppRow>, checking: Boolean, busy: Boolean, canInst
                 modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
             )
             if (!checking && updates > 1) {
-                Button(onClick = onUpdateAll, enabled = canInstall && !busy, modifier = Modifier.heightIn(min = 44.dp)) {
+                Button(onClick = onUpdateAll, enabled = canInstall && !busy, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(stringResource(R.string.update_all), fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
             }
@@ -308,12 +316,8 @@ private fun Section(title: String, rows: List<AppRow>, dashed: Boolean, group: G
     val scheme = MaterialTheme.colorScheme
     // Each group its own soft shade from the theme, told apart at a glance: updates in the accent,
     // installed in the second colour, the rest a lighter accent
-    val (tint, amount) = when (group) {
-        Group.UPDATES -> scheme.primary to 0.18f
-        Group.INSTALLED -> scheme.secondary to 0.13f
-        Group.AVAILABLE -> scheme.primary to 0.07f
-    }
-    val fill = lerp(scheme.surface, tint, amount)
+    val tint = if (group.shade.second) scheme.secondary else scheme.primary
+    val fill = lerp(scheme.surface, tint, group.shade.amount(dark = scheme.surface.luminance() < 0.5f))
     val edge = lerp(scheme.surface, tint, 0.45f)
     Column(Modifier.fillMaxWidth()) {
         Text(
@@ -442,8 +446,10 @@ private fun StatusText(row: AppRow) {
     val (text, color) = when {
         row.phase == Phase.Checking -> stringResource(R.string.checking) to scheme.onSurfaceVariant
         row.hasUpdate && latest != null && size != null -> stringResource(R.string.pill_update, latest, size) to scheme.primary
-        row.isInstalled && latest != null ->
-            ("✓ " + stringResource(R.string.pill_current, row.installedVersion.orEmpty().ifEmpty { latest })) to scheme.onSurfaceVariant
+        // Up to date only when the versions really compare as equal; anything unclear is just "Installed"
+        row.isInstalled && latest != null && !row.installedVersion.isNullOrEmpty() &&
+            Rules.compareVersions(latest, row.installedVersion) == 0 ->
+            ("✓ " + stringResource(R.string.pill_current, row.installedVersion)) to scheme.onSurfaceVariant
         row.isInstalled -> (if (row.installedVersion.isNullOrEmpty()) stringResource(R.string.installed)
             else stringResource(R.string.pill_installed, row.installedVersion)) to scheme.onSurfaceVariant
         size != null -> stringResource(R.string.pill_available, latest.orEmpty(), size) to scheme.onSurfaceVariant
@@ -455,12 +461,6 @@ private fun StatusText(row: AppRow) {
 
 /** Wider than this, the list stays this wide, in the middle. */
 private const val MAX_LIST_WIDTH = 1040
-
-private fun columnsFor(width: Int) = when {
-    width >= 1000 -> 3
-    width >= 600 -> 2
-    else -> 1
-}
 
 /** Where every line of text in a row starts: after the icon. The dividers start here too. */
 private val TEXT_EDGE = 78.dp
@@ -524,7 +524,7 @@ private fun AppListRow(
             }
             if (hasAction && !narrow) {
                 Spacer(Modifier.width(12.dp))
-                MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen, Modifier.widthIn(min = 112.dp).heightIn(min = 44.dp))
+                MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen, Modifier.widthIn(min = 112.dp).heightIn(min = 48.dp))
             }
         }
         // What the app is: under the name, at the same edge, across the rest of the row (never squeezed by the button)
@@ -541,7 +541,7 @@ private fun AppListRow(
         )
         if (hasAction && narrow) {
             MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen,
-                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp).fillMaxWidth().heightIn(min = 44.dp))
+                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp).fillMaxWidth().heightIn(min = 48.dp))
         }
         if (installedPair) {
             Row(
@@ -549,8 +549,8 @@ private fun AppListRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (canOpen) {
-                    OutlinedButton(onClick = onOpen, modifier = Modifier.weight(1f).heightIn(min = 44.dp)
-                        .semantics { contentDescription = "$ctxOpen $name" }) {
+                    OutlinedButton(onClick = onOpen, modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                        .semantics { contentDescription = "$ctxOpen: $name" }) {
                         Text(stringResource(R.string.open), fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
@@ -559,7 +559,7 @@ private fun AppListRow(
                     onClick = onUninstall,
                     border = BorderStroke(1.dp, scheme.error.copy(alpha = 0.6f)),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = scheme.error),
-                    modifier = Modifier.weight(1f).heightIn(min = 44.dp).semantics { contentDescription = "$ctxUninstall $name" },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp).semantics { contentDescription = "$ctxUninstall: $name" },
                 ) { Text(stringResource(R.string.uninstall), fontWeight = FontWeight.SemiBold, maxLines = 1) }
             }
         }
@@ -600,18 +600,22 @@ private fun AppListRow(
                         },
                     )
                     Text(stringResource(R.string.keep_open), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                    OutlinedButton(onClick = onCancel, modifier = Modifier.heightIn(min = 44.dp)) { Text(stringResource(R.string.cancel)) }
+                    OutlinedButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.cancel)) }
                 }
                 is Phase.Installing -> {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                     Text(stringResource(if (row.app.isSelf) R.string.updating_self else R.string.installing), style = MaterialTheme.typography.bodyMedium)
                     // Android is waiting for the owner's answer on its own screen
+                    if (onContinue == null && phase.sessionId != null) {
+                        // No answer from Android yet: the way out is always there
+                        OutlinedButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.cancel)) }
+                    }
                     if (onContinue != null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = onContinue, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) {
+                            Button(onClick = onContinue, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                                 Text(stringResource(R.string.continue_install), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) {
+                            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                                 Text(stringResource(R.string.cancel), maxLines = 1)
                             }
                         }
@@ -620,11 +624,11 @@ private fun AppListRow(
                 Phase.Checking, Phase.Idle -> {
                     // The way out of a problem
                     if (problem == Problem.OtherKey) {
-                        OutlinedButton(onClick = onAppSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
+                        OutlinedButton(onClick = onAppSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                             Text(stringResource(R.string.app_settings), fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                         }
                     }
-                    if (retry) OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
+                    if (retry) OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.retry), fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                     }
                 }
@@ -650,17 +654,17 @@ private fun MainAction(
         !row.isInstalled -> {
             val label = stringResource(R.string.install)
             Button(onClick = onInstall, enabled = canGet, contentPadding = padding,
-                modifier = modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) }
+                modifier = modifier.semantics { contentDescription = "$label: $name" }) { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) }
         }
         row.hasUpdate -> {
             val label = stringResource(R.string.update)
             Button(onClick = onInstall, enabled = canGet, contentPadding = padding,
-                modifier = modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) }
+                modifier = modifier.semantics { contentDescription = "$label: $name" }) { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) }
         }
         canOpen -> {
             val label = stringResource(R.string.open)
             OutlinedButton(onClick = onOpen, contentPadding = padding, colors = ButtonDefaults.outlinedButtonColors(),
-                modifier = modifier.semantics { contentDescription = "$label $name" }) { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) }
+                modifier = modifier.semantics { contentDescription = "$label: $name" }) { Text(label, maxLines = 1, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
@@ -713,7 +717,7 @@ private fun Tabs(verified: Int, added: Int, addedTab: Boolean, onChoose: (Boolea
         for ((isAdded, label) in listOf(false to stringResource(R.string.tab_verified, verified), true to stringResource(R.string.tab_added, added))) {
             val selected = isAdded == addedTab
             Row(
-                Modifier.weight(1f).heightIn(min = 44.dp)
+                Modifier.weight(1f).heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(50))
                     .background(if (selected) scheme.surface else Color.Transparent, RoundedCornerShape(50))
                     .border(1.dp, if (selected) scheme.outline else Color.Transparent, RoundedCornerShape(50))
@@ -727,8 +731,6 @@ private fun Tabs(verified: Int, added: Int, addedTab: Boolean, onChoose: (Boolea
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (selected) scheme.onSurface else scheme.onSurfaceVariant,
-                    maxLines = 1,
-                    softWrap = false,
                 )
             }
         }
@@ -759,7 +761,13 @@ private fun AddedIntro(onAdd: () -> Unit, onShare: (() -> Unit)?) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.add_source)) }
             // The list as links, to move it to another phone ("Add a source" there takes them all at once)
-            if (onShare != null) OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            if (onShare != null) OutlinedButton(
+                onClick = onShare,
+                // Ordinary text on the warning box: the accent is too faint there at night
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = scheme.onErrorContainer),
+                border = BorderStroke(1.dp, scheme.onErrorContainer.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) {
                 Text(stringResource(R.string.share_sources))
             }
         }
