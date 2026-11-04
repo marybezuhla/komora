@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.TextAlign
 
 /** Material colours from one of Komora's themes; the phone's own (Material You) for the system ones. */
 fun colorScheme(theme: Theme, context: Context): ColorScheme {
@@ -75,10 +76,12 @@ fun KomoraTheme(theme: Theme, content: @Composable () -> Unit) {
  * setting still scales all of it.
  */
 private val KomoraType = androidx.compose.material3.Typography().run {
-    // Body text: lines broken evenly over the whole paragraph (no ragged, chopped right edge), whole words
+    // Body text: justified, so a paragraph has two straight edges; lines broken evenly over the whole
+    // paragraph, and long words hyphenated, so no line gets wide gaps. Text set in the middle on purpose
+    // (headings, the letter in "About") says so itself and is not touched.
     fun body(t: TextStyle, size: Int, line: Int) = t.copy(
         fontSize = size.sp, lineHeight = line.sp, letterSpacing = 0.sp,
-        lineBreak = LineBreak.Paragraph, hyphens = Hyphens.None,
+        textAlign = TextAlign.Justify, lineBreak = LineBreak.Paragraph, hyphens = Hyphens.Auto,
     )
     // Labels and titles: the letters at their natural spacing (Material spreads them apart)
     fun label(t: TextStyle, size: Int, line: Int) = t.copy(fontSize = size.sp, lineHeight = line.sp, letterSpacing = 0.sp)

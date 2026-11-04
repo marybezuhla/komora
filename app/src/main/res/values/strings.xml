@@ -166,4 +166,7 @@
     <string name="theme_kalyna">Viburnum</string>
     <string name="theme_zoriana_nich">Starry night</string>
     <string name="banner_updates">Updates: %1$d</string>
+    <string name="details_technical">Technical details</string>
+    <string name="show_key">Show</string>
+    <string name="hide_key">Hide</string>
 </resources>

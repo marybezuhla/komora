@@ -41,4 +41,12 @@ class ReleaseNotesTest {
         val body = "<!-- hidden -->\n<details><summary>Більше</summary>\nТекст\u202Eзворотний\n![pic](https://x/y.png)\n</details>"
         assertEquals("Більше\nТекстзворотний", ReleaseNotes.clean(body))
     }
+
+    @Test
+    fun keepsTheLanguageShown() {
+        val both = "Світлина 0.6.1: приватна галерея\n• Нове\n\n---\n\nSvitlyna 0.6.1: a private gallery\n• New"
+        assertEquals("Світлина 0.6.1: приватна галерея\n• Нове", ReleaseNotes.forLanguage(both, "uk"))
+        assertEquals("Svitlyna 0.6.1: a private gallery\n• New", ReleaseNotes.forLanguage(both, "en"))
+        assertEquals("Лише одна мова", ReleaseNotes.forLanguage("Лише одна мова", "en"))
+    }
 }

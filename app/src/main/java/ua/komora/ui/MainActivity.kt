@@ -439,7 +439,9 @@ private fun SwitchRow(title: String, summary: String?, checked: Boolean, onChang
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            // A title: whole words, not justified
+            Text(title, style = MaterialTheme.typography.bodyLarge.copy(
+                textAlign = androidx.compose.ui.text.style.TextAlign.Start, hyphens = androidx.compose.ui.text.style.Hyphens.None), color = MaterialTheme.colorScheme.onSurface)
             if (summary != null) {
                 Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -476,7 +478,8 @@ private fun AboutRow(onClick: () -> Unit) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.about_komora), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                Text(stringResource(R.string.about_komora_summary), style = MaterialTheme.typography.bodyMedium,
+                Text(stringResource(R.string.about_komora_summary), style = MaterialTheme.typography.bodyMedium.copy(
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Start, hyphens = androidx.compose.ui.text.style.Hyphens.None),
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = null,
