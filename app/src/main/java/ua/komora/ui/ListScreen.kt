@@ -755,10 +755,11 @@ private fun AddedIntro(onAdd: () -> Unit, onShare: (() -> Unit)?) {
         Spacer(Modifier.height(6.dp))
         Text(stringResource(R.string.added_intro_text), style = MaterialTheme.typography.bodyMedium, color = scheme.onErrorContainer)
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.add_source)) }
+        // One under the other, the whole width: the words never wrap inside a button
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.add_source)) }
             // The list as links, to move it to another phone ("Add a source" there takes them all at once)
-            if (onShare != null) OutlinedButton(onClick = onShare, modifier = Modifier.heightIn(min = 48.dp)) {
+            if (onShare != null) OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                 Text(stringResource(R.string.share_sources))
             }
         }

@@ -107,7 +107,7 @@ jobs:
         with:
           name: komora-mapping
           path: app/build/outputs/mapping/release/mapping.txt
-          retention-days: 90
+          retention-days: 14
 
   # Puts the screen pictures on the ci-screens branch, to look at them without downloading anything.
   # Runs no project code; only for this repository's own branches (never for pull requests from forks).

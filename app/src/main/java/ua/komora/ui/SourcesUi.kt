@@ -224,117 +224,121 @@ private fun Field(label: String, value: String, mono: Boolean = false) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailsSheet(row: AppRow, lang: String, pinnedKey: String?, onRemove: (() -> Unit)?, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) { DetailsContent(row, lang, pinnedKey, onRemove) }
+}
+
+/** What the details sheet holds; on its own so the store pictures can show it whole. */
+@Composable
+internal fun DetailsContent(row: AppRow, lang: String, pinnedKey: String?, onRemove: (() -> Unit)?) {
     val uri = LocalUriHandler.current
     val scheme = MaterialTheme.colorScheme
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp).verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(row.app.name(lang), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
-            // 1. What the app is
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp).verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(row.app.name(lang), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
+        // 1. What the app is
+        Spacer(Modifier.height(12.dp))
+        Text(row.app.summary(lang), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface,
+            modifier = Modifier.fillMaxWidth())
+        // How it looks: only for Komora's own list (pictures from unknown sources are not opened)
+        if (!row.app.added) {
             Spacer(Modifier.height(12.dp))
-            Text(row.app.summary(lang), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface,
-                modifier = Modifier.fillMaxWidth())
-            // How it looks: only for Komora's own list (pictures from unknown sources are not opened)
-            if (!row.app.added) {
-                Spacer(Modifier.height(12.dp))
-                Screenshots(row.app.repo, lang)
-            }
-            // 2. What is new in the latest version, in the language shown
-            val notes = ReleaseNotes.forLanguage(row.latest?.notes.orEmpty(), lang)
-            if (notes.isNotBlank()) {
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    stringResource(R.string.whats_new) + (row.latestVersion?.let { " · $it" } ?: ""),
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    notes,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurface,
-                    modifier = Modifier.fillMaxWidth().background(scheme.surfaceVariant, RoundedCornerShape(16.dp)).padding(16.dp),
-                )
-            }
-            // 3. The technical facts, one per line; the signing key folded until asked for
+            Screenshots(row.app.repo, lang)
+        }
+        // 2. What is new in the latest version, in the language shown
+        val notes = ReleaseNotes.forLanguage(row.latest?.notes.orEmpty(), lang)
+        if (notes.isNotBlank()) {
             Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.details_technical), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.semantics { heading() })
-            Spacer(Modifier.height(4.dp))
             Text(
-                stringResource(if (row.app.added) R.string.details_added else R.string.details_verified),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (row.app.added) scheme.error else scheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
+                stringResource(R.string.whats_new) + (row.latestVersion?.let { " · $it" } ?: ""),
+                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { heading() },
             )
             Spacer(Modifier.height(8.dp))
-            Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).border(1.dp, scheme.outlineVariant, RoundedCornerShape(16.dp)),
-            ) {
-                val lines = buildList {
-                    add(stringResource(R.string.field_source) to row.app.repo)
-                    if (row.app.packageName.isNotEmpty()) add(stringResource(R.string.field_package) to row.app.packageName)
-                    row.installedVersion?.takeIf { it.isNotEmpty() }?.let { add(stringResource(R.string.field_installed) to it) }
-                    row.latestVersion?.let { add(stringResource(R.string.field_latest) to it) }
-                }
-                lines.forEachIndexed { i, (label, value) ->
-                    if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = scheme.outlineVariant)
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(label, style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Start), color = scheme.onSurfaceVariant)
-                        Spacer(Modifier.width(16.dp).weight(1f))
-                        Text(value, style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.End, hyphens = Hyphens.None),
-                            fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
-                    }
-                }
-                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = scheme.outlineVariant)
-                var showKey by rememberSaveable(row.app.key) { mutableStateOf(false) }
-                Row(
-                    Modifier.fillMaxWidth().clickable(role = Role.Button) { showKey = !showKey }
-                        .heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(stringResource(R.string.field_key), style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Start),
-                        color = scheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text(stringResource(if (showKey) R.string.hide_key else R.string.show_key),
-                        style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = scheme.primary)
-                }
-                AnimatedVisibility(visible = showKey) {
-                    // In full, in groups of four, to compare by eye
-                    Text(
-                        pinnedKey?.let { formatKey(it) } ?: stringResource(R.string.key_unknown_yet),
-                        style = if (pinnedKey != null) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace, textAlign = TextAlign.Start, hyphens = Hyphens.None)
-                        else MaterialTheme.typography.bodyMedium,
-                        color = scheme.onSurface,
-                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                    )
+            Text(
+                notes,
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurface,
+                modifier = Modifier.fillMaxWidth().background(scheme.surfaceVariant, RoundedCornerShape(16.dp)).padding(16.dp),
+            )
+        }
+        // 3. The technical facts, one per line; the signing key folded until asked for
+        Spacer(Modifier.height(16.dp))
+        Text(stringResource(R.string.details_technical), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(if (row.app.added) R.string.details_added else R.string.details_verified),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (row.app.added) scheme.error else scheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).border(1.dp, scheme.outlineVariant, RoundedCornerShape(16.dp)),
+        ) {
+            val lines = buildList {
+                add(stringResource(R.string.field_source) to row.app.repo)
+                if (row.app.packageName.isNotEmpty()) add(stringResource(R.string.field_package) to row.app.packageName)
+                row.installedVersion?.takeIf { it.isNotEmpty() }?.let { add(stringResource(R.string.field_installed) to it) }
+                row.latestVersion?.let { add(stringResource(R.string.field_latest) to it) }
+            }
+            lines.forEachIndexed { i, (label, value) ->
+                if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = scheme.outlineVariant)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(label, style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Start), color = scheme.onSurfaceVariant)
+                    Spacer(Modifier.width(16.dp).weight(1f))
+                    Text(value, style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.End, hyphens = Hyphens.None),
+                        fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            // The links, one under the other, the same width
-            val name = row.app.name(lang)
-            val version = row.installedVersion?.takeIf { it.isNotEmpty() } ?: row.latestVersion ?: "?"
-            val android = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
-            val body = stringResource(R.string.report_bug_body, name, version, android)
-            OutlinedButton(
-                onClick = { runCatching { uri.openUri("https://github.com/${row.app.repo}") } },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) { Text(stringResource(R.string.open_repository), fontWeight = FontWeight.SemiBold) }
+            HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = scheme.outlineVariant)
+            var showKey by rememberSaveable(row.app.key) { mutableStateOf(false) }
+            Row(
+                Modifier.fillMaxWidth().clickable(role = Role.Button) { showKey = !showKey }
+                    .heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.field_key), style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Start),
+                    color = scheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Text(stringResource(if (showKey) R.string.hide_key else R.string.show_key),
+                    style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = scheme.primary)
+            }
+            AnimatedVisibility(visible = showKey) {
+                // In full, in groups of four, to compare by eye
+                Text(
+                    pinnedKey?.let { formatKey(it) } ?: stringResource(R.string.key_unknown_yet),
+                    style = if (pinnedKey != null) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace, textAlign = TextAlign.Start, hyphens = Hyphens.None)
+                    else MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurface,
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        // The links, one under the other, the same width
+        val name = row.app.name(lang)
+        val version = row.installedVersion?.takeIf { it.isNotEmpty() } ?: row.latestVersion ?: "?"
+        val android = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+        val body = stringResource(R.string.report_bug_body, name, version, android)
+        OutlinedButton(
+            onClick = { runCatching { uri.openUri("https://github.com/${row.app.repo}") } },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) { Text(stringResource(R.string.open_repository), fontWeight = FontWeight.SemiBold) }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = { runCatching { uri.openUri(issueUrl(row.app.repo, name, version, body)) } },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) { Text(stringResource(R.string.report_bug), fontWeight = FontWeight.SemiBold) }
+        Spacer(Modifier.height(4.dp))
+        Text(stringResource(R.string.report_bug_note), style = MaterialTheme.typography.bodySmall,
+            color = scheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
+        if (onRemove != null) {
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { runCatching { uri.openUri(issueUrl(row.app.repo, name, version, body)) } },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) { Text(stringResource(R.string.report_bug), fontWeight = FontWeight.SemiBold) }
-            Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.report_bug_note), style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
-            if (onRemove != null) {
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = onRemove, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text(stringResource(R.string.remove_source), color = scheme.error, fontWeight = FontWeight.SemiBold)
-                }
+            TextButton(onClick = onRemove, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.remove_source), color = scheme.error, fontWeight = FontWeight.SemiBold)
             }
         }
     }
