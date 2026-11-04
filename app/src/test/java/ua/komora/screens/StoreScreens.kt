@@ -39,7 +39,7 @@ import ua.komora.ui.Actions
 import ua.komora.ui.AboutPage
 import ua.komora.ui.AppLanguage
 import ua.komora.ui.AppRow
-import ua.komora.ui.DetailsSheet
+import ua.komora.ui.DetailsContent
 import ua.komora.ui.KomoraList
 import ua.komora.ui.LookPage
 import ua.komora.ui.Phase
@@ -157,7 +157,10 @@ class StoreScreens {
     private fun s3() {
         val r = home().first()
         shot("03_details", Theme.NEBO, afterIdle = { runCatching { compose.onNodeWithText(if (uk()) "Показати" else "Show").performClick() } }) {
-            DetailsSheet(r, lang(), r.app.certSha256, onRemove = null, onDismiss = {})
+            // The sheet's content on a full page, as it looks pulled up
+            androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                DetailsContent(r, lang(), r.app.certSha256, onRemove = null)
+            }
         }
     }
 
@@ -198,7 +201,7 @@ class StoreScreens {
     @Config(qualifiers = "en-w360dp-h780dp-xxhdpi") @Test fun en3() = s3()
     @Config(qualifiers = "en-w360dp-h780dp-xxhdpi") @Test fun en4() = s4()
     @Config(qualifiers = "en-w360dp-h780dp-xxhdpi") @Test fun en5() = s5()
-    @Config(qualifiers = "en-w360dp-h780dp-xxhdpi-night") @Test fun en6() = s6()
+    @Config(qualifiers = "en-w360dp-h780dp-night-xxhdpi") @Test fun en6() = s6()
     @Config(qualifiers = "en-w360dp-h780dp-xxhdpi") @Test fun en7() = s7()
     @Config(qualifiers = "en-w360dp-h780dp-xxhdpi") @Test fun en8() = s8()
 }
