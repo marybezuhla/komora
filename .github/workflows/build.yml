@@ -161,6 +161,9 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
+      # GitHub's signed record of which workflow built the file, checked by scripts/sign-release.sh
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -187,6 +190,14 @@ jobs:
           bash .github/check-permissions.sh unsigned/app-release-unsigned.apk
           bash .github/check-manifest.sh unsigned/app-release-unsigned.apk
 
+      - name: Name the file
+        run: mv unsigned/app-release-unsigned.apk "komora-$(tr -d '[:space:]' < version.txt)-unsigned.apk"
+
+      # Only this job (no Gradle, no project code) can make the record
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: komora-*-unsigned.apk
+
       - name: Draft the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -196,11 +207,9 @@ jobs:
           set -euo pipefail
           bash .github/check-version.sh push refs/heads/main "$REPO"
           V="$(tr -d '[:space:]' < version.txt)"
-          # An older draft of the same version (a run before this one) is replaced
-          if gh release view "v$V" --repo "$REPO" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx true; then
-            gh release delete "v$V" --repo "$REPO" --yes
-          fi
-          mv unsigned/app-release-unsigned.apk "komora-$V-unsigned.apk"
+          # Older drafts of the same version (from earlier runs) are replaced; an error stops the job
+          IDS="$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.draft and .tag_name == \"v$V\") | .id")"
+          for id in $IDS; do gh api -X DELETE "repos/$REPO/releases/$id"; done
           cp .github/release-notes.md notes.md
           # Read by the signing script: the unsigned file must be exactly the one this build made
           printf '\n<!-- unsigned-sha256: %s -->\n' "$SUM" >> notes.md

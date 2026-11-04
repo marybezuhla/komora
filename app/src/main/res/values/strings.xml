@@ -181,4 +181,5 @@
     <string name="uninstall">Uninstall</string>
     <string name="source_removed">Removed from the list: %1$s</string>
     <string name="undo">Undo</string>
+    <string name="err_too_old">This release is older than Komora allows for this app. Nothing was installed.</string>
 </resources>

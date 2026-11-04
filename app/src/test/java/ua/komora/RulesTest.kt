@@ -113,6 +113,7 @@ class RulesTest {
         assertEquals(-1, Rules.compareVersions("1.0.0-rc.1", "1.0.0"))
         assertEquals(1, Rules.compareVersions("1.0.0-rc.2", "1.0.0-rc.1"))
         assertEquals(1, Rules.compareVersions("1.0.0-rc1", "1.0.0-beta3"))
+        assertEquals(1, Rules.compareVersions("1.0.0-preview", "1.0.0-pre.9"))
         assertEquals(0, Rules.compareVersions("1.0.0-BETA", "1.0.0-beta.0"))
         assertEquals(1, Rules.compareVersions("1.0.1-alpha", "1.0.0"))
     }

@@ -138,9 +138,14 @@ object Installer {
      * dropped it; a session Android already holds finishes and reports by itself.
      */
     fun cancel(context: Context, sessionId: Int) {
-        val dropped = runCatching { context.packageManager.packageInstaller.abandonSession(sessionId) }.isSuccess
-        if (dropped || context.packageManager.packageInstaller.getSessionInfo(sessionId) == null) {
-            report(InstallResult.Cancelled(sessionId))
+        val installer = context.packageManager.packageInstaller
+        val info = runCatching { installer.getSessionInfo(sessionId) }.getOrNull()
+        when {
+            // Gone already, with no answer: the row is freed
+            info == null -> report(InstallResult.Cancelled(sessionId))
+            // Android is installing it now: that finishes and reports by itself
+            info.isCommitted && _confirm.value?.sessionId != sessionId -> Unit
+            else -> if (runCatching { installer.abandonSession(sessionId) }.isSuccess) report(InstallResult.Cancelled(sessionId))
         }
     }
 

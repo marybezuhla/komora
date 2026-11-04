@@ -38,6 +38,8 @@ import java.io.IOException
 enum class Problem {
     Network, RateLimit, NoRelease, BadRelease, Download, NoSpace,
     Unreadable, WrongPackage, WrongSigner, NotNewer, OtherKey, Install,
+    /** Older than the lowest version Komora's list allows for this app. */
+    TooOld,
     /** An added source's APK claims to be an app Komora already has. */
     AlreadyInKomora,
 }
@@ -642,8 +644,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         is ApkRejected.WrongPackage -> Problem.WrongPackage
         is ApkRejected.WrongSigner -> Problem.WrongSigner
         is ApkRejected.NotNewer -> Problem.NotNewer
-        // An older version than Komora accepts for this app: a bad release
-        is ApkRejected.TooOld -> Problem.BadRelease
+        is ApkRejected.TooOld -> Problem.TooOld
         is ApkRejected.InstalledByOtherKey -> Problem.OtherKey
         is AlreadyInKomora -> Problem.AlreadyInKomora
         is InstallFailed -> Problem.Install

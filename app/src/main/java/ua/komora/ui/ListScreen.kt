@@ -684,6 +684,7 @@ private fun problemText(p: Problem): String = stringResource(
         Problem.RateLimit -> R.string.err_rate_limit
         Problem.NoRelease -> R.string.err_no_release
         Problem.BadRelease -> R.string.err_bad_release
+        Problem.TooOld -> R.string.err_too_old
         Problem.Download -> R.string.err_download
         Problem.NoSpace -> R.string.err_no_space
         Problem.Unreadable -> R.string.err_unreadable

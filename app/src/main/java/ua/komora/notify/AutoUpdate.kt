@@ -284,8 +284,10 @@ class AutoInstallReceiver : BroadcastReceiver() {
                 AutoUpdate.rememberRefused(context, pkg, version)
                 AutoUpdate.noticeAsk(context, what)
             }
-            // A failed update is left for the owner in Komora; not downloaded again every day
-            else -> AutoUpdate.rememberRefused(context, pkg, version)
+            // This version cannot be installed on this phone: not downloaded again every day
+            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> AutoUpdate.rememberRefused(context, pkg, version)
+            // Anything else (space, a passing conflict) is simply tried again next time
+            else -> Unit
         }
     }
 }

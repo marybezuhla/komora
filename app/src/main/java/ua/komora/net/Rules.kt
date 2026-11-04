@@ -145,7 +145,7 @@ object Rules {
     }
 
     private val LEADING = Regex("^[0-9]{1,9}(\\.[0-9]{1,9})*")
-    private val TEST = Regex("^[-._+]?(alpha|beta|pre|preview|rc)[-._]?([0-9]{0,9})", RegexOption.IGNORE_CASE)
+    private val TEST = Regex("^[-._+]?(alpha|beta|preview|pre|rc)[-._]?([0-9]{0,9})", RegexOption.IGNORE_CASE)
     private val TEST_KINDS = listOf("alpha", "beta", "pre", "preview", "rc")
 
     private fun numbers(v: String): List<Long>? =
