@@ -228,10 +228,8 @@ private fun LazyListScope.cards(
     onDetails: (AppRow) -> Unit,
 ) {
     items(rows.chunked(columns), key = { chunk -> chunk.first().app.key }) { chunk ->
-        // Cards side by side get one height; a single card keeps its own (asking a card for its smallest
-        // height can come out too small when its text wraps)
-        val rowModifier = if (columns > 1) Modifier.fillMaxWidth().height(IntrinsicSize.Min) else Modifier.fillMaxWidth()
-        Row(rowModifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Each card keeps its own height, aligned at the top: no card is stretched into an empty box
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
             for (row in chunk) {
                 val waiting = (row.phase as? Phase.Installing)?.sessionId?.let { id -> confirm?.takeIf { it.sessionId == id } }
                 AppCard(
@@ -246,8 +244,7 @@ private fun LazyListScope.cards(
                     onContinue = waiting?.let { c -> { actions.start(c.intent) } },
                     onCancel = onCancel,
                     onDetails = { onDetails(row) },
-                    modifier = if (columns > 1) Modifier.weight(1f).fillMaxHeight() else Modifier.weight(1f),
-                    stretch = columns > 1,
+                    modifier = Modifier.weight(1f),
                 )
             }
             // An incomplete last row keeps the same card width
