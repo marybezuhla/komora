@@ -63,8 +63,8 @@
     <string name="whats_new">What\'s new</string>
     <string name="hide_whats_new">Hide</string>
     <string name="updates_title">Updates</string>
-    <string name="notify_updates">Tell me about updates</string>
-    <string name="notify_updates_summary">Once a day Komora asks GitHub in the background and tells you when an app on this phone has a new version. Installing still happens here.</string>
+    <string name="notify_updates">New version notices</string>
+    <string name="notify_updates_summary">Komora checks whether your apps have new versions and sends a notice. You update them yourself, as always.</string>
     <string name="wifi_only">Only over Wi-Fi</string>
     <string name="notify_denied">Android does not allow Komora\'s notifications. They can be allowed in the phone\'s settings.</string>
     <string name="notification_channel">App updates</string>
@@ -160,4 +160,9 @@
     <string name="org_nbu_what">An account for the needs of the army, opened on 24 February 2022; the National Bank reports on it every month</string>
     <string name="org_nbu_url">https://bank.gov.ua/en/news/all/natsionalniy-bank-vidkriv-spetsrahunok-dlya-zboru-koshtiv-na-potrebi-armiyi</string>
     <string name="support_any">You can also support any trusted foundation, volunteers or unit you know. Check fundraisers: official details and reports.</string>
+    <string name="notify_how_often">How often</string>
+    <string name="notify_daily">Daily</string>
+    <string name="notify_weekly">Weekly</string>
+    <string name="theme_kalyna">Viburnum</string>
+    <string name="theme_zoriana_nich">Starry night</string>
 </resources>

@@ -29,7 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -85,14 +85,15 @@ internal fun AboutPage(onBack: () -> Unit) {
         containerColor = scheme.background,
         topBar = {
             Column(Modifier.background(scheme.background)) {
-                TopAppBar(
+                // The title in the middle, over the centred letter
+                CenterAlignedTopAppBar(
                     title = { Text(stringResource(R.string.about_komora), color = scheme.primary, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = scheme.background),
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = scheme.background),
                 )
                 Ornament(Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
             }

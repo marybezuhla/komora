@@ -37,11 +37,12 @@ object UpdateCheck {
     private const val CHANNEL = "updates"
     private const val NOTICE_ID = 1
 
-    data class Settings(val enabled: Boolean = false, val wifiOnly: Boolean = false)
+    /** Off by default; once a day, or once a week for those who want it quieter. */
+    data class Settings(val enabled: Boolean = false, val wifiOnly: Boolean = false, val weekly: Boolean = false)
 
     fun settings(context: Context): Settings = try {
         val p = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-        Settings(p.getBoolean("enabled", false), p.getBoolean("wifi_only", false))
+        Settings(p.getBoolean("enabled", false), p.getBoolean("wifi_only", false), p.getBoolean("weekly", false))
     } catch (_: Exception) {
         Settings()
     }
@@ -57,7 +58,11 @@ object UpdateCheck {
             s
         } else {
             val job = JobInfo.Builder(JOB_ID, ComponentName(context, UpdateJob::class.java))
-                .setPeriodic(TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(6))
+                // Android picks the moment within the last part of each period, when it suits the phone
+                .setPeriodic(
+                    TimeUnit.DAYS.toMillis(if (s.weekly) 7 else 1),
+                    if (s.weekly) TimeUnit.DAYS.toMillis(1) else TimeUnit.HOURS.toMillis(6),
+                )
                 .setRequiredNetworkType(if (s.wifiOnly) JobInfo.NETWORK_TYPE_UNMETERED else JobInfo.NETWORK_TYPE_ANY)
                 // After a lost connection, try again in an hour, then less often
                 .setBackoffCriteria(TimeUnit.HOURS.toMillis(1), JobInfo.BACKOFF_POLICY_EXPONENTIAL)
@@ -69,7 +74,8 @@ object UpdateCheck {
         }
         try {
             context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
-                .putBoolean("enabled", saved.enabled).putBoolean("wifi_only", saved.wifiOnly).apply()
+                .putBoolean("enabled", saved.enabled).putBoolean("wifi_only", saved.wifiOnly)
+                .putBoolean("weekly", saved.weekly).apply()
         } catch (_: Exception) {
             // Only a preference
         }

@@ -61,6 +61,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.Crossfade
 import ua.komora.ui.theme.SectionTitle
 import ua.komora.ui.theme.Group
+import ua.komora.ui.theme.Segments
 import ua.komora.notify.UpdateCheck
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.selection.toggleable
@@ -413,6 +414,13 @@ private fun UpdateSettings(
             }
             if (s.enabled) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text(stringResource(R.string.notify_how_often), style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 8.dp))
+                Segments(
+                    options = listOf(false to R.string.notify_daily, true to R.string.notify_weekly),
+                    chosen = s.weekly,
+                ) { onChange(s.copy(weekly = it)) }
+                Spacer(Modifier.height(8.dp))
                 SwitchRow(stringResource(R.string.wifi_only), null, s.wifiOnly) { onChange(s.copy(wifiOnly = it)) }
             }
         }
