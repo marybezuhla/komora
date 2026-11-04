@@ -148,42 +148,25 @@ jobs:
           done
           echo "::warning::Could not push the pictures"
 
-  # Signs. Only for main, only in the "release" environment (needs the owner's approval), and with
-  # no Gradle or other third-party build code: just the Android SDK's own zipalign and apksigner.
-  release:
+  # Prepares the release as a draft with the unsigned APK. Nothing is signed here and no key is ever
+  # on GitHub: the owner signs on her own computer with scripts/sign-release.sh, which checks this
+  # very file, signs it, uploads it and publishes the release. A draft is seen by nobody else.
+  draft:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: release
+    timeout-minutes: 10
     concurrency:
-      group: release
+      group: publish
       cancel-in-progress: false
     permissions:
-      contents: read
-    outputs:
-      signed: ${{ steps.secrets.outputs.ready }}
+      contents: write
     steps:
-      - name: Check that signing secrets exist
-        id: secrets
-        env:
-          PASS: ${{ secrets.KOMORA_SIGNING_PASS }}
-          STORE: ${{ secrets.KOMORA_STORE_PASS }}
-          KEYSTORE: ${{ secrets.KOMORA_KEYSTORE }}
-        run: |
-          if [ -n "$PASS" ] && [ -n "$STORE" ] && [ -n "$KEYSTORE" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::Signing secrets are not set in the release environment; nothing is published."
-            exit 1
-          fi
-
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
           sparse-checkout: |
             .github
-            signing
             version.txt
           sparse-checkout-cone-mode: false
 
@@ -199,86 +182,29 @@ jobs:
           [[ "$SUM" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::No APK checksum from the build"; exit 1; }
           echo "$SUM  unsigned/app-release-unsigned.apk" | sha256sum -c -
 
-      # Checked again here, before signing, in a step that has no secrets
-      - name: Check permissions again
-        run: bash .github/check-permissions.sh unsigned/app-release-unsigned.apk
-
-      - name: Sign
-        env:
-          PASS: ${{ secrets.KOMORA_SIGNING_PASS }}
-          STORE: ${{ secrets.KOMORA_STORE_PASS }}
-          KEYSTORE: ${{ secrets.KOMORA_KEYSTORE }}
-        shell: bash
+      - name: Check permissions and manifest again
         run: |
-          set -euo pipefail
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          # The encrypted keystore lives only in the release environment's secrets, not in the repository.
-          printf %s "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/k.enc"
-          printf %s "$PASS" > "$RUNNER_TEMP/p"
-          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in "$RUNNER_TEMP/k.enc" -out "$RUNNER_TEMP/komora.jks" -pass file:"$RUNNER_TEMP/p"
-          rm "$RUNNER_TEMP/p" "$RUNNER_TEMP/k.enc"
-          mkdir -p out
-          "$BT/zipalign" -P 16 -f 4 unsigned/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
-          OUT="out/komora-$(tr -d '[:space:]' < version.txt).apk"
-          "$BT/apksigner" sign --ks "$RUNNER_TEMP/komora.jks" --ks-key-alias komora \
-            --ks-pass env:STORE --key-pass env:STORE --out "$OUT" "$RUNNER_TEMP/aligned.apk"
-          rm -f "$RUNNER_TEMP/komora.jks"
-          # Exactly one signer, and it must be exactly Komora's own (signing/certificate-sha256.txt)
-          CERT="$(tr -d '[:space:]' < signing/certificate-sha256.txt)"
-          [[ "$CERT" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::Bad signing/certificate-sha256.txt"; exit 1; }
-          "$BT/apksigner" verify --print-certs "$OUT" | tee certs.txt
-          # Older apksigner prints "Signer #1 certificate ...", newer "V3.0 Signer: certificate ...".
-          # Each signing scheme may repeat the same certificate; any second, different one fails.
-          DIGESTS="$({ grep -iE "Signer[^:]*:? *certificate SHA-256 digest:" certs.txt || true; } | sed -E 's/.*digest: *//' | tr -d ' ' | tr 'A-F' 'a-f' | sort -u)"
-          if [ "$DIGESTS" != "$CERT" ]; then
-            echo "::error::Unexpected signing certificate"; exit 1
-          fi
+          bash .github/check-permissions.sh unsigned/app-release-unsigned.apk
+          bash .github/check-manifest.sh unsigned/app-release-unsigned.apk
 
-      - name: Remove the decrypted key
-        if: always()
-        run: rm -f "$RUNNER_TEMP/komora.jks" "$RUNNER_TEMP/p" "$RUNNER_TEMP/k.enc"
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: komora-signed
-          path: out/*.apk
-          retention-days: 7
-
-  # Publishes the signed APK. Never sees the signing key; uses only GitHub's own gh tool.
-  publish:
-    needs: release
-    if: needs.release.outputs.signed == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: publish
-      cancel-in-progress: false
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          sparse-checkout: |
-            .github/release-notes.md
-            .github/check-version.sh
-            version.txt
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: komora-signed
-          path: out
-      - name: Publish release
+      - name: Draft the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          SUM: ${{ needs.build.outputs.apk_sha256 }}
         run: |
-          # Checked again right before publishing: two approved runs must not publish out of order
+          set -euo pipefail
           bash .github/check-version.sh push refs/heads/main "$REPO"
           V="$(tr -d '[:space:]' < version.txt)"
-          # The SHA-256 of the APK, so anyone can check the file they downloaded is this one
+          # An older draft of the same version (a run before this one) is replaced
+          if gh release view "v$V" --repo "$REPO" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx true; then
+            gh release delete "v$V" --repo "$REPO" --yes
+          fi
+          mv unsigned/app-release-unsigned.apk "komora-$V-unsigned.apk"
           cp .github/release-notes.md notes.md
-          printf '\nSHA-256:\n```\n%s\n```\n' "$(cd out && sha256sum *.apk)" >> notes.md
-          gh release create "v$V" out/*.apk \
-            --repo "${{ github.repository }}" --target "${{ github.sha }}" \
-            --title "Komora $V" --notes-file notes.md --latest
+          # Read by the signing script: the unsigned file must be exactly the one this build made
+          printf '\n<!-- unsigned-sha256: %s -->\n' "$SUM" >> notes.md
+          gh release create "v$V" "komora-$V-unsigned.apk" --draft \
+            --repo "$REPO" --target "${{ github.sha }}" \
+            --title "Komora $V" --notes-file notes.md
+          echo "Draft v$V is ready: sign it with scripts/sign-release.sh $V" >> "$GITHUB_STEP_SUMMARY"
