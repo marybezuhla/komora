@@ -165,12 +165,18 @@ internal fun KomoraList(
     ) { padding ->
         // One column on a phone; two on an unfolded Galaxy Fold / Pixel Fold or an upright tablet;
         // three on a tablet held sideways
-        val columns = columnsFor(LocalConfiguration.current.screenWidthDp)
+        // On a big screen the list keeps a comfortable width, in the middle
+        val columns = columnsFor(minOf(LocalConfiguration.current.screenWidthDp, MAX_LIST_WIDTH))
+        val wide = columns > 1
         // Pull the list down to check for updates
-        PullToRefreshBox(isRefreshing = checking, onRefresh = onCheck, modifier = Modifier.fillMaxSize().padding(padding)) {
+        PullToRefreshBox(
+            isRefreshing = checking, onRefresh = onCheck,
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentAlignment = Alignment.TopCenter,
+        ) {
             LazyColumn(
                 state = if (showAdded) addedListState else listState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxHeight().widthIn(max = MAX_LIST_WIDTH.dp).fillMaxWidth(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -182,9 +188,20 @@ internal fun KomoraList(
                 if (showAdded) item { AddedIntro(onAddSource) }
                 // How this tab's apps stand; "Update all" covers only what is shown
                 if (!showAdded || shown.isNotEmpty()) {
-                    item { Summary(shown, checking, busy, canInstall, onCheck) { onUpdateAll(shown.map { it.app.key }) } }
+                    item {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Box(Modifier.widthIn(max = 560.dp)) {
+                                Summary(shown, checking, busy, canInstall, onCheck) { onUpdateAll(shown.map { it.app.key }) }
+                            }
+                        }
+                    }
                 }
-                for (group in Group.entries) {
+                if (wide) {
+                    // Side by side, one even grid in the same order (updates first): no half-empty rows;
+                    // each card's label already says where it stands
+                    val ordered = Group.entries.flatMap { g -> shown.filter { Group.of(it) == g } }
+                    if (ordered.isNotEmpty()) cards(ordered, columns, lang, busy, confirm, canInstall, actions, onCheck, onInstall, onCancel, onDetails)
+                } else for (group in Group.entries) {
                     val inGroup = shown.filter { Group.of(it) == group }
                     if (inGroup.isEmpty()) continue
                     item(key = "title-" + group.name) { GroupTitle(stringResource(group.title), inGroup.size) }
@@ -444,6 +461,9 @@ private fun StatusPill(row: AppRow) {
     )
 }
 
+/** Wider than this, the list stays this wide, in the middle. */
+private const val MAX_LIST_WIDTH = 1040
+
 private fun columnsFor(width: Int) = when {
     width >= 1000 -> 3
     width >= 600 -> 2
@@ -555,18 +575,22 @@ private fun AppCard(
         // Everything below uses the whole width, like the text above
         Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
             problem?.let {
-                // A sign as well as the colour: in red themes the error and the accent are close
-                Row(verticalAlignment = Alignment.Top) {
+                // A block of its own across the card: a sign as well as the colour, since in red themes
+                // the error and the accent are close
+                Row(
+                    Modifier.fillMaxWidth().background(scheme.errorContainer, RoundedCornerShape(12.dp)).padding(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
                     Icon(
                         painterResource(R.drawable.ic_warning),
                         contentDescription = null,
                         tint = scheme.error,
-                        modifier = Modifier.padding(top = 1.dp, end = 6.dp).size(16.dp),
+                        modifier = Modifier.padding(top = 2.dp, end = 10.dp).size(18.dp),
                     )
-                    Text(problemText(it), style = MaterialTheme.typography.bodyMedium, color = scheme.error,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                    Text(problemText(it), style = MaterialTheme.typography.bodyMedium, color = scheme.onErrorContainer,
+                        modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite })
                 }
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
             }
             when (val phase = row.phase) {
                 is Phase.Downloading -> {
