@@ -163,4 +163,5 @@
     <string name="notify_weekly">Щотижня</string>
     <string name="theme_kalyna">Калина</string>
     <string name="theme_zoriana_nich">Зоряна ніч</string>
+    <string name="banner_updates">Оновлень: %1$d</string>
 </resources>

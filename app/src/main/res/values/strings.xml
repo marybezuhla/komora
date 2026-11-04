@@ -165,4 +165,5 @@
     <string name="notify_weekly">Weekly</string>
     <string name="theme_kalyna">Viburnum</string>
     <string name="theme_zoriana_nich">Starry night</string>
+    <string name="banner_updates">Updates: %1$d</string>
 </resources>

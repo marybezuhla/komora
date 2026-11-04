@@ -47,6 +47,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ua.komora.R
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material3.HorizontalDivider
 import android.os.Build
 import java.net.URLEncoder
 
@@ -189,54 +194,103 @@ private fun Field(label: String, value: String, mono: Boolean = false) {
     }
 }
 
-/** "Details": where an app comes from and the key it must be signed with, so anyone can check. */
+/**
+ * "Details": where an app comes from and the key it must be signed with, as a table (label on the
+ * left, value on the right), what is new in its latest version, and the links.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailsSheet(row: AppRow, lang: String, pinnedKey: String?, onRemove: (() -> Unit)?, onDismiss: () -> Unit) {
     val uri = LocalUriHandler.current
+    val scheme = MaterialTheme.colorScheme
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp).verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Text(row.app.name(lang), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.semantics { heading() })
+                textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(if (row.app.added) R.string.details_added else R.string.details_verified),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (row.app.added) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
-                    .padding(12.dp),
+                color = if (row.app.added) scheme.error else scheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(8.dp))
-            Field(stringResource(R.string.field_source), "github.com/${row.app.repo}")
-            if (row.app.packageName.isNotEmpty()) Field(stringResource(R.string.field_package), row.app.packageName)
-            row.installedVersion?.takeIf { it.isNotEmpty() }?.let { Field(stringResource(R.string.field_installed), it) }
-            row.latestVersion?.let { Field(stringResource(R.string.field_latest), it) }
-            Field(
-                stringResource(R.string.field_key),
-                pinnedKey?.let { formatKey(it) } ?: stringResource(R.string.key_unknown_yet),
-                mono = pinnedKey != null,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { runCatching { uri.openUri("https://github.com/${row.app.repo}") } }) {
-                    Text(stringResource(R.string.open_repository))
+            Spacer(Modifier.height(16.dp))
+            // The facts, one per line
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).border(1.dp, scheme.outlineVariant, RoundedCornerShape(16.dp)),
+            ) {
+                val lines = buildList {
+                    add(stringResource(R.string.field_source) to row.app.repo)
+                    if (row.app.packageName.isNotEmpty()) add(stringResource(R.string.field_package) to row.app.packageName)
+                    row.installedVersion?.takeIf { it.isNotEmpty() }?.let { add(stringResource(R.string.field_installed) to it) }
+                    row.latestVersion?.let { add(stringResource(R.string.field_latest) to it) }
                 }
-                if (onRemove != null) {
-                    TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_source), color = MaterialTheme.colorScheme.error) }
+                lines.forEachIndexed { i, (label, value) ->
+                    if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = scheme.outlineVariant)
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(label, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                        Spacer(Modifier.width(16.dp).weight(1f))
+                        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface,
+                            textAlign = TextAlign.End)
+                    }
+                }
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = scheme.outlineVariant)
+                // The key: in full, in groups of four, to compare by eye
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(stringResource(R.string.field_key), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        pinnedKey?.let { formatKey(it) } ?: stringResource(R.string.key_unknown_yet),
+                        style = if (pinnedKey != null) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+                        else MaterialTheme.typography.bodyMedium,
+                        color = scheme.onSurface,
+                    )
                 }
             }
-            // A problem with the app: a new issue in its repository, filled in only with what is shown here
+            // What is new in the latest version
+            val notes = row.latest?.notes.orEmpty()
+            if (notes.isNotBlank()) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    stringResource(R.string.whats_new) + (row.latestVersion?.let { " · $it" } ?: ""),
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    notes,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurface,
+                    modifier = Modifier.fillMaxWidth().background(scheme.surfaceVariant, RoundedCornerShape(16.dp)).padding(16.dp),
+                )
+            }
             Spacer(Modifier.height(16.dp))
+            // The links, one under the other, the same width
             val name = row.app.name(lang)
             val version = row.installedVersion?.takeIf { it.isNotEmpty() } ?: row.latestVersion ?: "?"
             val android = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
             val body = stringResource(R.string.report_bug_body, name, version, android)
-            OutlinedButton(onClick = { runCatching { uri.openUri(issueUrl(row.app.repo, name, version, body)) } }) {
-                Text(stringResource(R.string.report_bug))
-            }
+            OutlinedButton(
+                onClick = { runCatching { uri.openUri("https://github.com/${row.app.repo}") } },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.open_repository), fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { runCatching { uri.openUri(issueUrl(row.app.repo, name, version, body)) } },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.report_bug), fontWeight = FontWeight.SemiBold) }
             Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.report_bug_note), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.report_bug_note), style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            if (onRemove != null) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onRemove, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.remove_source), color = scheme.error, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
     }
 }
