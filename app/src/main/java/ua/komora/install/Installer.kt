@@ -86,14 +86,17 @@ object Installer {
     }
 
     /** Step 2: asks Android to install. The answer comes to [InstallReceiver]. */
-    fun commit(context: Context, sessionId: Int) = wrap {
+    fun commit(context: Context, sessionId: Int) =
+        commitTo(context, sessionId, Intent(context, InstallReceiver::class.java))
+
+    /** Hands the session to Android; its answer goes to [receiver], one of Komora's own (explicit). */
+    private fun commitTo(context: Context, sessionId: Int, receiver: Intent) = wrap {
         val installer = context.packageManager.packageInstaller
         try {
             installer.openSession(sessionId).use { session ->
-                val intent = Intent(context, InstallReceiver::class.java).setPackage(context.packageName)
                 // Mutable is required: Android fills in the result. The intent is explicit, to Komora's own receiver.
                 val pending = PendingIntent.getBroadcast(
-                    context, sessionId, intent,
+                    context, sessionId, receiver.setPackage(context.packageName),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
                 )
                 session.commit(pending.intentSender)
@@ -105,6 +108,8 @@ object Installer {
     }
 
     const val EXTRA_WHAT = "ua.komora.extra.WHAT"
+    const val EXTRA_PACKAGE = "ua.komora.extra.PACKAGE"
+    const val EXTRA_VERSION = "ua.komora.extra.VERSION"
 
     /** True while Komora's own screen downloads or installs: the automatic run then waits for another day. */
     @Volatile var foregroundBusy = false
@@ -112,25 +117,20 @@ object Installer {
     /** Sessions the automatic run prepared and is about to hand to Android: never dropped as leftovers. */
     val backgroundSessions: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
-    /** Step 2 for an automatic update: the answer goes to [ua.komora.notify.AutoInstallReceiver], with [what] for the notice. */
-    fun commitInBackground(context: Context, sessionId: Int, what: String) = wrap {
-        val installer = context.packageManager.packageInstaller
-        try {
-            installer.openSession(sessionId).use { session ->
-                val intent = Intent(context, ua.komora.notify.AutoInstallReceiver::class.java)
-                    .setPackage(context.packageName)
-                    .putExtra(EXTRA_WHAT, what)
-                // Mutable is required: Android fills in the result. Explicit, to Komora's own receiver.
-                val pending = PendingIntent.getBroadcast(
-                    context, sessionId, intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
-                )
-                session.commit(pending.intentSender)
-            }
-        } catch (e: Exception) {
-            runCatching { installer.abandonSession(sessionId) }
-            throw e
-        }
+    /**
+     * Step 2 for an automatic update: the answer goes to [ua.komora.notify.AutoInstallReceiver], with [what]
+     * for the notice and the package and version, so a refused update is not downloaded again every day.
+     */
+    fun commitInBackground(context: Context, sessionId: Int, what: String, packageName: String, version: String) =
+        commitTo(
+            context, sessionId,
+            Intent(context, ua.komora.notify.AutoInstallReceiver::class.java)
+                .putExtra(EXTRA_WHAT, what).putExtra(EXTRA_PACKAGE, packageName).putExtra(EXTRA_VERSION, version),
+        )
+
+    /** The screen went away while Android's question was waiting: it no longer holds up automatic updates. */
+    fun forgetConfirm(sessionId: Int) {
+        _confirm.update { if (it?.sessionId == sessionId) null else it }
     }
 
     /**

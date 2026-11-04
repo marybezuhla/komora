@@ -18,9 +18,6 @@ object Rules {
     /** Screenshots: the list from GitHub's API, the pictures from the repository itself. Nothing else. */
     val SCREENSHOT_HOSTS = setOf("api.github.com", "raw.githubusercontent.com")
 
-    /** Every host Komora may ever connect to. */
-    val ALLOWED_HOSTS = APP_HOSTS + SCREENSHOT_HOSTS
-
     /** A screenshot is never bigger than this; a larger file is left out. */
     const val MAX_IMAGE_BYTES: Int = 3 * 1024 * 1024
 
@@ -57,8 +54,6 @@ object Rules {
             (uri.port == -1 || uri.port == 443)
         return uri.takeIf { ok }
     }
-
-    fun isAllowedUrl(url: String, hosts: Set<String> = APP_HOSTS): Boolean = allowedUri(url, hosts) != null
 
     data class Asset(val name: String, val url: String, val size: Long, val sha256: String?)
 
@@ -134,8 +129,10 @@ object Rules {
     fun normalizeVersion(v: String): String = v.trim().removePrefix("v").removePrefix("V")
 
     /**
-     * Compares the leading numbers of two versions ("v1.2.0", "1.2.0-debug" -> 1.2.0).
-     * Returns null when either has no leading number, so nothing is offered on a guess.
+     * Compares two versions by their leading numbers ("v1.2.0", "1.2.0-debug" -> 1.2.0). With the same
+     * numbers, a test version ("-alpha", "-beta", "-rc.2", "-pre", "-preview") comes before the final one,
+     * and test versions go by their kind, then their number. Returns null when either has no leading
+     * number, so nothing is offered on a guess.
      */
     fun compareVersions(a: String, b: String): Int? {
         val pa = numbers(a) ?: return null
@@ -144,13 +141,36 @@ object Rules {
             val c = pa.getOrElse(i) { 0L }.compareTo(pb.getOrElse(i) { 0L })
             if (c != 0) return c
         }
-        return 0
+        return compareTest(testOf(a), testOf(b))
     }
 
     private val LEADING = Regex("^[0-9]{1,9}(\\.[0-9]{1,9})*")
+    private val TEST = Regex("^[-._+]?(alpha|beta|pre|preview|rc)[-._]?([0-9]{0,9})", RegexOption.IGNORE_CASE)
+    private val TEST_KINDS = listOf("alpha", "beta", "pre", "preview", "rc")
 
     private fun numbers(v: String): List<Long>? =
         LEADING.find(normalizeVersion(v))?.value?.split(".")?.map { it.toLong() }
+
+    /** The kind (0 alpha … 4 rc) and number of a test version; null for a final one ("-debug" counts as final). */
+    private fun testOf(v: String): Pair<Int, Long>? {
+        val rest = normalizeVersion(v).replaceFirst(LEADING, "")
+        val m = TEST.find(rest) ?: return null
+        return TEST_KINDS.indexOf(m.groupValues[1].lowercase()) to (m.groupValues[2].toLongOrNull() ?: 0L)
+    }
+
+    private fun compareTest(a: Pair<Int, Long>?, b: Pair<Int, Long>?): Int = when {
+        a == null && b == null -> 0
+        a == null -> 1
+        b == null -> -1
+        else -> compareValuesBy(a, b, { it.first }, { it.second })
+    }
+
+    /** Automatic updates take a release only after this long, so a bad one can be noticed and pulled first. */
+    const val AUTO_UPDATE_WAIT_MS: Long = 48L * 60 * 60 * 1000
+
+    /** True when a release published at [publishedMs] has waited long enough at [nowMs]; unknown is never. */
+    fun oldEnough(publishedMs: Long?, nowMs: Long): Boolean =
+        publishedMs != null && nowMs - publishedMs >= AUTO_UPDATE_WAIT_MS
 
     fun toHex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
 }

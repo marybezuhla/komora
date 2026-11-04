@@ -573,8 +573,11 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
-        // The screen is gone: automatic updates may run again
-        if (active != null) Installer.foregroundBusy = false
+        // The screen is gone: automatic updates may run again, even if Android's question was left unanswered
+        active?.let { a ->
+            Installer.foregroundBusy = false
+            a.sessionId?.let(Installer::forgetConfirm)
+        }
         super.onCleared()
     }
 
@@ -611,6 +614,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         is ApkRejected.WrongPackage -> Problem.WrongPackage
         is ApkRejected.WrongSigner -> Problem.WrongSigner
         is ApkRejected.NotNewer -> Problem.NotNewer
+        // An older version than Komora accepts for this app: a bad release
+        is ApkRejected.TooOld -> Problem.BadRelease
         is ApkRejected.InstalledByOtherKey -> Problem.OtherKey
         is AlreadyInKomora -> Problem.AlreadyInKomora
         is InstallFailed -> Problem.Install

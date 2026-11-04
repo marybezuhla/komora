@@ -12,8 +12,11 @@ import java.security.MessageDigest
 import java.util.concurrent.CancellationException
 import javax.net.ssl.HttpsURLConnection
 
-/** A published release: its tag, its one APK, and its description made plain ("What's new"). */
-data class Release(val tag: String, val apk: Rules.Asset, val notes: String = "")
+/**
+ * A published release: its tag, its one APK, its description made plain ("What's new"), and when it was
+ * published (milliseconds; null if GitHub did not say), so automatic updates can wait before taking it.
+ */
+data class Release(val tag: String, val apk: Rules.Asset, val notes: String = "", val published: Long? = null)
 
 /** GitHub allows 60 requests an hour without an account. */
 class RateLimitException : IOException("GitHub rate limit")
@@ -35,7 +38,7 @@ object GitHub {
         // An added source may have been renamed since: GitHub sends it on, and its files carry the new name
         val apk = app.apkPattern?.let { Rules.pickByPattern(r.assets, it, r.repo ?: app.repo) }
             ?: Rules.pickApk(r.assets, app.assetPrefix, app.repo)
-        return Release(tag = r.tag, apk = apk, notes = r.notes)
+        return Release(tag = r.tag, apk = apk, notes = r.notes, published = r.published)
     }
 
     /**
@@ -48,19 +51,34 @@ object GitHub {
         return name to r.assets.filter { it.name.endsWith(".apk") && Rules.inRepo(it.url, name) }
     }
 
-    /** The newest published (not draft, not pre-release) release of [repo], with its one APK. */
-    fun latestRelease(repo: String, assetPrefix: String): Release {
-        val r = latest(repo)
-        return Release(tag = r.tag, apk = Rules.pickApk(r.assets, assetPrefix, repo), notes = r.notes)
-    }
-
-    private class Latest(val tag: String, val assets: List<Rules.Asset>, val notes: String, val repo: String?)
+    private class Latest(val tag: String, val assets: List<Rules.Asset>, val notes: String, val repo: String?, val published: Long?)
 
     private val RELEASE_PAGE = Regex("^https://github\\.com/([A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100})/releases/")
 
+    /**
+     * The last answer about each repository, with GitHub's tag for it: asking again with that tag costs
+     * nothing from the 60 an hour when nothing changed. Kept only while Komora runs.
+     */
+    private val known = java.util.concurrent.ConcurrentHashMap<String, Pair<String, ByteArray>>()
+    private const val MAX_KNOWN = 100
+
+    private class NotModified : IOException("Not modified")
+
     private fun latest(repo: String): Latest {
-        val body = open("https://api.github.com/repos/$repo/releases/latest", api = true).use { conn ->
-            readLimited(conn.inputStream, Rules.MAX_JSON_BYTES)
+        val url = "https://api.github.com/repos/$repo/releases/latest"
+        val cached = known[url]
+        val body = try {
+            open(url, api = true, etag = cached?.first).use { conn ->
+                readLimited(conn.inputStream, Rules.MAX_JSON_BYTES).also { bytes ->
+                    val tag = conn.etag
+                    if (tag != null && tag.length <= 200) {
+                        if (known.size >= MAX_KNOWN) known.clear()
+                        known[url] = tag to bytes
+                    } else known.remove(url)
+                }
+            }
+        } catch (_: NotModified) {
+            cached?.second ?: throw IOException("Not modified, nothing kept")
         }
         // An answer that cannot be read as a release is a bad release, not a lost connection
         return try {
@@ -76,7 +94,8 @@ object GitHub {
                     size = a.getLong("size"),
                     sha256 = Rules.parseDigest(a.optString("digest", "").ifEmpty { null }),
                 )
-            }, ReleaseNotes.clean(o.optString("body", "")), canonical)
+            }, ReleaseNotes.clean(o.optString("body", "")), canonical,
+                runCatching { java.time.Instant.parse(o.getString("published_at")).toEpochMilli() }.getOrNull())
         } catch (e: JSONException) {
             throw BadReleaseException("Unreadable release")
         } catch (e: StackOverflowError) {
@@ -180,7 +199,7 @@ object GitHub {
     }
 
     /** An open connection after any redirects, each one checked against the allowed hosts. */
-    private fun open(start: String, api: Boolean, hosts: Set<String> = Rules.APP_HOSTS): Connection {
+    private fun open(start: String, api: Boolean, hosts: Set<String> = Rules.APP_HOSTS, etag: String? = null): Connection {
         var url = start
         repeat(MAX_REDIRECTS + 1) {
             val uri = Rules.allowedUri(url, hosts) ?: throw IOException("Refused to connect outside GitHub")
@@ -195,9 +214,12 @@ object GitHub {
                 if (api) {
                     conn.setRequestProperty("Accept", "application/vnd.github+json")
                     conn.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+                    if (etag != null) conn.setRequestProperty("If-None-Match", etag)
                 }
                 when (val code = conn.responseCode) {
                     HttpURLConnection.HTTP_OK -> return Connection(conn)
+                    // Same as last time: the kept answer is used
+                    HttpURLConnection.HTTP_NOT_MODIFIED -> if (etag != null) throw NotModified() else throw IOException("GitHub answered 304")
                     301, 302, 303, 307, 308 -> {
                         val next = conn.getHeaderField("Location")
                         if (next.isNullOrEmpty()) throw IOException("Redirect without a target")
@@ -238,6 +260,7 @@ object GitHub {
     private class Connection(private val conn: HttpsURLConnection) : AutoCloseable {
         val inputStream: InputStream get() = conn.inputStream
         val contentLengthLong: Long get() = conn.contentLengthLong
+        val etag: String? get() = conn.getHeaderField("ETag")
         override fun close() = conn.disconnect()
     }
 }
