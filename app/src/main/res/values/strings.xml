@@ -184,4 +184,5 @@
     <string name="share_sources">Share the list</string>
     <string name="add_err_some">Could not add: %1$s</string>
     <string name="open_fullscreen">open full screen</string>
+    <string name="uninstall">Uninstall</string>
 </resources>

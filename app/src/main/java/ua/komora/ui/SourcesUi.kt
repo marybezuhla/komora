@@ -329,22 +329,7 @@ fun DetailsSheet(row: AppRow, lang: String, pinnedKey: String?, onRemove: (() ->
             ) { Text(stringResource(R.string.report_bug), fontWeight = FontWeight.SemiBold) }
             Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.report_bug_note), style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
-            // Android's own "Uninstall?" question; Komora itself is removed in the phone's settings
-            if (row.isInstalled && !row.app.isSelf && row.app.packageName.isNotEmpty()) {
-                val context = LocalContext.current
-                Spacer(Modifier.height(8.dp))
-                TextButton(
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_DELETE, Uri.parse("package:${row.app.packageName}")),
-                            )
-                        }
-                    },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text(stringResource(R.string.uninstall_app), color = scheme.error, fontWeight = FontWeight.SemiBold) }
-            }
+                color = scheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
             if (onRemove != null) {
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = onRemove, modifier = Modifier.heightIn(min = 48.dp)) {

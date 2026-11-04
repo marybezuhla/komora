@@ -263,6 +263,7 @@ class MainActivity : ComponentActivity() {
                                 start(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")))
                             },
                             start = ::start,
+                            uninstall = { pkg -> start(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))) },
                         ),
                     )
                 }
@@ -317,6 +318,8 @@ internal class Actions(
     val canOpen: (String) -> Boolean,
     val appSettings: (String) -> Unit,
     val start: (Intent) -> Unit,
+    /** Android's own "Uninstall?" question for the app. */
+    val uninstall: (String) -> Unit = { },
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

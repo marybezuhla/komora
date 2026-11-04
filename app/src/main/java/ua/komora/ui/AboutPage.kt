@@ -132,26 +132,30 @@ internal fun AboutPage(onBack: () -> Unit) {
                 Text(stringResource(R.string.support_title), style = CardTitle, color = scheme.onSurface, textAlign = TextAlign.Center,
                     modifier = Modifier.semantics { heading() })
                 Spacer(Modifier.height(4.dp))
-                Text(stringResource(R.string.support_note), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.support_note), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(16.dp))
                 CauseGroup(R.string.support_defence, DEFENCE, open)
                 Spacer(Modifier.height(16.dp))
                 CauseGroup(R.string.support_humanitarian, HUMANITARIAN, open)
                 Spacer(Modifier.height(12.dp))
-                Text(stringResource(R.string.support_any), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.support_any), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth())
 
                 Spacer(Modifier.height(24.dp))
                 Text(stringResource(R.string.about_title), style = CardTitle, color = scheme.onSurface, textAlign = TextAlign.Center,
                     modifier = Modifier.semantics { heading() })
                 Spacer(Modifier.height(4.dp))
-                Text(stringResource(R.string.about_text), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.about_text), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth())
                 val context = LocalContext.current
                 val version = remember {
                     runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
                 }
                 version?.let {
                     Spacer(Modifier.height(4.dp))
-                    Text(stringResource(R.string.about_version, it), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                    Text(stringResource(R.string.about_version, it), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth())
                 }
                 Row {
                     TextButton(onClick = { open(SOURCE_URL) }) { Text(stringResource(R.string.source_code)) }

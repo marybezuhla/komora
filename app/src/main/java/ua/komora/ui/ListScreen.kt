@@ -220,6 +220,7 @@ internal fun KomoraList(
                             canOpen = row.isInstalled && !row.app.isSelf && actions.canOpen(row.app.packageName),
                             onInstall = { onInstall(row) },
                             onOpen = { actions.open(row.app.packageName) },
+                            onUninstall = { actions.uninstall(row.app.packageName) },
                             onAppSettings = { actions.appSettings(row.app.packageName) },
                             onRetry = onCheck,
                             onContinue = waiting?.let { c -> { actions.start(c.intent) } },
@@ -470,6 +471,7 @@ private fun AppListRow(
     canOpen: Boolean,
     onInstall: () -> Unit,
     onOpen: () -> Unit,
+    onUninstall: () -> Unit,
     onAppSettings: () -> Unit,
     onRetry: () -> Unit,
     onContinue: (() -> Unit)?,
@@ -482,8 +484,12 @@ private fun AppListRow(
     // A copy from another source: said at once when there is nothing to update; otherwise after a try
     val problem = row.problem ?: Problem.OtherKey.takeIf { row.foreignKey && !row.hasUpdate }
     val retry = problem == Problem.Network || problem == Problem.RateLimit
-    val hasAction = idle && (!row.isInstalled || row.hasUpdate || canOpen)
+    // Installed and up to date: "Open" and "Uninstall" side by side under the text, not one button on the right
+    val installedPair = idle && row.isInstalled && !row.hasUpdate && !row.app.isSelf && row.app.packageName.isNotEmpty()
+    val hasAction = idle && !installedPair && (!row.isInstalled || row.hasUpdate || canOpen)
     val details = stringResource(R.string.details)
+    val ctxOpen = stringResource(R.string.open)
+    val ctxUninstall = stringResource(R.string.uninstall)
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth()
@@ -527,6 +533,26 @@ private fun AppListRow(
         if (hasAction && narrow) {
             MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen,
                 Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp).fillMaxWidth().heightIn(min = 44.dp))
+        }
+        if (installedPair) {
+            Row(
+                Modifier.padding(start = if (narrow) 16.dp else TEXT_EDGE, end = 16.dp, bottom = 14.dp).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (canOpen) {
+                    OutlinedButton(onClick = onOpen, modifier = Modifier.weight(1f).heightIn(min = 44.dp)
+                        .semantics { contentDescription = "$ctxOpen $name" }) {
+                        Text(stringResource(R.string.open), fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    }
+                }
+                // In the theme's warning colour: it removes the app and all its data
+                OutlinedButton(
+                    onClick = onUninstall,
+                    border = BorderStroke(1.dp, scheme.error.copy(alpha = 0.6f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = scheme.error),
+                    modifier = Modifier.weight(1f).heightIn(min = 44.dp).semantics { contentDescription = "$ctxUninstall $name" },
+                ) { Text(stringResource(R.string.uninstall), fontWeight = FontWeight.SemiBold, maxLines = 1) }
+            }
         }
 
         val secondary = retry || problem == Problem.OtherKey
