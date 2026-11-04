@@ -585,11 +585,11 @@ private fun AppListRow(
                     // The way out of a problem
                     if (problem == Problem.OtherKey) {
                         OutlinedButton(onClick = onAppSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
-                            Text(stringResource(R.string.app_settings), fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.app_settings), fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                         }
                     }
                     if (retry) OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
-                        Text(stringResource(R.string.retry), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.retry), fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                     }
                 }
             }
