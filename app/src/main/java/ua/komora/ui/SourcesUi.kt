@@ -47,6 +47,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ua.komora.R
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.AnimatedVisibility
@@ -326,7 +328,7 @@ fun DetailsSheet(row: AppRow, lang: String, pinnedKey: String?, onRemove: (() ->
                     onClick = {
                         runCatching {
                             context.startActivity(
-                                android.content.Intent(android.content.Intent.ACTION_DELETE, android.net.Uri.parse("package:${row.app.packageName}")),
+                                Intent(Intent.ACTION_DELETE, Uri.parse("package:${row.app.packageName}")),
                             )
                         }
                     },
