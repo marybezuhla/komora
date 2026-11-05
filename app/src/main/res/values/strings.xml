@@ -87,8 +87,7 @@
     <string name="added_intro_title">Not checked by Komora</string>
     <string name="added_intro_text">Before the first install it shows the app\'s name, package and signing key. If you agree, only updates signed with the same key are installed. Install only what you trust.</string>
     <string name="added_by_you">Added by you</string>
-    <string name="more_about">Screenshots and details ›</string>
-    <string name="more_about_added">Details ›</string>
+    <string name="more_about">Details ›</string>
     <string name="details">Details</string>
     <string name="details_added">Added by you. Komora has not checked this app: only that every update is signed with the same key as the first install.</string>
     <string name="details_verified">From Komora\'s own list. The key is built into Komora; an APK with any other key is refused.</string>

@@ -85,8 +85,7 @@
     <string name="added_intro_title">Комора їх не перевіряла</string>
     <string name="added_intro_text">Перед першим встановленням вона покаже назву, пакет і ключ підпису. Якщо погодитеся, встановлюватимуться лише оновлення з тим самим ключем. Встановлюйте лише те, чому довіряєте.</string>
     <string name="added_by_you">Додано вами</string>
-    <string name="more_about">Знімки й опис ›</string>
-    <string name="more_about_added">Опис і подробиці ›</string>
+    <string name="more_about">Опис і подробиці ›</string>
     <string name="details">Подробиці</string>
     <string name="details_added">Додано вами. Комора не перевіряла цей застосунок, лише стежить, щоб кожне оновлення мало той самий ключ, що й перше встановлення.</string>
     <string name="details_verified">Із власного списку Комори. Ключ вшитий у Комору; APK з іншим ключем буде відхилено.</string>

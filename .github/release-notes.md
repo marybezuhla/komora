@@ -2,7 +2,7 @@
 
 - Нове в налаштуваннях: «Знімки й іконки сторонніх джерел». Вимкнено за замовчуванням і вмикається лише після попередження; тоді застосунки, які ви додали самі, показують свої знімки й іконку.
 - Знімки екрана застосунків зі списку Комори завантажуються наперед, тож відкриваються одразу.
-- На кожній картці видно «Знімки й опис ›»: що дотик відкриває подробиці.
+- На кожній картці видно «Опис і подробиці ›»: туди можна натиснути.
 - Автоматичні оновлення чекають дві доби й тоді, коли файл у випуску замінили.
 - Зручніше з TalkBack і великим шрифтом: кнопка «Продовжити» не обрізається, у переглядачі знімків є «Закрити».
 
@@ -16,7 +16,7 @@
 
 - New in Settings: "Pictures from added sources". Off by default and turned on only after a warning; then the apps you added yourself show their screenshots and icon.
 - Screenshots of the apps in Komora's list are fetched ahead, so they open at once.
-- Every card shows "Screenshots and details ›": a tap opens the details.
+- Every card shows "Details ›" to tap.
 - Automatic updates also wait two days when a release's file was replaced.
 - Easier with TalkBack and large fonts: "Continue" is never cut short, and the screenshot viewer has Close.
 

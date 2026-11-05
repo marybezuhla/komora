@@ -566,7 +566,7 @@ private fun AppListRow(
         )
         // Said in words: a tap on the app shows its pictures and what is new (not obvious from the name alone)
         Text(
-            stringResource(if (row.app.added) R.string.more_about_added else R.string.more_about),
+            stringResource(R.string.more_about),
             style = MaterialTheme.typography.labelLarge,
             color = scheme.primary,
             fontWeight = FontWeight.SemiBold,
