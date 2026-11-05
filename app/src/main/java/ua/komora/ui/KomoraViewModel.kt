@@ -207,25 +207,40 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Pulled down while a check was running: once it ends, everything is asked about again. */
+    private var forceAgain = false
+
     /** [force]: pulled down by the owner, so GitHub is asked now even if it was asked a moment ago. */
     fun checkUpdates(force: Boolean = false) {
         // One check at a time: GitHub allows only 60 requests an hour without an account
-        if (checkJob?.isActive == true) return
+        if (checkJob?.isActive == true) {
+            if (force) forceAgain = true
+            return
+        }
         checkJob = viewModelScope.launch {
-            val list = apps()
-            for ((index, app) in list.withIndex()) {
-                // Sources switched off or removed meanwhile: not asked about any more
-                if (apps().none { it.key == app.key }) continue
-                if (!check(app, force)) {
-                    // Without a connection or after the rate limit, the rest would fail the same way: say so for all
-                    val p = _rows.value.firstOrNull { it.app.key == app.key }?.problem ?: break
-                    for (rest in list.drop(index + 1)) {
-                        set(rest.key) {
-                            if (it.isBusy || (it.problem != null && it.problem !in checkProblems)) it else it.copy(problem = p)
-                        }
+            var forced = force
+            do {
+                forceAgain = false
+                checkAll(forced)
+                forced = true
+            } while (forceAgain)
+        }
+    }
+
+    private suspend fun checkAll(force: Boolean) {
+        val list = apps()
+        for ((index, app) in list.withIndex()) {
+            // Sources switched off or removed meanwhile: not asked about any more
+            if (apps().none { it.key == app.key }) continue
+            if (!check(app, force)) {
+                // Without a connection or after the rate limit, the rest would fail the same way: say so for all
+                val p = _rows.value.firstOrNull { it.app.key == app.key }?.problem ?: return
+                for (rest in list.drop(index + 1)) {
+                    set(rest.key) {
+                        if (it.isBusy || (it.problem != null && it.problem !in checkProblems)) it else it.copy(problem = p)
                     }
-                    break
                 }
+                return
             }
         }
     }
@@ -440,7 +455,11 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The chance to undo has passed: nothing about the source is left behind, not even the last version told about. */
     fun forgetRemoved() {
-        for (s in lastRemoved) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
+        for (s in lastRemoved) {
+            if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
+            // GitHub's last answer about it too: nothing of a removed source stays on the phone
+            Stores.releases(ctx).forget(s.repo)
+        }
         lastRemoved = emptyList()
         _removed.value = null
     }
@@ -543,8 +562,12 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             }
             val id = prepared.getOrElse { e ->
                 if (active === current) finish(current)
-                // The kept answer about this release may be out of date: GitHub is asked anew next time
-                if (e is DownloadException) Stores.releases(ctx).forget(row.app.repo)
+                // The kept answer about this release may be out of date: GitHub is asked anew right away,
+                // so the next tap does not try the same file again
+                if (e is DownloadException) viewModelScope.launch {
+                    withContext(Dispatchers.IO) { Stores.releases(ctx).forget(row.app.repo) }
+                    check(row.app, force = true)
+                }
                 // Saying no to an unknown app is not an error
                 set(current.key) { it.copy(phase = Phase.Idle, problem = if (e is TrustDeclined) null else problemOf(e)) }
                 // One app failing does not stop "Update all"

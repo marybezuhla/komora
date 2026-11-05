@@ -6,6 +6,8 @@ Komora is a simple, open and safe collection of apps. It installs and updates fr
 • Other sources: optionally any public GitHub repository, with a warning and a key remembered at the first install.
 • Ukrainian and English, light and dark themes with Ukrainian names, or the phone's own colours.
 
+Requires Android 12 or newer.
+
 Licence: GPL-3.0-or-later. Source code: https://github.com/marybezuhla/komora
 
 The code was written with AI (Claude, Anthropic), directed and tested by the author.

@@ -41,12 +41,14 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import ua.komora.R
 import ua.komora.Stores
 import ua.komora.net.GitHub
+import ua.komora.net.ScreenshotStore
 
 /** Screenshots already shown while Komora is open, ready to show again without reading them from storage. */
 private object ScreenshotCache {
@@ -91,15 +93,28 @@ fun Screenshots(repo: String, tag: String?, lang: String) {
     LaunchedEffect(key) {
         if (shots != null) return@LaunchedEffect
         val loaded = withContext(Dispatchers.IO) {
-            val store = Stores.screenshots(context)
-            val bytes = store.get(repo, lang, tag) ?: tag?.let { release ->
-                // Stops between requests once the details are closed; what could not be fetched is tried again next time
-                GitHub.screenshotList(repo, lang) { !isActive }
-                    ?.let { listed -> store.update(repo, lang, release, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null } }
-                    // No connection: the pictures of an earlier release, if any
-                    ?: store.get(repo, lang, null)
+            try {
+                val store = Stores.screenshots(context)
+                // The pictures for this release, or (until it is known) the ones kept from before
+                val kept = store.get(repo, lang, tag)
+                val result = when {
+                    kept != null -> ScreenshotStore.Result(kept, complete = tag != null)
+                    tag == null -> null
+                    // Stops between requests once the details are closed; what could not be fetched is tried again next time
+                    else -> GitHub.screenshotList(repo, lang) { !isActive }
+                        ?.let { listed -> store.update(repo, lang, tag, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null } }
+                        // No connection: the pictures of an earlier release, if any
+                        ?: store.get(repo, lang, null)?.let { ScreenshotStore.Result(it, complete = false) }
+                }
+                if (result == null) null else result.pictures.mapNotNull { decode(it) }
+                    // Only a whole set is remembered for this visit; a partial one is tried again next time the details open
+                    .also { if (result.complete && isActive) ScreenshotCache.put(key, it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Pictures are only a help: whatever goes wrong, the details show without them
+                null
             }
-            bytes?.mapNotNull { decode(it) }?.also { if (isActive) ScreenshotCache.put(key, it) }
         }
         shots = loaded
     }

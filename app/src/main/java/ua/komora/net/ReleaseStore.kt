@@ -4,7 +4,6 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 
 /**
  * GitHub's last answer about each repository's newest release, kept on the phone (in a folder Android
@@ -12,6 +11,7 @@ import java.security.MessageDigest
  * Android code: tested on a computer.
  */
 class ReleaseStore(private val dir: File) {
+    /** [tag] as [Rules.tagKey] makes it; [body] is GitHub's answer as it came. */
     class Entry(val tag: String, val checkedAt: Long, val body: ByteArray)
 
     @Synchronized
@@ -19,15 +19,15 @@ class ReleaseStore(private val dir: File) {
         val f = fileFor(repo)
         if (!f.isFile) return null
         return try {
-            if (f.length() > MAX_FILE_BYTES) throw IOException("Too large")
+            if (f.length() > Rules.MAX_KEPT_RELEASE_FILE_BYTES) throw IOException("Too large")
             val o = JSONObject(f.readText(Charsets.UTF_8))
             val body = o.getString("body").toByteArray(Charsets.UTF_8)
             if (body.size > Rules.MAX_JSON_BYTES) throw IOException("Too large")
             Entry(o.getString("tag"), o.getLong("checkedAt"), body)
         } catch (_: IOException) {
+            // Unreadable or too large: dropped, so GitHub is simply asked anew
             f.delete(); null
         } catch (_: JSONException) {
-            // Half written or damaged: asked anew
             f.delete(); null
         } catch (_: StackOverflowError) {
             f.delete(); null
@@ -40,48 +40,41 @@ class ReleaseStore(private val dir: File) {
         trim()
     }
 
-    /** GitHub said nothing changed: the kept answer counts as checked now. */
+    /**
+     * The release page still names [tag]: the kept answer counts as checked [now]. Only if it is still
+     * about that tag, so a check that saw an older answer never puts it back over a newer one.
+     */
     @Synchronized
-    fun touch(repo: String, entry: Entry, now: Long) = write(repo, Entry(entry.tag, now, entry.body))
+    fun touch(repo: String, tag: String, now: Long) {
+        val current = get(repo) ?: return
+        if (current.tag == tag) write(repo, Entry(tag, now, current.body))
+    }
 
-    /** The kept answer turned out wrong (its file did not download as described): asked anew next time. */
+    /** The kept answer is wrong or no longer wanted (a failed download, a removed source): asked anew next time. */
     @Synchronized
     fun forget(repo: String) {
         fileFor(repo).delete()
     }
 
     private fun write(repo: String, e: Entry) {
-        // Losing what is kept only means asking GitHub again, so a failure here is not shown to anyone
-        runCatching {
+        val text = JSONObject().put("tag", e.tag).put("checkedAt", e.checkedAt)
+            .put("body", String(e.body, Charsets.UTF_8)).toString()
+        try {
             dir.mkdirs()
-            val text = JSONObject().put("tag", e.tag).put("checkedAt", e.checkedAt)
-                .put("body", String(e.body, Charsets.UTF_8)).toString()
-            val tmp = File.createTempFile("release", ".tmp", dir)
-            try {
-                tmp.writeText(text, Charsets.UTF_8)
-                // Whole or not at all: a check in the background and one on screen never see half a file
-                if (!tmp.renameTo(fileFor(repo))) throw IOException("Not saved")
-            } finally {
-                tmp.delete()
-            }
+            WholeFile.write(fileFor(repo), text.toByteArray(Charsets.UTF_8))
+        } catch (_: IOException) {
+            // Not kept only means asking GitHub again next time, so nobody needs to be told
         }
     }
 
     /** Sources removed long ago leave their answers behind: only the newest ones are kept. */
     private fun trim() {
+        WholeFile.dropLeftovers(dir)
         val files = dir.listFiles { f -> f.name.endsWith(".json") } ?: return
-        if (files.size <= MAX_ENTRIES) return
-        files.sortedBy { it.lastModified() }.take(files.size - MAX_ENTRIES).forEach { it.delete() }
+        if (files.size <= Rules.MAX_KEPT_RELEASES) return
+        files.sortedBy { it.lastModified() }.take(files.size - Rules.MAX_KEPT_RELEASES).forEach { it.delete() }
     }
 
-    // Names on GitHub ignore case; the file name is a hash, so no repository name can reach outside the folder
-    private fun fileFor(repo: String): File {
-        val hash = MessageDigest.getInstance("SHA-256").digest(repo.lowercase().toByteArray(Charsets.UTF_8))
-        return File(dir, Rules.toHex(hash).take(32) + ".json")
-    }
-
-    private companion object {
-        const val MAX_ENTRIES = 100
-        const val MAX_FILE_BYTES = 3L * 1024 * 1024 * 2
-    }
+    // Names on GitHub ignore case, and so does the hash
+    private fun fileFor(repo: String) = File(dir, Rules.storeName(repo) + ".json")
 }

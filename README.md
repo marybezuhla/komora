@@ -22,7 +22,7 @@
 
 ## Приватність
 
-Акаунтів, аналітики й реклами немає. Комора зʼєднується лише з GitHub і лише через захищене зʼєднання. GitHub бачить адресу телефона, коли Комора питає про нові версії (під час запуску, а у фоні — якщо ввімкнено сповіщення чи автоматичні оновлення), і коли ви відкриваєте подробиці застосунку з новою версією (тоді завантажуються його нові знімки екрана, тож GitHub може бачити, який застосунок ви переглядали; без нової версії знімки беруться з телефона). Щоб знати, чи встановлено доданий застосунок, Комора бачить застосунки з іконкою на головному екрані, але нікуди їх не надсилає й не зберігає.
+Акаунтів, аналітики й реклами немає. Комора зʼєднується лише з GitHub і лише через захищене зʼєднання. GitHub бачить адресу телефона, коли Комора питає про нові версії (під час запуску, а у фоні — якщо ввімкнено сповіщення чи автоматичні оновлення), і коли ви відкриваєте подробиці застосунку, знімків якого ще немає на телефоні, наприклад уперше чи після нової версії (тоді GitHub може бачити, який застосунок ви переглядали; інакше знімки беруться з телефона). Щоб знати, чи встановлено доданий застосунок, Комора бачить застосунки з іконкою на головному екрані, але нікуди їх не надсилає й не зберігає.
 
 ## Встановлення
 
@@ -63,7 +63,7 @@ A simple, open and safe collection of apps for Android. Komora installs and upda
 
 ## Privacy
 
-No accounts, analytics or ads. Komora connects only to GitHub, only over HTTPS. GitHub sees the phone's address when Komora asks about new versions (at start, and in the background if notifications or automatic updates are on) and when you open the details of an app with a new version (its new screenshots are fetched then, so GitHub can see which app was looked at; without a new version they come from the phone). To tell whether an added app is installed, Komora can see apps that have a home-screen icon; it never sends or keeps that list.
+No accounts, analytics or ads. Komora connects only to GitHub, only over HTTPS. GitHub sees the phone's address when Komora asks about new versions (at start, and in the background if notifications or automatic updates are on) and when you open the details of an app whose screenshots are not on the phone yet, for example the first time or after a new version (GitHub can then see which app was looked at; otherwise they come from the phone). To tell whether an added app is installed, Komora can see apps that have a home-screen icon; it never sends or keeps that list.
 
 ## Install
 

@@ -11,6 +11,7 @@ import java.net.URI
 import java.security.MessageDigest
 import java.util.concurrent.CancellationException
 import javax.net.ssl.HttpsURLConnection
+import ua.komora.catalog.CatalogApp
 
 /**
  * A published release: its tag, its one APK, its description made plain ("What's new"), and when it was
@@ -35,11 +36,54 @@ object GitHub {
 
     /**
      * The newest release of an app: for Komora's own list by the APK's name, for added sources by its pattern.
-     * GitHub's API (60 requests an hour without an account) is asked only when [store] has nothing for it
-     * or a new tag is out; a check in the last half hour is trusted as it is, unless [force].
+     * GitHub's API (60 requests an hour without an account) is asked only when [store] has nothing usable
+     * or a new tag is out; a recent check ([Rules.trustKept]) is used as it is, unless [force].
      */
-    fun latestRelease(app: ua.komora.catalog.CatalogApp, store: ReleaseStore, force: Boolean = false): Release {
-        val r = latest(app.repo, store, force)
+    fun latestRelease(app: CatalogApp, store: ReleaseStore, force: Boolean = false): Release {
+        val now = System.currentTimeMillis()
+        val kept = store.get(app.repo)
+        if (kept != null && Rules.trustKept(kept.checkedAt, now, force)) {
+            fromKept(app, kept, store)?.let { return it }
+        }
+        // Which tag is newest, from the page github.com sends "latest" on to: free of the API's limit
+        if (kept != null && Rules.sameRelease(kept.tag, latestTag(app.repo))) {
+            fromKept(app, kept, store)?.let {
+                store.touch(app.repo, kept.tag, now)
+                return it
+            }
+        }
+        return fromApi(app, store, now)
+    }
+
+    /**
+     * The newest release straight from GitHub's API, whatever is kept: right before an automatic install,
+     * so a release pulled or replaced under the same tag is never installed from an older answer.
+     */
+    fun confirmedRelease(app: CatalogApp, store: ReleaseStore): Release = fromApi(app, store, System.currentTimeMillis())
+
+    private fun fromApi(app: CatalogApp, store: ReleaseStore, now: Long): Release {
+        val body = fetchLatest(app.repo)
+        val latest = parse(body)
+        val release = try {
+            releaseOf(app, latest)
+        } catch (e: BadReleaseException) {
+            // Kept only once it holds the right APK: a release whose files are still uploading is asked about again
+            store.forget(app.repo)
+            throw e
+        }
+        store.put(app.repo, latest.tagKey, body, now)
+        return release
+    }
+
+    /** The kept answer as a release, or null (and forgotten) when it no longer gives one. */
+    private fun fromKept(app: CatalogApp, kept: ReleaseStore.Entry, store: ReleaseStore): Release? = try {
+        releaseOf(app, parse(kept.body))
+    } catch (_: BadReleaseException) {
+        store.forget(app.repo)
+        null
+    }
+
+    private fun releaseOf(app: CatalogApp, r: Latest): Release {
         // The account or repository may have been renamed since: GitHub sends the old name on, and the files
         // carry the new one. Trusting it is safe because every APK must still be signed with the pinned key
         val repo = r.repo ?: app.repo
@@ -58,55 +102,27 @@ object GitHub {
         return name to r.assets.filter { it.name.endsWith(".apk") && Rules.inRepo(it.url, name) }
     }
 
-    private class Latest(val tag: String, val assets: List<Rules.Asset>, val notes: String, val repo: String?, val published: Long?)
+    private class Latest(
+        val tag: String, val tagKey: String, val assets: List<Rules.Asset>, val notes: String, val repo: String?, val published: Long?,
+    )
 
-    private val RELEASE_PAGE = Regex("^https://github\\.com/([A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100})/releases/")
-
-    private fun latest(repo: String, store: ReleaseStore, force: Boolean): Latest {
-        val now = System.currentTimeMillis()
-        val kept = store.get(repo)
-        if (kept != null && !force && Rules.stillFresh(kept.checkedAt, now)) {
-            keptRelease(repo, kept, store)?.let { return it }
-        }
-        // Which tag is newest, from the page github.com sends "latest" on to: free of the API's limit
-        val tag = latestTag(repo)
-        if (kept != null && tag != null && tag == kept.tag) {
-            keptRelease(repo, kept, store)?.let {
-                store.touch(repo, kept, now)
-                return it
-            }
-        }
-        val body = fetchLatest(repo)
-        val release = parse(body)
-        store.put(repo, release.tag, body, now)
-        return release
-    }
-
-    /** The kept answer, or null (and forgotten) if it no longer reads as a release. */
-    private fun keptRelease(repo: String, kept: ReleaseStore.Entry, store: ReleaseStore): Latest? = try {
-        parse(kept.body)
-    } catch (_: BadReleaseException) {
-        store.forget(repo)
-        null
-    }
+    private val RELEASE_PAGE = Regex("^https://github\\.com/(${Rules.OWNER}/${Rules.REPO_NAME})/releases/")
 
     private fun fetchLatest(repo: String): ByteArray =
         open("https://api.github.com/repos/$repo/releases/latest", api = true).use { readLimited(it.inputStream, Rules.MAX_JSON_BYTES) }
 
     /**
-     * The newest tag as github.com's "releases/latest" page names it, by following its redirects by hand
+     * The newest tag as github.com's "releases/latest" page names it, following its redirects one by one
      * (a renamed repository first sends on to its new name). Null when GitHub answers in any other way:
      * then the API is asked, as before. Only a lost connection is an error.
      */
     private fun latestTag(repo: String): String? {
         var url = "https://github.com/$repo/releases/latest"
         repeat(MAX_REDIRECTS + 1) {
-            val uri = Rules.allowedUri(url, setOf("github.com")) ?: return null
+            val uri = Rules.allowedUri(url, Rules.RELEASE_PAGE_HOSTS) ?: return null
             val conn = connect(uri, api = false)
             try {
-                if (conn.responseCode !in REDIRECTS) return null
-                val next = conn.getHeaderField("Location")?.takeIf { it.isNotEmpty() } ?: return null
-                url = try { URI(url).resolve(next).toString() } catch (_: IllegalArgumentException) { return null }
+                url = nextUrl(conn, url) ?: return null
                 Rules.tagFromRedirect(url)?.let { return it }
             } finally {
                 conn.disconnect()
@@ -115,13 +131,21 @@ object GitHub {
         return null
     }
 
+    /** Where a redirect sends to, whole; null when the answer is not a redirect or names no valid address. */
+    private fun nextUrl(conn: HttpsURLConnection, from: String): String? {
+        if (conn.responseCode !in REDIRECTS) return null
+        val next = conn.getHeaderField("Location")?.takeIf { it.isNotEmpty() } ?: return null
+        return try { URI(from).resolve(next).toString() } catch (_: IllegalArgumentException) { null }
+    }
+
     // An answer that cannot be read as a release is a bad release, not a lost connection
     private fun parse(body: ByteArray): Latest = try {
         val o = JSONObject(String(body, Charsets.UTF_8))
         val assetsJson = o.getJSONArray("assets")
         // The repository as GitHub spells it now (from GitHub's own answer, over the checked connection)
         val canonical = RELEASE_PAGE.find(o.optString("html_url"))?.groupValues?.get(1)?.takeUnless { it.substringAfter('/').startsWith(".") }
-        Latest(Rules.plainTag(o.getString("tag_name")), (0 until assetsJson.length()).map { i ->
+        val tag = o.getString("tag_name")
+        Latest(Rules.plainTag(tag), Rules.tagKey(tag), (0 until assetsJson.length()).map { i ->
             val a = assetsJson.getJSONObject(i)
             Rules.Asset(
                 name = a.getString("name"),
@@ -131,22 +155,19 @@ object GitHub {
             )
         }, ReleaseNotes.clean(o.optString("body", "")), canonical,
             runCatching { java.time.Instant.parse(o.getString("published_at")).toEpochMilli() }.getOrNull())
-    } catch (e: JSONException) {
+    } catch (_: JSONException) {
         throw BadReleaseException("Unreadable release")
-    } catch (e: StackOverflowError) {
+    } catch (_: StackOverflowError) {
         // Absurdly nested JSON: never a crash
         throw BadReleaseException("Unreadable release")
     }
-
-    /** One screenshot in a repository, as GitHub lists it: [sha] is Git's name for its content. */
-    class Shot(val name: String, val url: String, val size: Long, val sha: String)
 
     /**
      * The screenshots an app keeps in its repository for F-Droid, in the language shown if it has them:
      * two requests to GitHub's API (which languages, then which files). Empty when there are none; null
      * when GitHub could not be asked (to try again later). [isCancelled] stops it between requests.
      */
-    fun screenshotList(repo: String, lang: String, isCancelled: () -> Boolean): List<Shot>? {
+    fun screenshotList(repo: String, lang: String, isCancelled: () -> Boolean): List<Rules.Shot>? {
         fun list(path: String): org.json.JSONArray = try {
             val body = open("https://api.github.com/repos/$repo/contents/$path", api = true, hosts = Rules.SCREENSHOT_HOSTS)
                 .use { readLimited(it.inputStream, Rules.MAX_JSON_BYTES) }
@@ -164,7 +185,7 @@ object GitHub {
             val langs = list(base)
             val have = (0 until langs.length()).mapNotNull { langs.optJSONObject(it)?.takeIf { o -> o.optString("type") == "dir" }?.optString("name") }
             // The language shown first; the next one only if that one has no pictures
-            var files = emptyList<Shot>()
+            var files = emptyList<Rules.Shot>()
             for (dir in Rules.screenshotDirs(lang).filter { d -> d.removePrefix("$base/").substringBefore('/') in have }) {
                 if (isCancelled()) return null
                 val a = list(dir)
@@ -173,7 +194,7 @@ object GitHub {
                     val name = o.optString("name"); val url = o.optString("download_url"); val size = o.optLong("size")
                     val sha = o.optString("sha").lowercase()
                     if (o.optString("type") == "file" && Rules.isScreenshot(name, url, size, repo) && Rules.GIT_SHA_HEX.matches(sha)) {
-                        Shot(name, url, size, sha)
+                        Rules.Shot(name, url, size, sha)
                     } else null
                 }
                 if (files.isNotEmpty()) break
@@ -187,7 +208,7 @@ object GitHub {
     }
 
     /** One screenshot's bytes, only if they are exactly the file GitHub listed; null otherwise. */
-    fun screenshot(shot: Shot): ByteArray? = try {
+    fun screenshot(shot: Rules.Shot): ByteArray? = try {
         open(shot.url, api = false, hosts = Rules.SCREENSHOT_HOSTS).use { readLimited(it.inputStream, shot.size.toInt()) }
             .takeIf { it.size.toLong() == shot.size && Rules.gitBlobSha(it) == shot.sha }
     } catch (_: IOException) {
@@ -266,13 +287,7 @@ object GitHub {
             try {
                 when (val code = conn.responseCode) {
                     HttpURLConnection.HTTP_OK -> return Connection(conn)
-                    in REDIRECTS -> {
-                        val next = conn.getHeaderField("Location")
-                        if (next.isNullOrEmpty()) throw IOException("Redirect without a target")
-                        url = try { URI(url).resolve(next).toString() } catch (e: IllegalArgumentException) {
-                            throw IOException("Bad redirect")
-                        }
-                    }
+                    in REDIRECTS -> url = nextUrl(conn, url) ?: throw IOException("Bad redirect")
                     // Only the API's own "rate limit" answers count as such
                     403, 429 -> if (api && (code == 429 || conn.getHeaderField("X-RateLimit-Remaining") == "0")) {
                         throw RateLimitException()

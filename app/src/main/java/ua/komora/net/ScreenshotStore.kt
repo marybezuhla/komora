@@ -5,15 +5,21 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 
 /**
  * An app's screenshots kept on the phone (in Android's cache folder, which it may empty when space runs
  * low), with the release they were fetched for. GitHub is asked again only when a new release is out,
  * and then only changed pictures are downloaded. Plain files, no Android code: tested on a computer.
  */
-class ScreenshotStore(private val root: File, private val maxBytes: Long = Rules.MAX_KEPT_SCREENSHOT_BYTES) {
+class ScreenshotStore(
+    private val root: File,
+    // Smaller only in tests, so filling it does not take 50 MB
+    private val maxBytes: Long = Rules.MAX_KEPT_SCREENSHOT_BYTES,
+) {
     private class Kept(val tag: String, val files: List<Pair<String, String>>) // name, sha
+
+    /** [complete]: every listed picture is here, so this release need not be asked about again. */
+    class Result(val pictures: List<ByteArray>, val complete: Boolean)
 
     /** The pictures kept for this release ([tag]), or for any release when [tag] is null; null when none. */
     @Synchronized
@@ -28,46 +34,64 @@ class ScreenshotStore(private val root: File, private val maxBytes: Long = Rules
     }
 
     /**
-     * The pictures for release [tag] as [listed] now: those already here (same name, same content) are
-     * kept, the rest fetched with [fetch], and pictures no longer listed are removed. When one could not
-     * be fetched, the ones that could are kept, but not marked as done, so the next look tries again.
+     * The pictures for release [tag] as [listed] now: those already here (same content) are kept, the rest
+     * fetched with [fetch] (outside the lock, so other apps' pictures can be read meanwhile), and pictures
+     * no longer listed are removed. A picture that could not be fetched keeps its older copy, if there is
+     * one, and the release is not marked as done, so the next look tries again.
      */
-    @Synchronized
-    fun update(repo: String, lang: String, tag: String, listed: List<GitHub.Shot>, fetch: (GitHub.Shot) -> ByteArray?): List<ByteArray> {
-        val dir = dirFor(repo, lang).apply { mkdirs() }
-        val before = read(dir)?.files.orEmpty().toMap()
-        val pictures = mutableListOf<ByteArray>()
-        val saved = mutableListOf<Pair<String, String>>()
-        for (shot in listed) {
-            val have = if (before[shot.name] == shot.sha) readPicture(dir, shot.sha) else null
-            val bytes = have ?: fetch(shot)?.also { savePicture(dir, shot.sha, it) } ?: continue
-            pictures += bytes
-            saved += shot.name to shot.sha
+    fun update(repo: String, lang: String, tag: String, listed: List<Rules.Shot>, fetch: (Rules.Shot) -> ByteArray?): Result {
+        val dir = dirFor(repo, lang)
+        val (before, here) = synchronized(this) {
+            val kept = read(dir)?.files.orEmpty().toMap()
+            kept to listed.mapNotNull { s -> readPicture(dir, s.sha)?.let { s.sha to it } }.toMap()
         }
-        val complete = saved.size == listed.size
-        write(dir, Kept(if (complete) tag else "", saved))
-        // Pictures no longer listed (or left from a failed save) go
-        val keep = saved.map { it.second }.toSet()
-        dir.listFiles()?.filter { it.name != INDEX && it.name !in keep }?.forEach { it.delete() }
-        trim(except = dir)
-        return pictures
+        val fetched = listed.filter { it.sha !in here }.mapNotNull { s -> fetch(s)?.let { s.sha to it } }.toMap()
+        synchronized(this) {
+            dir.mkdirs()
+            val saved = fetched.filter { (sha, bytes) -> savePicture(dir, sha, bytes) }.keys
+            val pictures = mutableListOf<ByteArray>()
+            val files = mutableListOf<Pair<String, String>>()
+            var complete = true
+            for (s in listed) {
+                val new = here[s.sha] ?: fetched[s.sha]
+                if (new != null) {
+                    pictures += new
+                    if (s.sha in here || s.sha in saved) files += s.name to s.sha else complete = false
+                    continue
+                }
+                complete = false
+                // Not fetched now: the older copy of this picture, if it is still here
+                val old = before[s.name]?.let { sha -> readPicture(dir, sha)?.let { sha to it } } ?: continue
+                pictures += old.second
+                files += s.name to old.first
+            }
+            write(dir, Kept(if (complete) tag else "", files))
+            val keep = files.map { it.second }.toSet() + INDEX
+            dir.listFiles()?.filter { it.name !in keep }?.forEach { it.delete() }
+            trim(except = dir)
+            return Result(pictures, complete)
+        }
     }
 
     private fun readPicture(dir: File, sha: String): ByteArray? {
         val f = File(dir, sha)
         if (!f.isFile || f.length() > Rules.MAX_IMAGE_BYTES) return null
         // A damaged copy is fetched again rather than shown
-        return runCatching { f.readBytes() }.getOrNull()?.takeIf { Rules.gitBlobSha(it) == sha }
+        val bytes = try { f.readBytes() } catch (_: IOException) { return null }
+        return bytes.takeIf { Rules.gitBlobSha(it) == sha }
     }
 
-    private fun savePicture(dir: File, sha: String, bytes: ByteArray) {
-        // Not saved only means it is fetched again next time
-        runCatching { atomically(File(dir, sha)) { it.writeBytes(bytes) } }
+    private fun savePicture(dir: File, sha: String, bytes: ByteArray): Boolean = try {
+        WholeFile.write(File(dir, sha), bytes)
+        true
+    } catch (_: IOException) {
+        // Not saved: shown this time, fetched again next time
+        false
     }
 
     private fun read(dir: File): Kept? {
         val f = File(dir, INDEX)
-        if (!f.isFile || f.length() > MAX_INDEX_BYTES) return null
+        if (!f.isFile || f.length() > Rules.MAX_SCREENSHOT_INDEX_BYTES) return null
         return try {
             val o = JSONObject(f.readText(Charsets.UTF_8))
             val a = o.getJSONArray("files")
@@ -80,8 +104,11 @@ class ScreenshotStore(private val root: File, private val maxBytes: Long = Rules
             }
             Kept(o.getString("tag"), files)
         } catch (_: JSONException) {
+            // Damaged: as if nothing were kept, so the pictures are fetched again
             null
         } catch (_: IOException) {
+            null
+        } catch (_: StackOverflowError) {
             null
         }
     }
@@ -90,16 +117,10 @@ class ScreenshotStore(private val root: File, private val maxBytes: Long = Rules
         val files = JSONArray()
         kept.files.forEach { (name, sha) -> files.put(JSONObject().put("name", name).put("sha", sha)) }
         val text = JSONObject().put("tag", kept.tag).put("files", files).toString()
-        runCatching { atomically(File(dir, INDEX)) { it.writeText(text, Charsets.UTF_8) } }
-    }
-
-    private fun atomically(target: File, write: (File) -> Unit) {
-        val tmp = File.createTempFile("shot", ".tmp", target.parentFile)
         try {
-            write(tmp)
-            if (!tmp.renameTo(target)) throw IOException("Not saved")
-        } finally {
-            tmp.delete()
+            WholeFile.write(File(dir, INDEX), text.toByteArray(Charsets.UTF_8))
+        } catch (_: IOException) {
+            // No list: the pictures are fetched again next time, nothing worse
         }
     }
 
@@ -115,14 +136,9 @@ class ScreenshotStore(private val root: File, private val maxBytes: Long = Rules
         }
     }
 
-    // Names on GitHub ignore case; the folder name is a hash, so no repository name can reach outside the root
-    private fun dirFor(repo: String, lang: String): File {
-        val hash = MessageDigest.getInstance("SHA-256").digest("${repo.lowercase()}|$lang".toByteArray(Charsets.UTF_8))
-        return File(root, Rules.toHex(hash).take(32))
-    }
+    private fun dirFor(repo: String, lang: String) = File(root, Rules.storeName("$repo|$lang"))
 
     private companion object {
         const val INDEX = "index.json"
-        const val MAX_INDEX_BYTES = 64L * 1024
     }
 }

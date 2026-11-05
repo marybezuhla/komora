@@ -20,6 +20,7 @@ import ua.komora.catalog.CatalogApp
 import ua.komora.catalog.Sources
 import ua.komora.install.ApkVerifier
 import ua.komora.install.Installer
+import ua.komora.net.DownloadException
 import ua.komora.net.GitHub
 import ua.komora.net.RateLimitException
 import ua.komora.net.Rules
@@ -157,6 +158,18 @@ object AutoUpdate {
             if (!Rules.oldEnough(release.published, System.currentTimeMillis())) continue
             // Android already refused this very version without the owner: left for the owner, not fetched again
             if (refused(context, app.packageName) == latest) continue
+            // Asked again straight from GitHub's API before installing anything unattended: a release pulled
+            // or replaced under the same tag is never installed from an older kept answer
+            val confirmed = try {
+                GitHub.confirmedRelease(app, Stores.releases(context))
+            } catch (_: RateLimitException) {
+                return true
+            } catch (_: Exception) {
+                // Gone or changed meanwhile: this app waits for the next run
+                continue
+            }
+            if (confirmed.tag != release.tag || confirmed.apk != release.apk) continue
+            if (!Rules.oldEnough(confirmed.published, System.currentTimeMillis())) continue
             if (dir.usableSpace < release.apk.size * 2) continue
             val file = File.createTempFile("apk", ".apk", dir)
             try {
@@ -165,7 +178,7 @@ object AutoUpdate {
                 } catch (e: IOException) {
                     if (stopped()) return true
                     // The kept answer about this release may be out of date: GitHub is asked anew next time
-                    if (e is ua.komora.net.DownloadException) Stores.releases(context).forget(app.repo)
+                    if (e is DownloadException) Stores.releases(context).forget(app.repo)
                     continue
                 }
                 // Every check, as for a tap on "Update"

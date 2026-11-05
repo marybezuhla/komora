@@ -7,6 +7,10 @@ class BadReleaseException(message: String) : Exception(message)
 
 /** Plain rules with no Android code, so they can be tested on a computer. */
 object Rules {
+    /** A GitHub account and a repository name, as GitHub allows them; every check of a name is built from these. */
+    const val OWNER = "[A-Za-z0-9][A-Za-z0-9-]{0,38}"
+    const val REPO_NAME = "[A-Za-z0-9._-]{1,100}"
+
     /** The only places Komora ever connects to: GitHub's API and the hosts GitHub serves release files from. */
     val APP_HOSTS = setOf(
         "api.github.com",
@@ -45,6 +49,16 @@ object Rules {
 
     val SHA256_HEX = Regex("^[0-9a-f]{64}$")
 
+    /** Git's name for a file's content (SHA-1, as GitHub lists it). */
+    val GIT_SHA_HEX = Regex("^[0-9a-f]{40}$")
+
+    /** Git's own name for a file's content: SHA-1 of "blob <size>\u0000" and the bytes. */
+    fun gitBlobSha(bytes: ByteArray): String {
+        val sha = java.security.MessageDigest.getInstance("SHA-1")
+        sha.update("blob ${bytes.size}\u0000".toByteArray(Charsets.US_ASCII))
+        return toHex(sha.digest(bytes))
+    }
+
     /** Parses [url] once; the same object is then used to connect, so the check and the connection agree. */
     fun allowedUri(url: String, hosts: Set<String> = APP_HOSTS): URI? {
         val uri = try { URI(url) } catch (_: Exception) { return null }
@@ -56,6 +70,9 @@ object Rules {
     }
 
     data class Asset(val name: String, val url: String, val size: Long, val sha256: String?)
+
+    /** One screenshot in a repository, as GitHub lists it: [sha] is Git's name for its content. */
+    class Shot(val name: String, val url: String, val size: Long, val sha: String)
 
     /**
      * Picks the one APK named "<prefix>-<version>.apk" (the version starts with a digit, optionally after "v")
@@ -116,7 +133,10 @@ object Rules {
     private fun escape(part: String) = part.map { c -> if (c in "\\.^$|?*+()[]{}-") "\\$c" else c.toString() }.joinToString("")
 
     /** A tag or version from a release, as one short plain line. */
-    fun plainTag(tag: String): String = tag.replace(Regex("[\\p{C}\\s]"), "").take(40)
+    fun plainTag(tag: String): String = tagKey(tag).take(40)
+
+    /** A tag whole (only invisible characters taken out), to tell two releases apart even when their tags are long. */
+    fun tagKey(tag: String): String = tag.replace(Regex("[\\p{C}\\s]"), "").take(200)
 
     /** GitHub gives a file's checksum as "sha256:<hex>"; anything else is treated as not given. */
     fun parseDigest(digest: String?): String? {
@@ -174,35 +194,52 @@ object Rules {
 
     fun toHex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
 
-    /** A check this recent is trusted as it is; pulling the list down asks again at once. */
+    // ---- What Komora keeps from GitHub ----
+
+    /** The only host asked which release is newest without GitHub's API (and its 60 requests an hour). */
+    val RELEASE_PAGE_HOSTS = setOf("github.com")
+
+    /** A check this recent is trusted as it is, so opening Komora again soon asks nothing. */
     const val CHECK_FRESH_MS: Long = 30L * 60 * 1000
 
-    /** True when a check made at [checkedAt] still holds at [now] (a clock turned back never counts as recent). */
-    fun stillFresh(checkedAt: Long, now: Long): Boolean = now - checkedAt in 0 until CHECK_FRESH_MS
+    /** Release answers kept at most (one per app); old ones from removed sources go first. */
+    const val MAX_KEPT_RELEASES = 30
 
-    private val TAG_PATH = Regex("^/([A-Za-z0-9][A-Za-z0-9-]{0,38})/([A-Za-z0-9._-]{1,100})/releases/tag/(.{1,200})$")
-
-    /**
-     * The tag from where github.com sends "releases/latest" ("…/releases/tag/v1.2.3"), as [plainTag] makes it;
-     * null for any other address. This page is not GitHub's API, so asking it does not use up the 60 an hour.
-     */
-    fun tagFromRedirect(location: String): String? {
-        val uri = try { URI(location) } catch (_: Exception) { return null }
-        if (uri.scheme != "https" || uri.host?.lowercase() != "github.com" || uri.rawQuery != null) return null
-        val m = TAG_PATH.matchEntire(uri.path ?: return null) ?: return null
-        if (m.groupValues[2].startsWith(".")) return null
-        return plainTag(m.groupValues[3]).ifEmpty { null }
-    }
-
-    /** Git's own name for a file's content, as GitHub lists it: SHA-1 of "blob <size>\0" and the bytes. */
-    fun gitBlobSha(bytes: ByteArray): String {
-        val sha = java.security.MessageDigest.getInstance("SHA-1")
-        sha.update("blob ${bytes.size}\u0000".toByteArray(Charsets.US_ASCII))
-        return toHex(sha.digest(bytes))
-    }
-
-    val GIT_SHA_HEX = Regex("^[0-9a-f]{40}$")
+    /** A kept answer's file: the answer itself, which saving as JSON text can make up to a few times longer. */
+    const val MAX_KEPT_RELEASE_FILE_BYTES: Long = MAX_JSON_BYTES * 3L
 
     /** Screenshots kept on the phone take no more than this together; the ones looked at longest ago go first. */
     const val MAX_KEPT_SCREENSHOT_BYTES: Long = 50L * 1024 * 1024
+
+    /** The list of an app's kept screenshots is never bigger than this. */
+    const val MAX_SCREENSHOT_INDEX_BYTES: Long = 64L * 1024
+
+    /**
+     * A kept answer checked at [checkedAt] is used as it is at [now], without asking anything: only when not
+     * [forced] (pulled down) and recent. A clock turned back never counts as recent.
+     */
+    fun trustKept(checkedAt: Long, now: Long, forced: Boolean): Boolean =
+        !forced && now - checkedAt in 0 until CHECK_FRESH_MS
+
+    /** The kept answer is still about the newest release when the release page names the same tag. */
+    fun sameRelease(keptTag: String, pageTag: String?): Boolean = pageTag != null && keptTag == pageTag
+
+    private val TAG_PATH = Regex("^/($OWNER)/($REPO_NAME)/releases/tag/(.{1,200})$")
+
+    /**
+     * The tag from where github.com sends "releases/latest" ("…/releases/tag/v1.2.3"), as [tagKey] makes it;
+     * null for any other address.
+     */
+    fun tagFromRedirect(location: String): String? {
+        // Not a link at all: GitHub answered oddly, so its API is asked instead
+        val uri = try { URI(location) } catch (_: Exception) { return null }
+        if (uri.scheme != "https" || uri.host?.lowercase() !in RELEASE_PAGE_HOSTS || uri.rawQuery != null) return null
+        val m = TAG_PATH.matchEntire(uri.path ?: return null) ?: return null
+        if (m.groupValues[2].startsWith(".")) return null
+        return tagKey(m.groupValues[3]).ifEmpty { null }
+    }
+
+    /** A file or folder name for what is kept about [key]: a hash, so no name from GitHub can reach outside the folder. */
+    fun storeName(key: String): String =
+        toHex(java.security.MessageDigest.getInstance("SHA-256").digest(key.lowercase().toByteArray(Charsets.UTF_8))).take(32)
 }
