@@ -1,10 +1,8 @@
-**Комора 1.0**
+**Комора 1.0.1**
 
-- Автоматичні оновлення ставлять лише випуски, яким уже дві доби: є час помітити й прибрати невдалий.
-- Прибране джерело можна повернути одразу, разом із його ключем.
-- Для кожного застосунку зі списку є найнижча дозволена версія: старішу Комора не встановить.
-- Бета-версії й «rc» тепер передують остаточному випуску.
-- Кращий контраст у всіх темах, більші кнопки, точніші тексти й підписи для TalkBack.
+- Нова адреса автора на GitHub: `marybezuhla`. Перейменування акаунта чи репозиторію більше не зупиняє оновлень: Комора бере назву з відповіді GitHub, а кожен файл, як і раніше, мусить бути підписаний закріпленим ключем.
+- Нові версії перевіряються без вичерпання ліміту GitHub (60 запитів на годину): спершу звичайна сторінка випуску, а до API Комора звертається лише тоді, коли вийшла нова версія. Перевірку, зроблену менш ніж пів години тому, не повторює; «потягнути вниз» перевіряє одразу.
+- Знімки екрана зберігаються на телефоні й оновлюються лише з новою версією застосунку, і то лише ті, що змінилися.
 
 Нова Комора: завантажте `.apk` нижче на телефоні й відкрийте його. Далі нові версії Комори зʼявляються в її списку. Потрібен Android 12 або новіший. Як перевірити файл без Комори — у README.
 
@@ -12,13 +10,11 @@
 
 ---
 
-**Komora 1.0**
+**Komora 1.0.1**
 
-- Automatic updates only take releases that have been out for two days: time to notice and pull a bad one.
-- A removed source can be brought back at once, with its key.
-- Each app in the list has a lowest allowed version: Komora will not install an older one.
-- Beta and rc versions now come before the final release.
-- Better contrast in every theme, larger buttons, clearer texts and TalkBack labels.
+- The author's new GitHub address: `marybezuhla`. Renaming an account or repository no longer stops updates: Komora takes the name from GitHub's answer, and every file must still be signed with the pinned key.
+- New versions are checked without running out of GitHub's limit (60 requests an hour): first the plain release page, and GitHub's API only when a new version is out. A check made less than half an hour ago is not repeated; pulling the list down checks at once.
+- Screenshots are kept on the phone and refreshed only with a new version of the app, and then only those that changed.
 
 New to Komora: download the `.apk` below on your phone and open it. After that, new versions of Komora show up in its own list. Requires Android 12 or newer. How to check the file without Komora: see README.
 

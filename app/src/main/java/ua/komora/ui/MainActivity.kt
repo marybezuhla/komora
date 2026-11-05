@@ -364,7 +364,7 @@ private fun KomoraScreen(
     KomoraList(
         rows, busy, confirm, canInstall, onLook, actions,
         listState = listState,
-        onCheck = vm::checkUpdates,
+        onCheck = { vm.checkUpdates(force = true) },
         onInstall = vm::install,
         onCancel = vm::cancelInstall,
         onUpdateAll = vm::updateAll,

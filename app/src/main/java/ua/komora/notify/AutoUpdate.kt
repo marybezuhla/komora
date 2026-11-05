@@ -14,6 +14,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import ua.komora.R
+import ua.komora.Stores
 import ua.komora.catalog.Catalog
 import ua.komora.catalog.CatalogApp
 import ua.komora.catalog.Sources
@@ -138,7 +139,7 @@ object AutoUpdate {
             // Signed with another key: the update would be refused anyway, so it is not even downloaded
             if (!ApkVerifier.installedMatchesPin(context, app, installed)) continue
             val release = try {
-                GitHub.latestRelease(app)
+                GitHub.latestRelease(app, Stores.releases(context))
             } catch (_: RateLimitException) {
                 return true
             } catch (_: ua.komora.net.NoReleaseException) {
@@ -163,6 +164,8 @@ object AutoUpdate {
                     GitHub.download(release.apk, file, isCancelled = stopped) { }
                 } catch (e: IOException) {
                     if (stopped()) return true
+                    // The kept answer about this release may be out of date: GitHub is asked anew next time
+                    if (e is ua.komora.net.DownloadException) Stores.releases(context).forget(app.repo)
                     continue
                 }
                 // Every check, as for a tap on "Update"

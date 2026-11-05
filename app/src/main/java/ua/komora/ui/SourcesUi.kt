@@ -245,7 +245,7 @@ internal fun DetailsContent(row: AppRow, lang: String, pinnedKey: String?, onRem
         // How it looks: only for Komora's own list (pictures from unknown sources are not opened)
         if (!row.app.added) {
             Spacer(Modifier.height(12.dp))
-            Screenshots(row.app.repo, lang)
+            Screenshots(row.latest?.repo ?: row.app.repo, row.latest?.tag, lang)
         }
         // 2. What is new in the latest version, in the language shown
         val notes = ReleaseNotes.forLanguage(row.latest?.notes.orEmpty(), lang)

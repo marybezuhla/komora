@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -44,9 +45,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import ua.komora.R
+import ua.komora.Stores
 import ua.komora.net.GitHub
 
-/** Screenshots already fetched while Komora is open: asked for once per app, not on every look. */
+/** Screenshots already shown while Komora is open, ready to show again without reading them from storage. */
 private object ScreenshotCache {
     private val map = LinkedHashMap<String, List<ImageBitmap>>()
     @Synchronized fun get(key: String) = map[key]
@@ -77,19 +79,27 @@ private fun decode(bytes: ByteArray): ImageBitmap? = try {
 }
 
 /**
- * The app's screenshots in a row, fetched from its repository only now that the details are open.
- * Nothing is shown while there are none (or no connection). A tap opens them full screen.
+ * The app's screenshots in a row. They are kept on the phone and fetched from the repository again only
+ * for a new release ([tag]), when the details are open; until the release is known, the kept ones show.
+ * Nothing is shown while there are none (or no connection and nothing kept). A tap opens them full screen.
  */
 @Composable
-fun Screenshots(repo: String, lang: String) {
-    val key = "$repo|$lang"
+fun Screenshots(repo: String, tag: String?, lang: String) {
+    val context = LocalContext.current
+    val key = "$repo|$lang|$tag"
     var shots by remember(key) { mutableStateOf(ScreenshotCache.get(key)) }
     LaunchedEffect(key) {
         if (shots != null) return@LaunchedEffect
         val loaded = withContext(Dispatchers.IO) {
-            // Stops between requests once the details are closed; a failure is not remembered, so it is tried again
-            runCatching { GitHub.screenshots(repo, lang) { !isActive } }.getOrNull()?.mapNotNull { decode(it) }
-                ?.also { ScreenshotCache.put(key, it) }
+            val store = Stores.screenshots(context)
+            val bytes = store.get(repo, lang, tag) ?: tag?.let { release ->
+                // Stops between requests once the details are closed; what could not be fetched is tried again next time
+                GitHub.screenshotList(repo, lang) { !isActive }
+                    ?.let { listed -> store.update(repo, lang, release, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null } }
+                    // No connection: the pictures of an earlier release, if any
+                    ?: store.get(repo, lang, null)
+            }
+            bytes?.mapNotNull { decode(it) }?.also { if (isActive) ScreenshotCache.put(key, it) }
         }
         shots = loaded
     }

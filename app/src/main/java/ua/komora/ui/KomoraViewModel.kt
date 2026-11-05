@@ -15,6 +15,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ua.komora.Stores
 import ua.komora.catalog.Catalog
 import ua.komora.catalog.CatalogApp
 import ua.komora.catalog.Source
@@ -206,7 +207,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun checkUpdates() {
+    /** [force]: pulled down by the owner, so GitHub is asked now even if it was asked a moment ago. */
+    fun checkUpdates(force: Boolean = false) {
         // One check at a time: GitHub allows only 60 requests an hour without an account
         if (checkJob?.isActive == true) return
         checkJob = viewModelScope.launch {
@@ -214,7 +216,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             for ((index, app) in list.withIndex()) {
                 // Sources switched off or removed meanwhile: not asked about any more
                 if (apps().none { it.key == app.key }) continue
-                if (!check(app)) {
+                if (!check(app, force)) {
                     // Without a connection or after the rate limit, the rest would fail the same way: say so for all
                     val p = _rows.value.firstOrNull { it.app.key == app.key }?.problem ?: break
                     for (rest in list.drop(index + 1)) {
@@ -229,9 +231,9 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Asks GitHub about one app. False when the connection or GitHub's limit stops the whole check. */
-    private suspend fun check(app: CatalogApp): Boolean {
+    private suspend fun check(app: CatalogApp, force: Boolean = false): Boolean {
         set(app.key) { if (it.phase == Phase.Idle) it.copy(phase = Phase.Checking) else it }
-        val result = withContext(Dispatchers.IO) { catching { GitHub.latestRelease(app) } }
+        val result = withContext(Dispatchers.IO) { catching { GitHub.latestRelease(app, Stores.releases(ctx), force) } }
         set(app.key) { row ->
             val phase = if (row.phase == Phase.Checking) Phase.Idle else row.phase
             result.fold(
@@ -541,6 +543,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             }
             val id = prepared.getOrElse { e ->
                 if (active === current) finish(current)
+                // The kept answer about this release may be out of date: GitHub is asked anew next time
+                if (e is DownloadException) Stores.releases(ctx).forget(row.app.repo)
                 // Saying no to an unknown app is not an error
                 set(current.key) { it.copy(phase = Phase.Idle, problem = if (e is TrustDeclined) null else problemOf(e)) }
                 // One app failing does not stop "Update all"

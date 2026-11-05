@@ -11,7 +11,7 @@ import ua.komora.net.Rules
 import ua.komora.net.Rules.Asset
 
 class RulesTest {
-    private val repo = "Marybezu/tarilka"
+    private val repo = "marybezuhla/tarilka"
     private fun asset(name: String, url: String = "https://github.com/$repo/releases/download/v1/$name", size: Long = 1000) =
         Asset(name, url, size, null)
 
@@ -36,14 +36,14 @@ class RulesTest {
 
     @Test
     fun screenshotsOnlyFromTheRepository() {
-        val ok = "https://raw.githubusercontent.com/Marybezu/sprotyv/main/fastlane/1.png"
-        assertTrue(Rules.isScreenshot("1.png", ok, 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/other/x/main/1.png", 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.svg", ok, 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/Marybezu/sprotyv-evil/main/1.png", 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/Marybezu/sprotyv/../x/1.png", 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("../1.png", ok, 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.png", ok, Rules.MAX_IMAGE_BYTES + 1L, "Marybezu/sprotyv"))
+        val ok = "https://raw.githubusercontent.com/marybezuhla/sprotyv/main/fastlane/1.png"
+        assertTrue(Rules.isScreenshot("1.png", ok, 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/other/x/main/1.png", 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.svg", ok, 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/marybezuhla/sprotyv-evil/main/1.png", 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/marybezuhla/sprotyv/../x/1.png", 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("../1.png", ok, 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", ok, Rules.MAX_IMAGE_BYTES + 1L, "marybezuhla/sprotyv"))
         assertEquals("fastlane/metadata/android/uk/images/phoneScreenshots", Rules.screenshotDirs("uk").first())
     }
 

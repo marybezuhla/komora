@@ -97,7 +97,7 @@ import ua.komora.install.Confirm
 import ua.komora.ui.theme.CardTitle
 import ua.komora.ui.theme.Ornament
 
-internal const val SOURCE_URL = "https://github.com/Marybezu/komora"
+internal const val SOURCE_URL = "https://github.com/marybezuhla/komora"
 internal const val LICENSE_URL = "$SOURCE_URL/blob/main/LICENSE"
 
 /** The three groups of the list, in the order shown: what needs doing first. */

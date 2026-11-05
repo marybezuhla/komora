@@ -173,4 +173,36 @@ object Rules {
         publishedMs != null && nowMs - publishedMs >= AUTO_UPDATE_WAIT_MS
 
     fun toHex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
+
+    /** A check this recent is trusted as it is; pulling the list down asks again at once. */
+    const val CHECK_FRESH_MS: Long = 30L * 60 * 1000
+
+    /** True when a check made at [checkedAt] still holds at [now] (a clock turned back never counts as recent). */
+    fun stillFresh(checkedAt: Long, now: Long): Boolean = now - checkedAt in 0 until CHECK_FRESH_MS
+
+    private val TAG_PATH = Regex("^/([A-Za-z0-9][A-Za-z0-9-]{0,38})/([A-Za-z0-9._-]{1,100})/releases/tag/(.{1,200})$")
+
+    /**
+     * The tag from where github.com sends "releases/latest" ("…/releases/tag/v1.2.3"), as [plainTag] makes it;
+     * null for any other address. This page is not GitHub's API, so asking it does not use up the 60 an hour.
+     */
+    fun tagFromRedirect(location: String): String? {
+        val uri = try { URI(location) } catch (_: Exception) { return null }
+        if (uri.scheme != "https" || uri.host?.lowercase() != "github.com" || uri.rawQuery != null) return null
+        val m = TAG_PATH.matchEntire(uri.path ?: return null) ?: return null
+        if (m.groupValues[2].startsWith(".")) return null
+        return plainTag(m.groupValues[3]).ifEmpty { null }
+    }
+
+    /** Git's own name for a file's content, as GitHub lists it: SHA-1 of "blob <size>\0" and the bytes. */
+    fun gitBlobSha(bytes: ByteArray): String {
+        val sha = java.security.MessageDigest.getInstance("SHA-1")
+        sha.update("blob ${bytes.size}\u0000".toByteArray(Charsets.US_ASCII))
+        return toHex(sha.digest(bytes))
+    }
+
+    val GIT_SHA_HEX = Regex("^[0-9a-f]{40}$")
+
+    /** Screenshots kept on the phone take no more than this together; the ones looked at longest ago go first. */
+    const val MAX_KEPT_SCREENSHOT_BYTES: Long = 50L * 1024 * 1024
 }

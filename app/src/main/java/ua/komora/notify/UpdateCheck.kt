@@ -13,6 +13,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import ua.komora.R
+import ua.komora.Stores
 import ua.komora.catalog.Catalog
 import ua.komora.catalog.Sources
 import ua.komora.install.ApkVerifier
@@ -122,7 +123,7 @@ object UpdateCheck {
         for (app in catalog) {
             if (stopped()) return true
             val release = try {
-                GitHub.latestRelease(app)
+                GitHub.latestRelease(app, Stores.releases(context))
             } catch (_: RateLimitException) {
                 // Only part of the answers: no notice from that; tomorrow again
                 return true
