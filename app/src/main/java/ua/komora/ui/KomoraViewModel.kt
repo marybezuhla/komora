@@ -165,6 +165,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     init {
         // Taken here, on the main thread, where the list is changed
         val listed = (verified.map { it.repo } + sources.map { it.repo }).toSet()
+        val noSources = sources.isEmpty()
         viewModelScope.launch {
             // Leftovers from a time Komora was closed mid-install
             withContext(Dispatchers.IO) {
@@ -174,7 +175,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                 // closed before its undo ran out) go at the next start
                 Stores.releases(ctx).keepOnly(listed)
                 // Added apps' pictures with no added source left, or with their pictures off: none kept
-                if (sources.isEmpty() || !Sources.pictures(ctx)) Stores.forgetSourcePictures(ctx)
+                if (noSources || !Sources.pictures(ctx)) Stores.forgetSourcePictures(ctx)
             }
         }
         refreshInstalled()
@@ -299,8 +300,9 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             }
         }.also { job ->
             // Another round if one was asked for meanwhile (on the main thread, where it was asked)
-            job.invokeOnCompletion { cause ->
-                if (cause == null) viewModelScope.launch { if (prefetchAgain) prefetchScreenshots() }
+            // (also after a cancel: what the list asked for meanwhile still comes)
+            job.invokeOnCompletion {
+                viewModelScope.launch { if (prefetchAgain) prefetchScreenshots() }
             }
         }
     }

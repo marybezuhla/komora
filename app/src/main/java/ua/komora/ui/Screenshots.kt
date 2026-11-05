@@ -52,10 +52,10 @@ import ua.komora.net.GitHub
 import ua.komora.net.ScreenshotStore
 import ua.komora.net.Rules
 
-/** Screenshots already shown while Komora is open, ready to show again without reading them from storage. */
 /** Decoded pictures kept in memory at most (a screenshot decodes to about 4 bytes a pixel). */
 private const val MAX_CACHE_BYTES = 48L * 1024 * 1024
 
+/** Screenshots already shown while Komora is open, ready to show again without reading them from storage. */
 internal object ScreenshotCache {
     private val map = LinkedHashMap<String, List<ImageBitmap>>()
     @Synchronized fun get(key: String) = map[key]

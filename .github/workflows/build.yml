@@ -75,8 +75,10 @@ jobs:
         id: sum
         shell: bash
         run: |
-          set -euo pipefail
-          echo "sha256=$(sha256sum app/build/outputs/apk/release/app-release-unsigned.apk | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          # Taken first and checked, so a failed checksum stops here instead of passing on an empty value
+          S="$(sha256sum app/build/outputs/apk/release/app-release-unsigned.apk | cut -d' ' -f1)"
+          [[ "$S" =~ ^[0-9a-f]{64}$ ]]
+          echo "sha256=$S" >> "$GITHUB_OUTPUT"
 
       - name: Prepare build log
         if: always()
@@ -285,7 +287,10 @@ jobs:
           V="$(tr -d '[:space:]' < version.txt)"
           # The SHA-256 of the APK, so anyone can check the file they downloaded is this one
           cp .github/release-notes.md notes.md
-          printf '\nSHA-256:\n```\n%s\n```\n' "$(cd out && sha256sum *.apk)" >> notes.md
+          # Taken first and checked: the notes never go out without the file's SHA-256
+          SUMS="$(cd out && sha256sum *.apk)"
+          [[ "$SUMS" =~ ^[0-9a-f]{64}\ \ [^/]+\.apk$ ]]
+          printf '\nSHA-256:\n```\n%s\n```\n' "$SUMS" >> notes.md
           gh release create "v$V" out/*.apk \
             --repo "${{ github.repository }}" --target "${{ github.sha }}" \
             --title "Komora $V" --notes-file notes.md --latest

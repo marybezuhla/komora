@@ -81,7 +81,7 @@
     <string name="pill_available">%1$s · %2$s</string>
     <string name="sources_title">Other sources</string>
     <string name="sources_switch">Apps from other GitHub repositories</string>
-    <string name="sources_summary">Adds a second tab where you can add any public GitHub repository. Komora did not check those apps: you decide whom to trust. Their key is remembered when you agree to the first install, and every update must have the same key. Turning this off hides the tab but keeps the list. To move it to a new phone, use Share the list; each app must be trusted again.</string>
+    <string name="sources_summary">Adds a second tab where you can add any public GitHub repository. Komora did not check those apps: you decide whom to trust. Their key is remembered when you agree to the first install, and every update must have the same key. Turning this off hides the tab but keeps the list. To move it to a new phone, use "Share the list"; each app must be trusted again.</string>
     <string name="tab_verified">Verified · %1$d</string>
     <string name="tab_added">Added by you · %1$d</string>
     <string name="added_intro_title">Not checked by Komora</string>
