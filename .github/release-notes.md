@@ -1,6 +1,6 @@
-**Комора 1.0.2**
+**Комора 1.0.3**
 
-- Нова іконка Мандату в списку: та сама рука з квадратом, на синьому тлі, як у Спротиву.
+- У розділі «Про Комору» під словом авторки тепер її фото й імʼя.
 
 Нова Комора: завантажте `.apk` нижче на телефоні й відкрийте його. Далі нові версії Комори зʼявляються в її списку. Потрібен Android 12 або новіший. Як перевірити файл без Комори — у README.
 
@@ -8,9 +8,9 @@
 
 ---
 
-**Komora 1.0.2**
+**Komora 1.0.3**
 
-- Mandat's new icon in the list: the same hand holding a square, on the blue of Sprotyv's icon.
+- In About Komora, the author's photo and name now follow her word.
 
 New to Komora: download the `.apk` below on your phone and open it. After that, new versions of Komora show up in its own list. Requires Android 12 or newer. How to check the file without Komora: see README.
 
