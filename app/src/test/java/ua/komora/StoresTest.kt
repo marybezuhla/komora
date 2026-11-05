@@ -44,6 +44,16 @@ class StoresTest {
     }
 
     @Test
+    fun answersAboutWhatLeftTheListGo() {
+        val store = ReleaseStore(tmp.newFolder("r"))
+        store.put("a/kept", "v1", "{}".toByteArray(), 1)
+        store.put("a/removed", "v1", "{}".toByteArray(), 1)
+        store.keepOnly(setOf("A/Kept"))
+        assertEquals("v1", store.get("a/kept")!!.tag)
+        assertNull(store.get("a/removed"))
+    }
+
+    @Test
     fun aDamagedAnswerIsAskedAnew() {
         val dir = tmp.newFolder("r")
         val store = ReleaseStore(dir)

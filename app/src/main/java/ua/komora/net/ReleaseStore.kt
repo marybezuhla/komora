@@ -56,6 +56,13 @@ class ReleaseStore(private val dir: File) {
         fileFor(repo).delete()
     }
 
+    /** Removes every kept answer that is not about one of [repos]. */
+    @Synchronized
+    fun keepOnly(repos: Set<String>) {
+        val wanted = repos.map { fileFor(it).name }.toSet()
+        dir.listFiles { f -> f.name.endsWith(".json") && f.name !in wanted }?.forEach { it.delete() }
+    }
+
     private fun write(repo: String, e: Entry) {
         val text = JSONObject().put("tag", e.tag).put("checkedAt", e.checkedAt)
             .put("body", String(e.body, Charsets.UTF_8)).toString()

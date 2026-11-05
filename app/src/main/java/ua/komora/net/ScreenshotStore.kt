@@ -56,8 +56,9 @@ class ScreenshotStore(
                 val new = here[s.sha] ?: fetched[s.sha]
                 if (new != null) {
                     pictures += new
-                    // Still on disk: another look may have cleared this folder in between
-                    if (s.sha in saved || (s.sha in here && File(dir, s.sha).isFile)) files += s.name to s.sha else complete = false
+                    // Still on disk (another look may have cleared this folder in between), or saved again now
+                    val stored = s.sha in saved || File(dir, s.sha).isFile || savePicture(dir, s.sha, new)
+                    if (stored) files += s.name to s.sha else complete = false
                     continue
                 }
                 complete = false
