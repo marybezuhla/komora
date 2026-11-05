@@ -436,7 +436,7 @@ private fun AppIcon(packageName: String, name: String, color: Long, installedVer
         val fetched by androidx.compose.runtime.produceState<ImageBitmap?>(null, addedRepo, tag, version) {
             value = withContext(Dispatchers.IO) {
                 if (!ua.komora.catalog.Sources.pictures(context)) null
-                else Stores.sourceIcons(context).get(addedRepo, SourcePictures.ICON, null)?.firstOrNull()?.let { smallIcon(it, px) }
+                else Stores.sourceIcons(context).get(addedRepo, SourcePictures.ICON, SourcePictures.ICON_ONCE)?.firstOrNull()?.let { smallIcon(it, px) }
             }
         }
         fetched?.let {
@@ -816,9 +816,10 @@ private fun AddedIntro(onAdd: () -> Unit, onShare: (() -> Unit)?) {
     }
 }
 
-/** An added app's icon, decoded small: only a real PNG of sane size, never larger than [px] on screen. */
+/** An added app's icon, decoded small: only a PNG (by its first bytes) of sane size, never larger than [px] on screen. */
 private fun smallIcon(bytes: ByteArray, px: Int): ImageBitmap? = try {
-    if (!looksLikeImage(bytes)) null else {
+    val png = bytes.size > 8 && bytes.copyOfRange(0, 8).contentEquals(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A))
+    if (!png) null else {
         val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
         android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         val w = bounds.outWidth; val h = bounds.outHeight

@@ -28,16 +28,23 @@ object Stores {
      */
     @Synchronized
     fun sourceScreenshots(context: Context): ScreenshotStore = sourceScreenshots
-        ?: ScreenshotStore(File(context.applicationContext.cacheDir, "source-screenshots")).also { sourceScreenshots = it }
+        ?: ScreenshotStore(File(context.applicationContext.cacheDir, "source-screenshots"),
+            maxBytes = 25L * 1024 * 1024, allowed = { ua.komora.catalog.Sources.pictures(context.applicationContext) }).also { sourceScreenshots = it }
 
     @Synchronized
     fun sourceIcons(context: Context): ScreenshotStore = sourceIcons
-        ?: ScreenshotStore(File(context.applicationContext.cacheDir, "source-icons"), maxBytes = 5L * 1024 * 1024).also { sourceIcons = it }
+        ?: ScreenshotStore(File(context.applicationContext.cacheDir, "source-icons"),
+            maxBytes = 5L * 1024 * 1024, allowed = { ua.komora.catalog.Sources.pictures(context.applicationContext) }).also { sourceIcons = it }
 
-    /** Every added source's picture gone from the phone. */
-    @Synchronized
+    /** Every added source's picture gone from the phone (under each store's own lock, after any write in progress). */
     fun forgetSourcePictures(context: Context) {
-        File(context.applicationContext.cacheDir, "source-screenshots").deleteRecursively()
-        File(context.applicationContext.cacheDir, "source-icons").deleteRecursively()
+        sourceScreenshots(context).clear()
+        sourceIcons(context).clear()
+    }
+
+    /** One removed source's pictures gone. */
+    fun forgetSourcePictures(context: Context, repo: String) {
+        sourceScreenshots(context).forget(repo, listOf("uk", "en"))
+        sourceIcons(context).forget(repo, listOf(ua.komora.ui.SourcePictures.ICON))
     }
 }

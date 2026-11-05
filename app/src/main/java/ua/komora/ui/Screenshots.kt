@@ -49,15 +49,20 @@ import ua.komora.R
 import ua.komora.Stores
 import ua.komora.net.GitHub
 import ua.komora.net.ScreenshotStore
+import ua.komora.net.Rules
 
 /** Screenshots already shown while Komora is open, ready to show again without reading them from storage. */
-private object ScreenshotCache {
+internal object ScreenshotCache {
     private val map = LinkedHashMap<String, List<ImageBitmap>>()
     @Synchronized fun get(key: String) = map[key]
     @Synchronized fun put(key: String, value: List<ImageBitmap>) {
         map[key] = value
         // A few apps at most, to keep memory small
         while (map.size > 4) map.remove(map.keys.first())
+    }
+    /** Added apps' pictures (their keys end in "|true"), dropped when they are turned off. */
+    @Synchronized fun clearAdded() {
+        map.keys.removeAll { it.endsWith("|true") }
     }
 }
 
@@ -71,8 +76,9 @@ private fun decode(bytes: ByteArray): ImageBitmap? = try {
     if (w <= 0 || h <= 0 || w > 8000 || h > 8000) null
     else {
         // No side larger than a phone screen needs
+        // Never more than 1600 px on the long side nor about 4 million pixels once decoded
         var sample = 1
-        while (maxOf(w, h) / (sample * 2) >= 1600) sample *= 2
+        while (maxOf(w, h) / sample > 1600 || (w.toLong() / sample) * (h.toLong() / sample) > 4_000_000L) sample *= 2
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply {
             inSampleSize = sample
             inPreferredConfig = Bitmap.Config.ARGB_8888
@@ -113,6 +119,8 @@ fun Screenshots(repo: String, tag: String?, lang: String, added: Boolean = false
                     tag == null -> null
                     // Stops between requests once the details are closed; what could not be fetched is tried again next time
                     else -> GitHub.screenshotList(repo, lang) { !isActive }
+                        // An added source's pictures: smaller ones only (1 MB each)
+                        ?.let { listed -> if (added) listed.filter { it.size <= Rules.MAX_SOURCE_IMAGE_BYTES } else listed }
                         ?.let { listed -> store.update(repo, lang, tag, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null } }
                         // No connection: the pictures of an earlier release, if any
                         ?: store.get(repo, lang, null)?.let { ScreenshotStore.Result(it, complete = false) }

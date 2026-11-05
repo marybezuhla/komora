@@ -15,6 +15,8 @@ class ScreenshotStore(
     private val root: File,
     // Smaller only in tests, so filling it does not take 50 MB
     private val maxBytes: Long = Rules.MAX_KEPT_SCREENSHOT_BYTES,
+    // Asked just before anything is written: false (an added source's pictures turned off meanwhile) writes nothing
+    private val allowed: () -> Boolean = { true },
 ) {
     private class Kept(val tag: String, val files: List<Pair<String, String>>) // name, sha
 
@@ -47,6 +49,7 @@ class ScreenshotStore(
         }
         val fetched = listed.filter { it.sha !in here }.mapNotNull { s -> fetch(s)?.let { s.sha to it } }.toMap()
         synchronized(this) {
+            if (!allowed()) return Result(emptyList(), complete = false)
             dir.mkdirs()
             val saved = fetched.filter { (sha, bytes) -> savePicture(dir, sha, bytes) }.keys
             val pictures = mutableListOf<ByteArray>()
@@ -73,6 +76,18 @@ class ScreenshotStore(
             trim(except = dir)
             return Result(pictures, complete)
         }
+    }
+
+    /** Everything kept for [repo], in each of [keys] (languages, or the icon's key). */
+    @Synchronized
+    fun forget(repo: String, keys: List<String>) {
+        keys.forEach { dirFor(repo, it).deleteRecursively() }
+    }
+
+    /** Everything kept, under the same lock as writing, so nothing half-written comes back after. */
+    @Synchronized
+    fun clear() {
+        root.deleteRecursively()
     }
 
     private fun readPicture(dir: File, sha: String): ByteArray? {
