@@ -1,12 +1,8 @@
 package ua.komora.ui
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.drawable.AdaptiveIconDrawable
 import android.text.format.Formatter
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.selection.selectableGroup
@@ -19,7 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,12 +27,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -53,21 +46,13 @@ import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import ua.komora.ui.theme.Shade
 import ua.komora.net.Rules
@@ -78,7 +63,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -91,7 +75,6 @@ import ua.komora.R
 import androidx.compose.runtime.key
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.CenterAlignedTopAppBar
 import ua.komora.install.Confirm
 import ua.komora.ui.theme.CardTitle
@@ -364,81 +347,6 @@ private fun About() {
     }
 }
 
-/**
- * An installed app's icon, drawn round like the bundled ones: the two layers of an adaptive icon are
- * drawn in full and the middle cut out as a circle, so every launcher style looks the same here.
- */
-private fun installedIcon(context: Context, packageName: String, px: Int): ImageBitmap? = try {
-    val drawable = context.packageManager.getApplicationIcon(packageName)
-    val bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-    val canvas = android.graphics.Canvas(bitmap)
-    val circle = android.graphics.Path().apply { addCircle(px / 2f, px / 2f, px / 2f, android.graphics.Path.Direction.CW) }
-    canvas.clipPath(circle)
-    if (drawable is AdaptiveIconDrawable) {
-        // A layer is 108 dp, of which the middle 72 dp is the visible icon
-        val full = px * 1.5f
-        val offset = ((px - full) / 2f).toInt()
-        for (layer in listOfNotNull(drawable.background, drawable.foreground)) {
-            layer.setBounds(offset, offset, offset + full.toInt(), offset + full.toInt())
-            layer.draw(canvas)
-        }
-    } else {
-        drawable.setBounds(0, 0, px, px)
-        drawable.draw(canvas)
-    }
-    bitmap.asImageBitmap()
-} catch (_: Exception) {
-    null
-}
-
-/**
- * Each app's own icon, copied from its repository into Komora (round, as most launchers show it).
- * Listed by hand, not looked up by name, so the build's resource shrinking keeps them.
- */
-private val APP_ICONS = mapOf(
-    "ua.komora" to R.drawable.app_icon_komora,
-    "ua.tarilka" to R.drawable.app_icon_tarilka,
-    "ua.mandat" to R.drawable.app_icon_mandat,
-    "ua.sprotyv" to R.drawable.app_icon_sprotyv,
-    "ua.pysanka" to R.drawable.app_icon_pysanka,
-    "ua.svitlyna" to R.drawable.app_icon_svitlyna,
-    "ua.hramota" to R.drawable.app_icon_hramota,
-    "ua.surma" to R.drawable.app_icon_surma,
-    "ua.shyriai" to R.drawable.app_icon_shyriai,
-)
-
-private val ICON = 48.dp
-
-/**
- * The app's icon. Once installed, it comes from the app itself on this phone, so a new icon shows as
- * soon as the app is updated; before that, the copy bundled in Komora. An app with neither gets a
- * small square with its first letters. Decoration only.
- */
-@Composable
-private fun AppIcon(packageName: String, name: String, color: Long, installedVersion: String?) {
-    val context = LocalContext.current
-    val px = with(LocalDensity.current) { ICON.roundToPx() }
-    // Read again whenever the installed version changes (an update may bring a new icon)
-    val installed = remember(packageName, installedVersion) {
-        if (installedVersion == null) null else installedIcon(context, packageName, px)
-    }
-    if (installed != null) {
-        Image(installed, contentDescription = null, modifier = Modifier.size(ICON).clearAndSetSemantics { })
-        return
-    }
-    val icon = APP_ICONS[packageName]
-    if (icon != null) {
-        Image(painterResource(icon), contentDescription = null, modifier = Modifier.size(ICON).clip(CircleShape).clearAndSetSemantics { })
-        return
-    }
-    Box(
-        Modifier.size(ICON).background(Color(color), CircleShape).clearAndSetSemantics { },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(name.take(2).replaceFirstChar { it.uppercase() }, color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-    }
-}
-
 /** Where an app stands, in one short coloured line: the accent when there is something new. */
 @Composable
 private fun StatusText(row: AppRow) {
@@ -450,7 +358,8 @@ private fun StatusText(row: AppRow) {
         row.phase == Phase.Checking -> stringResource(R.string.checking) to scheme.onSurfaceVariant
         row.hasUpdate && latest != null && size != null -> stringResource(R.string.pill_update, latest, size) to scheme.primary
         // Up to date only when the versions really compare as equal; anything unclear is just "Installed"
-        row.isInstalled && latest != null && !row.installedVersion.isNullOrEmpty() &&
+        // (not for a copy from another source: Komora cannot vouch for it)
+        row.isInstalled && !row.foreignKey && latest != null && !row.installedVersion.isNullOrEmpty() &&
             Rules.compareVersions(latest, row.installedVersion) == 0 ->
             ("✓ " + stringResource(R.string.pill_current, row.installedVersion)) to scheme.onSurfaceVariant
         row.isInstalled -> (if (row.installedVersion.isNullOrEmpty()) stringResource(R.string.installed)
@@ -458,8 +367,9 @@ private fun StatusText(row: AppRow) {
         size != null -> stringResource(R.string.pill_available, latest.orEmpty(), size) to scheme.onSurfaceVariant
         else -> stringResource(R.string.not_installed) to scheme.onSurfaceVariant
     }
+    // Not a live region: a check would read every row out twice; the banner above says what happens
     Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = color,
-        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        modifier = Modifier.semantics { contentDescription = text.removePrefix("✓ ") })
 }
 
 /** Wider than this, the list stays this wide, in the middle. */
@@ -510,7 +420,8 @@ private fun AppListRow(
                 .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
+            AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion,
+                addedRepo = if (row.app.added) row.latest?.repo ?: row.app.repo else null, tag = row.latest?.tagKey)
             Spacer(Modifier.width(TEXT_EDGE - 16.dp - ICON))
             // One swipe reads the app: name, what it is, where it stands
             Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -541,7 +452,19 @@ private fun AppListRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth()
                 .clickable(onClickLabel = details, onClick = onDetails)
-                .padding(start = if (narrow) 16.dp else TEXT_EDGE, end = 16.dp, bottom = 14.dp),
+                .padding(start = if (narrow) 16.dp else TEXT_EDGE, end = 16.dp, bottom = 2.dp),
+        )
+        // Said in words: a tap on the app shows its pictures and what is new (not obvious from the name alone)
+        Text(
+            stringResource(R.string.more_about),
+            style = MaterialTheme.typography.labelLarge,
+            color = scheme.primary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = if (narrow) 4.dp else TEXT_EDGE - 12.dp, bottom = 6.dp)
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .clickable(role = Role.Button, onClick = onDetails)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
         )
         if (hasAction && narrow) {
             MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen,
@@ -621,13 +544,12 @@ private fun AppListRow(
                         OutlinedButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.cancel)) }
                     }
                     if (onContinue != null) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = onContinue, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                Text(stringResource(R.string.continue_install), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                Text(stringResource(R.string.cancel), maxLines = 1)
-                            }
+                        // One under the other, each across the width: "Continue" is never cut short
+                        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.continue_install), textAlign = TextAlign.Center)
+                        }
+                        OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.cancel), textAlign = TextAlign.Center)
                         }
                     }
                 }

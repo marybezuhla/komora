@@ -47,7 +47,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -124,7 +123,6 @@ internal fun AboutPage(onBack: () -> Unit) {
                         Text(
                             stringResource(R.string.letter_signature),
                             style = MaterialTheme.typography.bodyLarge,
-                            fontStyle = FontStyle.Italic,
                             color = scheme.primary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),

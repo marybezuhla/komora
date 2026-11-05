@@ -41,10 +41,7 @@ data class CatalogApp(
 }
 
 object Catalog {
-    private val PACKAGE = Regex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
-    private val REPO = Regex("^${Rules.OWNER}/${Rules.REPO_NAME}$")
     private val PREFIX = Regex("^[a-z0-9][a-z0-9_-]{0,40}$")
-    private val SHA256 = Regex("^[0-9a-f]{64}$")
     private val BADGE = Regex("^#[0-9A-Fa-f]{6}$")
     private val VERSION = Regex("^[0-9]{1,9}(\\.[0-9]{1,9}){0,3}$")
     private const val DEFAULT_BADGE = "#5A5048"
@@ -71,10 +68,10 @@ object Catalog {
                     require(VERSION.matches(v)) { "Bad minVersion: $v" }
                 } else null,
             )
-            require(PACKAGE.matches(app.packageName)) { "Bad package name: ${app.packageName}" }
-            require(REPO.matches(app.repo)) { "Bad repo: ${app.repo}" }
+            require(Rules.PACKAGE.matches(app.packageName)) { "Bad package name: ${app.packageName}" }
+            require(Rules.REPO.matches(app.repo)) { "Bad repo: ${app.repo}" }
             require(PREFIX.matches(app.assetPrefix)) { "Bad asset prefix: ${app.assetPrefix}" }
-            require(app.isSelf || SHA256.matches(app.certSha256)) { "Bad certificate for ${app.packageName}" }
+            require(app.isSelf || Rules.SHA256_HEX.matches(app.certSha256)) { "Bad certificate for ${app.packageName}" }
             require(o.getJSONObject("name").has("en") && o.getJSONObject("summary").has("en")) {
                 "English name and summary are required for ${app.packageName}"
             }

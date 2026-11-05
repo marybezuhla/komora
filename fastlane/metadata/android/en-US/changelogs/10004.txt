@@ -1,0 +1,1 @@
+Komora 1.0.4. Screenshots are fetched ahead and open at once. Cards show "Details". Requires Android 12 or newer.

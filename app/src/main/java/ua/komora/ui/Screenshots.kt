@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -49,35 +50,56 @@ import ua.komora.R
 import ua.komora.Stores
 import ua.komora.net.GitHub
 import ua.komora.net.ScreenshotStore
+import ua.komora.net.Rules
+
+/** Decoded pictures kept in memory at most (a screenshot decodes to about 4 bytes a pixel). */
+private const val MAX_CACHE_BYTES = 48L * 1024 * 1024
 
 /** Screenshots already shown while Komora is open, ready to show again without reading them from storage. */
-private object ScreenshotCache {
+internal object ScreenshotCache {
     private val map = LinkedHashMap<String, List<ImageBitmap>>()
     @Synchronized fun get(key: String) = map[key]
     @Synchronized fun put(key: String, value: List<ImageBitmap>) {
         map[key] = value
-        // A few apps at most, to keep memory small
-        while (map.size > 4) map.remove(map.keys.first())
+        // A few apps' pictures at most, counted in bytes, so large pictures never fill the memory
+        fun bytes() = map.values.sumOf { list -> list.sumOf { it.width.toLong() * it.height * 4 } }
+        while (map.size > 1 && (map.size > 4 || bytes() > MAX_CACHE_BYTES)) map.remove(map.keys.first())
+    }
+    /** Added apps' pictures (their keys end in "|true"), dropped when they are turned off. */
+    @Synchronized fun clearAdded() {
+        map.keys.removeAll { it.endsWith("|true") }
     }
 }
 
 /** Decodes an image no larger than a phone screen needs; anything odd (too big, unreadable) is left out. */
 private fun decode(bytes: ByteArray): ImageBitmap? = try {
+    // Only what it says it is: PNG, JPEG or WebP by its first bytes, nothing else handed to the decoder
+    if (!looksLikeImage(bytes)) return null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     val w = bounds.outWidth; val h = bounds.outHeight
     if (w <= 0 || h <= 0 || w > 8000 || h > 8000) null
     else {
         // No side larger than a phone screen needs
+        // Never more than 1600 px on the long side nor about 2.5 million pixels once decoded
         var sample = 1
-        while (maxOf(w, h) / (sample * 2) >= 1600) sample *= 2
+        while (maxOf(w, h) / sample > Rules.MAX_DECODED_SIDE || (w.toLong() / sample) * (h.toLong() / sample) > Rules.MAX_DECODED_PIXELS) sample *= 2
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply {
             inSampleSize = sample
             inPreferredConfig = Bitmap.Config.ARGB_8888
         })?.asImageBitmap()
     }
 } catch (_: Throwable) {
+    // A broken picture, or one too big for memory (OutOfMemoryError, hence Throwable): not shown, never a crash
     null
+}
+
+/** PNG, JPEG or WebP by its first bytes (the decoder never sees anything else). */
+internal fun looksLikeImage(b: ByteArray): Boolean {
+    fun at(i: Int, vararg v: Int) = b.size >= i + v.size && v.withIndex().all { (k, x) -> (b[i + k].toInt() and 0xFF) == x }
+    return at(0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A) ||
+        at(0, 0xFF, 0xD8, 0xFF) ||
+        (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50))
 }
 
 /**
@@ -86,15 +108,16 @@ private fun decode(bytes: ByteArray): ImageBitmap? = try {
  * Nothing is shown while there are none (or no connection and nothing kept). A tap opens them full screen.
  */
 @Composable
-fun Screenshots(repo: String, tag: String?, lang: String) {
+fun Screenshots(repo: String, tag: String?, lang: String, added: Boolean = false) {
     val context = LocalContext.current
-    val key = "$repo|$lang|$tag"
+    val key = "$repo|$lang|$tag|$added"
     var shots by remember(key) { mutableStateOf(ScreenshotCache.get(key)) }
     LaunchedEffect(key) {
         if (shots != null) return@LaunchedEffect
         val loaded = withContext(Dispatchers.IO) {
             try {
-                val store = Stores.screenshots(context)
+                // An added app's pictures: their own store, removed at once when turned off
+                val store = if (added) Stores.sourceScreenshots(context) else Stores.screenshots(context)
                 // The pictures for this release, or (until it is known) the ones kept from before
                 val kept = store.get(repo, lang, tag)
                 val result = when {
@@ -102,6 +125,8 @@ fun Screenshots(repo: String, tag: String?, lang: String) {
                     tag == null -> null
                     // Stops between requests once the details are closed; what could not be fetched is tried again next time
                     else -> GitHub.screenshotList(repo, lang) { !isActive }
+                        // An added source's pictures: smaller ones only (1 MB each)
+                        ?.let { listed -> if (added) listed.filter { it.size <= Rules.MAX_SOURCE_IMAGE_BYTES } else listed }
                         ?.let { listed -> store.update(repo, lang, tag, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null } }
                         // No connection: the pictures of an earlier release, if any
                         ?: store.get(repo, lang, null)?.let { ScreenshotStore.Result(it, complete = false) }
@@ -142,11 +167,17 @@ fun Screenshots(repo: String, tag: String?, lang: String) {
     if (open >= 0) {
         Dialog(onDismissRequest = { open = -1 }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             val pager = rememberPagerState(initialPage = open.coerceIn(0, list.lastIndex)) { list.size }
-            Box(Modifier.fillMaxSize().background(Color.Black).clickable { open = -1 }) {
+            val close = stringResource(R.string.close)
+            Box(Modifier.fillMaxSize().background(Color.Black).clickable(onClickLabel = close) { open = -1 }) {
                 HorizontalPager(pager, modifier = Modifier.fillMaxSize()) { page ->
-                    Image(list[page], contentDescription = "$label ${page + 1}", contentScale = ContentScale.Fit,
+                    Image(list[page], contentDescription = "$label ${page + 1} / ${list.size}", contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize().padding(12.dp))
                 }
+                // A visible way out, besides Back and a tap anywhere
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = { open = -1 },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).heightIn(min = 48.dp),
+                ) { Text(close) }
                 Text(
                     "${pager.currentPage + 1} / ${list.size}",
                     color = Color.White,

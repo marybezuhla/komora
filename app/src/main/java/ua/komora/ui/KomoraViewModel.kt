@@ -11,10 +11,12 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ua.komora.R
 import ua.komora.Stores
 import ua.komora.catalog.Catalog
 import ua.komora.catalog.CatalogApp
@@ -28,6 +30,7 @@ import ua.komora.install.Installer
 import ua.komora.net.BadReleaseException
 import ua.komora.net.DownloadException
 import ua.komora.net.GitHub
+import ua.komora.net.InterruptedDownload
 import ua.komora.net.NoReleaseException
 import ua.komora.net.RateLimitException
 import ua.komora.net.Release
@@ -120,6 +123,10 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     private val _sourcesEnabled = MutableStateFlow(Sources.enabled(app))
     val sourcesEnabled: StateFlow<Boolean> = _sourcesEnabled
 
+    private val _sourcePictures = MutableStateFlow(Sources.pictures(app))
+    /** Added apps' screenshots and icons shown (the owner turned them on after a warning). */
+    val sourcePictures: StateFlow<Boolean> = _sourcePictures
+
     /**
      * Komora's own list, then the added sources. A source whose pinned package is (now) in Komora's own
      * list, or is Komora itself, is left out: Komora's own key always wins.
@@ -159,14 +166,23 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     init {
         // Taken here, on the main thread, where the list is changed
         val listed = (verified.map { it.repo } + sources.map { it.repo }).toSet()
+        val noSources = sources.isEmpty()
         viewModelScope.launch {
             // Leftovers from a time Komora was closed mid-install
             withContext(Dispatchers.IO) {
-                runCatching { apkDir.listFiles()?.forEach { it.delete() } }
+                // (except the start of an interrupted download, for a while, so it can still continue)
+                runCatching {
+                    val now = System.currentTimeMillis()
+                    apkDir.listFiles()?.filter { f ->
+                        !f.name.startsWith("part-") || now - f.lastModified() !in 0..Rules.MAX_PARTIAL_AGE_MS
+                    }?.forEach { it.delete() }
+                }
                 runCatching { Installer.dropUncommitted(ctx) }
                 // Release answers about anything no longer in the list (a source removed while Komora was
                 // closed before its undo ran out) go at the next start
                 Stores.releases(ctx).keepOnly(listed)
+                // Added apps' pictures with no added source left, or with their pictures off: none kept
+                if (noSources || !Sources.pictures(ctx)) Stores.forgetSourcePictures(ctx)
             }
         }
         refreshInstalled()
@@ -229,6 +245,72 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                 checkAll(forced)
                 forced = true
             } while (forceAgain)
+            prefetchScreenshots()
+        }
+    }
+
+    private var prefetchJob: Job? = null
+    // Asked for while one was running (it may have seen the list before a check finished): one more round
+    private var prefetchAgain = false
+    // Removing added apps' pictures, when they were turned off: turning them on waits for it
+    private var cleanupJob: Job? = null
+
+    /**
+     * The screenshots of every app in Komora's own list, for its newest release, fetched ahead (on any
+     * network), so its details open with them at once. Only what is missing: once a release's pictures
+     * are kept, GitHub is not asked again until a new release. Added apps (only with their pictures
+     * turned on) get just their icon here, once per source and a few per round, so GitHub's hourly
+     * limit stays for update checks; their screenshots come when their details open. Stops at the first
+     * failure (no connection, GitHub's limit): tried again next check.
+     */
+    private fun prefetchScreenshots() {
+        if (prefetchJob?.isActive == true) {
+            prefetchAgain = true
+            return
+        }
+        prefetchAgain = false
+        prefetchJob = viewModelScope.launch(Dispatchers.IO) {
+            val lang = ctx.getString(R.string.catalog_lang)
+            val store = Stores.screenshots(ctx)
+            var icons = 0
+            try {
+                for (row in _rows.value) {
+                    val latest = row.latest ?: continue
+                    // As the details ask for them: the release's own repository (after a rename), else the listed one
+                    val repo = latest.repo ?: row.app.repo
+                    val done = try {
+                        if (row.app.added) {
+                            if (!_sourcePictures.value || icons >= ICONS_PER_ROUND) continue
+                            val iconStore = Stores.sourceIcons(ctx)
+                            if (iconStore.get(repo, SourcePictures.ICON, SourcePictures.ICON_ONCE) != null) continue
+                            icons++
+                            val icon = GitHub.iconList(repo, lang) { !isActive } ?: break
+                            iconStore.update(repo, SourcePictures.ICON, SourcePictures.ICON_ONCE, icon) { shot -> if (isActive) GitHub.screenshot(shot) else null }
+                            true
+                        } else {
+                            if (store.get(repo, lang, latest.tagKey) != null) continue
+                            val listed = GitHub.screenshotList(repo, lang) { !isActive }
+                            if (listed == null) false
+                            else store.update(repo, lang, latest.tagKey, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null }.complete
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // Pictures are only a help: never a problem shown for them
+                        false
+                    }
+                    if (!done) break
+                }
+            } finally {
+                // Icons read again once, when the round is over
+                if (icons > 0) SourcePictures.changed()
+            }
+        }.also { job ->
+            // Another round if one was asked for meanwhile (on the main thread, where it was asked)
+            // (also after a cancel: what the list asked for meanwhile still comes)
+            job.invokeOnCompletion {
+                viewModelScope.launch { if (prefetchAgain) prefetchScreenshots() }
+            }
         }
     }
 
@@ -274,7 +356,29 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Added sources ----
 
+    /** Added apps' pictures on (after the warning) or off: off removes every one of them from the phone. */
+    fun setSourcePictures(on: Boolean) {
+        Sources.setPictures(ctx, on)
+        _sourcePictures.value = on
+        if (on) {
+            // After any removal still going on, so it cannot delete what is fetched now
+            val cleaning = cleanupJob
+            viewModelScope.launch { cleaning?.join(); prefetchScreenshots() }
+        } else {
+            // Gone from the screen at once; from storage once anything being fetched has stopped
+            SourcePictures.changed()
+            val running = prefetchJob
+            cleanupJob = viewModelScope.launch(Dispatchers.IO) {
+                running?.cancelAndJoin()
+                Stores.forgetSourcePictures(ctx)
+                SourcePictures.changed()
+            }
+        }
+    }
+
     fun setSourcesEnabled(on: Boolean) {
+        // Without added sources, their pictures go too (and stay off until asked for again)
+        if (!on && _sourcePictures.value) setSourcePictures(false)
         Sources.setEnabled(ctx, on)
         _sourcesEnabled.value = on
         rebuildRows()
@@ -292,6 +396,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                     forceAgain = false
                     checkAll(force = true)
                 }
+                // The added apps' icons, if their pictures are on
+                prefetchScreenshots()
             }
         }
     }
@@ -392,7 +498,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** The added sources as links, one per line, to move them to another phone. */
-    fun sourcesAsText(): String = sources.joinToString("\n") { "https://github.com/${it.repo}" }
+    fun sourcesAsText(): String = sources.joinToString("\n") { Rules.repoUrl(it.repo) }
 
     /** Step 2, when there were several APKs: the one to take from now on. */
     fun chooseApk(repo: String, name: String) {
@@ -432,6 +538,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The source just removed, kept (with its key) until the owner's chance to undo has passed. */
     private var lastRemoved: List<Source> = emptyList()
+    // Where the removed sources live now (after a rename on GitHub): their pictures are kept under that name
+    private var lastRemovedNow: Map<String, String> = emptyMap()
     private val _removed = MutableStateFlow<String?>(null)
     /** The name of the source just removed, for "Removed · Undo"; null when there is nothing to undo. */
     val removed: StateFlow<String?> = _removed
@@ -447,6 +555,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         forgetRemoved()
         sources = next
         lastRemoved = gone
+        lastRemovedNow = _rows.value.filter { it.app.repo == repo }.mapNotNull { r -> r.latest?.repo?.let { repo to it } }.toMap()
         _removed.value = gone.first().let { it.name.ifEmpty { it.repo } }
         rebuildRows()
     }
@@ -455,6 +564,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     fun undoRemove() {
         val back = lastRemoved.filter { r -> sources.none { it.repo.equals(r.repo, ignoreCase = true) } }
         lastRemoved = emptyList()
+        lastRemovedNow = emptyMap()
         _removed.value = null
         if (back.isEmpty() || sources.size + back.size > Sources.MAX) return
         val next = (sources + back).sortedBy { it.addedAt }
@@ -471,7 +581,15 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         val drop = gone.filter { it.repo.lowercase() !in back }
         for (s in drop) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
         // GitHub's last answer about it too (a file, so not on the main thread)
-        viewModelScope.launch(Dispatchers.IO) { drop.forEach { Stores.releases(ctx).forget(it.repo) } }
+        val now = lastRemovedNow
+        viewModelScope.launch(Dispatchers.IO) {
+            drop.forEach {
+                Stores.releases(ctx).forget(it.repo)
+                // Its pictures, under the name it was added with and the one it has now
+                Stores.forgetSourcePictures(ctx, it.repo)
+                now[it.repo]?.let { current -> Stores.forgetSourcePictures(ctx, current) }
+            }
+        }
         lastRemoved = emptyList()
         _removed.value = null
     }
@@ -534,13 +652,16 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             set(current.key) { it.copy(phase = Phase.Downloading(0, release.apk.size), problem = null) }
             val prepared = withContext(Dispatchers.IO) {
                 var file: File? = null
+                var keep = false
                 try {
                     catching {
                         val dir = apkDir.apply { mkdirs() }
                         // The APK, plus Android's own copy while installing
                         if (dir.usableSpace < release.apk.size * 2) throw NotEnoughSpace()
-                        // A new file each time, so two attempts can never share bytes
-                        val f = File.createTempFile("apk", ".apk", dir).also { file = it }
+                        // Named after exactly this file: an interrupted try of it continues where it stopped
+                        val f = File(dir, Rules.partialName(release.apk)).also { file = it }
+                        // The start of any other file (an older release, a replaced file) is of no use now
+                        dir.listFiles()?.filter { it.name.startsWith("part-") && it.name != f.name }?.forEach { it.delete() }
                         var shown = -1L
                         GitHub.download(release.apk, f, isCancelled = { !isActive }) { bytes ->
                             // About 200 updates per download, whatever its size
@@ -566,17 +687,17 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                             throw CancellationException("Cancelled")
                         }
                         id
-                    }
+                    }.also { result -> keep = result.exceptionOrNull() is InterruptedDownload }
                 } finally {
-                    // The session holds its own copy now
-                    file?.delete()
+                    // The session holds its own copy now. Only a broken connection keeps what arrived, for the next try
+                    if (!keep) file?.delete()
                 }
             }
             val id = prepared.getOrElse { e ->
                 if (active === current) finish(current)
                 // The kept answer about this release may be out of date: GitHub is asked anew right away,
                 // so the next tap does not try the same file again
-                if (e is DownloadException) viewModelScope.launch {
+                if (e is DownloadException && e !is InterruptedDownload) viewModelScope.launch {
                     withContext(Dispatchers.IO) { Stores.releases(ctx).forget(row.app.repo) }
                     check(row.app, force = true)
                 }
@@ -690,3 +811,6 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         else -> Problem.Network
     }
 }
+
+/** At most this many added apps' icons are looked up per round (each may take a few of GitHub's 60 hourly requests). */
+private const val ICONS_PER_ROUND = 3

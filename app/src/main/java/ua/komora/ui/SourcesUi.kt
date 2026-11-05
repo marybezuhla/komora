@@ -35,6 +35,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -54,6 +56,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.ui.text.style.Hyphens
 import ua.komora.net.ReleaseNotes
+import ua.komora.net.Rules
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.border
@@ -65,7 +68,7 @@ import java.net.URLEncoder
 /** A new issue in [repo] with a title and the text already there; nothing is sent until the owner does. */
 fun issueUrl(repo: String, name: String, version: String, body: String): String {
     fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
-    return "https://github.com/$repo/issues/new?title=${enc("$name $version: ")}&body=${enc(body)}"
+    return Rules.repoUrl(repo) + "/issues/new?title=${enc("$name $version: ")}&body=${enc(body)}"
 }
 
 /** A signing key, as people compare it: 64 hex digits in groups of four, on four lines. */
@@ -112,14 +115,17 @@ fun AddSourceDialog(
                     Text(
                         if (state.reason == AddError.SomeFailed) stringResource(R.string.add_err_some, state.repos.joinToString(", "))
                         else addErrorText(state.reason),
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error,
+                        // Read out by TalkBack as soon as it appears
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                 }
                 if (working) {
                     Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.padding(start = 8.dp))
-                        Text(stringResource(R.string.add_source_looking), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.add_source_looking), style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     }
                 }
             }
@@ -242,10 +248,11 @@ internal fun DetailsContent(row: AppRow, lang: String, pinnedKey: String?, onRem
         Spacer(Modifier.height(12.dp))
         Text(row.app.summary(lang), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface,
             modifier = Modifier.fillMaxWidth())
-        // How it looks: only for Komora's own list (pictures from unknown sources are not opened)
-        if (!row.app.added) {
+        // How it looks: Komora's own list, and added apps only if the owner turned their pictures on
+        val context = androidx.compose.ui.platform.LocalContext.current
+        if (!row.app.added || ua.komora.catalog.Sources.pictures(context)) {
             Spacer(Modifier.height(12.dp))
-            Screenshots(row.latest?.repo ?: row.app.repo, row.latest?.tagKey, lang)
+            Screenshots(row.latest?.repo ?: row.app.repo, row.latest?.tagKey, lang, added = row.app.added)
         }
         // 2. What is new in the latest version, in the language shown
         val notes = ReleaseNotes.forLanguage(row.latest?.notes.orEmpty(), lang)
@@ -324,7 +331,7 @@ internal fun DetailsContent(row: AppRow, lang: String, pinnedKey: String?, onRem
         val android = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
         val body = stringResource(R.string.report_bug_body, name, version, android)
         OutlinedButton(
-            onClick = { runCatching { uri.openUri("https://github.com/${row.latest?.repo ?: row.app.repo}") } },
+            onClick = { runCatching { uri.openUri(Rules.repoUrl(row.latest?.repo ?: row.app.repo)) } },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         ) { Text(stringResource(R.string.open_repository), fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.height(8.dp))

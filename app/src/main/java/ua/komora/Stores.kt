@@ -9,6 +9,8 @@ import java.io.File
 object Stores {
     private var releases: ReleaseStore? = null
     private var screenshots: ScreenshotStore? = null
+    private var sourceScreenshots: ScreenshotStore? = null
+    private var sourceIcons: ScreenshotStore? = null
 
     /** Release answers: in a folder Android never backs up or moves to another phone. */
     @Synchronized
@@ -19,4 +21,30 @@ object Stores {
     @Synchronized
     fun screenshots(context: Context): ScreenshotStore = screenshots
         ?: ScreenshotStore(File(context.applicationContext.cacheDir, "screenshots")).also { screenshots = it }
+
+    /**
+     * Added sources' screenshots and icons (only when the owner turned them on): kept apart from the
+     * list's own, so turning them off removes every one of them at once.
+     */
+    @Synchronized
+    fun sourceScreenshots(context: Context): ScreenshotStore = sourceScreenshots
+        ?: ScreenshotStore(File(context.applicationContext.cacheDir, "source-screenshots"),
+            maxBytes = ua.komora.net.Rules.MAX_SOURCE_SCREENSHOT_BYTES, allowed = { ua.komora.catalog.Sources.pictures(context.applicationContext) }).also { sourceScreenshots = it }
+
+    @Synchronized
+    fun sourceIcons(context: Context): ScreenshotStore = sourceIcons
+        ?: ScreenshotStore(File(context.applicationContext.cacheDir, "source-icons"),
+            maxBytes = ua.komora.net.Rules.MAX_SOURCE_ICON_BYTES, allowed = { ua.komora.catalog.Sources.pictures(context.applicationContext) }).also { sourceIcons = it }
+
+    /** Every added source's picture gone from the phone (under each store's own lock, after any write in progress). */
+    fun forgetSourcePictures(context: Context) {
+        sourceScreenshots(context).clear()
+        sourceIcons(context).clear()
+    }
+
+    /** One removed source's pictures gone. */
+    fun forgetSourcePictures(context: Context, repo: String) {
+        sourceScreenshots(context).forget(repo, listOf("uk", "en"))
+        sourceIcons(context).forget(repo, listOf(ua.komora.ui.SourcePictures.ICON))
+    }
 }

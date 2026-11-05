@@ -180,4 +180,18 @@ class RulesTest {
         assertTrue(Regex("^[0-9a-f]{32}$").matches(n))
         assertEquals(n, Rules.storeName("owner/../repo|uk"))
     }
+
+    @Test
+    fun replacedFileWaitsAgain() {
+        val day = 24L * 60 * 60 * 1000
+        val published = 0L
+        // The file replaced five days later: counted from then
+        assertEquals(5 * day, Rules.unchangedSince(published, 5 * day))
+        // No date for the file: the release's
+        assertEquals(published, Rules.unchangedSince(published, null))
+        // No release date: never old enough
+        assertEquals(null, Rules.unchangedSince(null, 5 * day))
+        assertEquals(false, Rules.oldEnough(Rules.unchangedSince(published, 5 * day), 6 * day))
+        assertEquals(true, Rules.oldEnough(Rules.unchangedSince(published, 5 * day), 8 * day))
+    }
 }

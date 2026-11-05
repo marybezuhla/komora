@@ -16,4 +16,4 @@ Komora is distributed under GPL-3.0-or-later ([LICENSE](LICENSE)). The app inclu
 
 Точний перелік із версіями й контрольними сумами — у [gradle/verification-metadata.xml](gradle/verification-metadata.xml) та [app/build.gradle.kts](app/build.gradle.kts). · The exact list with versions and checksums: [gradle/verification-metadata.xml](gradle/verification-metadata.xml) and [app/build.gradle.kts](app/build.gradle.kts).
 
-Лише для тестів (не входять у застосунок) · Tests only (not in the app): JUnit (EPL-1.0), Robolectric (MIT), AndroidX Test (Apache-2.0), JSON-java (Public Domain).
+Лише для тестів (не входять у застосунок) · Tests only (not in the app): JUnit (EPL-1.0), Hamcrest (BSD-3-Clause), Robolectric (MIT), AndroidX Test (Apache-2.0), JSON-java (Public Domain).
