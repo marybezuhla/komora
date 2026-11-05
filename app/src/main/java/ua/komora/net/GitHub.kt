@@ -23,6 +23,9 @@ data class Release(val tag: String, val apk: Rules.Asset, val notes: String = ""
 /** GitHub allows 60 requests an hour without an account. */
 class RateLimitException : IOException("GitHub rate limit")
 
+/** GitHub (or a link it gave) answered, but not with what was asked: not a broken connection. */
+class BadAnswer(message: String) : IOException(message)
+
 /** The connection broke mid-download: what arrived is kept, and the next try continues from there. */
 class InterruptedDownload(cause: Throwable?) : DownloadException("Download interrupted", cause)
 
@@ -320,9 +323,12 @@ object GitHub {
             throw DownloadException("File not found", e)
         } catch (e: DownloadException) {
             throw e
-        } catch (e: IOException) {
-            // No connection, a refused host, an odd answer: started anew next time
+        } catch (e: BadAnswer) {
+            // A refused host or an odd answer: started anew next time, with the release asked about again
             throw DownloadException("Download failed", e)
+        } catch (e: IOException) {
+            // No connection yet, or it broke before the bytes came: what is already here stays for the next try
+            throw InterruptedDownload(e)
         }
         if (total != asset.size) throw InterruptedDownload(null)
         val expected = asset.sha256
@@ -355,22 +361,22 @@ object GitHub {
     private fun open(start: String, api: Boolean, hosts: Set<String> = Rules.APP_HOSTS, from: Long = 0): Connection {
         var url = start
         repeat(Rules.MAX_REDIRECTS + 1) {
-            val uri = Rules.allowedUri(url, hosts) ?: throw IOException("Refused to connect outside GitHub")
+            val uri = Rules.allowedUri(url, hosts) ?: throw BadAnswer("Refused to connect outside GitHub")
             val conn = connect(uri, api, from)
             try {
                 when (val code = conn.responseCode) {
                     HttpURLConnection.HTTP_OK -> return Connection(conn)
                     // Only when the rest of a file was asked for
-                    HttpURLConnection.HTTP_PARTIAL -> if (from > 0) return Connection(conn) else throw IOException("GitHub answered $code")
-                    in REDIRECTS -> url = nextUrl(conn, url) ?: throw IOException("Bad redirect")
+                    HttpURLConnection.HTTP_PARTIAL -> if (from > 0) return Connection(conn) else throw BadAnswer("GitHub answered $code")
+                    in REDIRECTS -> url = nextUrl(conn, url) ?: throw BadAnswer("Bad redirect")
                     // Only the API's own "rate limit" answers count as such
                     403, 429 -> if (api && (code == 429 || conn.getHeaderField("X-RateLimit-Remaining") == "0")) {
                         throw RateLimitException()
                     } else {
-                        throw IOException("GitHub answered $code")
+                        throw BadAnswer("GitHub answered $code")
                     }
                     404 -> throw NoReleaseException()
-                    else -> throw IOException("GitHub answered $code")
+                    else -> throw BadAnswer("GitHub answered $code")
                 }
             } catch (e: Throwable) {
                 conn.disconnect()
@@ -378,7 +384,7 @@ object GitHub {
             }
             conn.disconnect()
         }
-        throw IOException("Too many redirects")
+        throw BadAnswer("Too many redirects")
     }
 
     private fun readLimited(input: InputStream, max: Int): ByteArray = input.use {
