@@ -290,6 +290,46 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private suspend fun checkAll(force: Boolean) {
+        val list = apps()
+        for ((index, app) in list.withIndex()) {
+            // Sources switched off or removed meanwhile: not asked about any more
+            if (apps().none { it.key == app.key }) continue
+            if (!check(app, force)) {
+                // Without a connection or after the rate limit, the rest would fail the same way: say so for all
+                val p = _rows.value.firstOrNull { it.app.key == app.key }?.problem ?: return
+                for (rest in list.drop(index + 1)) {
+                    set(rest.key) {
+                        if (it.isBusy || (it.problem != null && it.problem !in checkProblems)) it else it.copy(problem = p)
+                    }
+                }
+                return
+            }
+        }
+    }
+
+    /** Asks GitHub about one app. False when the connection or GitHub's limit stops the whole check. */
+    private suspend fun check(app: CatalogApp, force: Boolean = false): Boolean {
+        set(app.key) { if (it.phase == Phase.Idle) it.copy(phase = Phase.Checking) else it }
+        val result = withContext(Dispatchers.IO) { catching { GitHub.latestRelease(app, Stores.releases(ctx), force) } }
+        set(app.key) { row ->
+            val phase = if (row.phase == Phase.Checking) Phase.Idle else row.phase
+            result.fold(
+                onSuccess = {
+                    val problem = row.problem.takeIf { p -> p !in checkProblems }
+                    row.copy(latest = it, phase = phase, problem = problem)
+                },
+                // A check never covers an install in progress or its result
+                onFailure = {
+                    if (row.isBusy || (row.problem != null && row.problem !in checkProblems)) row.copy(phase = phase)
+                    else row.copy(phase = phase, problem = problemOf(it))
+                },
+            )
+        }
+        val p = problemOf(result.exceptionOrNull() ?: return true)
+        return p != Problem.RateLimit && p != Problem.Network
+    }
+
     // ---- Added sources ----
 
     /** Added apps' pictures on (after the warning) or off: off removes every one of them from the phone. */
@@ -472,6 +512,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The source just removed, kept (with its key) until the owner's chance to undo has passed. */
     private var lastRemoved: List<Source> = emptyList()
+    // Where the removed sources live now (after a rename on GitHub): their pictures are kept under that name
+    private var lastRemovedNow: Map<String, String> = emptyMap()
     private val _removed = MutableStateFlow<String?>(null)
     /** The name of the source just removed, for "Removed · Undo"; null when there is nothing to undo. */
     val removed: StateFlow<String?> = _removed
@@ -487,6 +529,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         forgetRemoved()
         sources = next
         lastRemoved = gone
+        lastRemovedNow = _rows.value.filter { it.app.repo == repo }.mapNotNull { r -> r.latest?.repo?.let { repo to it } }.toMap()
         _removed.value = gone.first().let { it.name.ifEmpty { it.repo } }
         rebuildRows()
     }
@@ -495,6 +538,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     fun undoRemove() {
         val back = lastRemoved.filter { r -> sources.none { it.repo.equals(r.repo, ignoreCase = true) } }
         lastRemoved = emptyList()
+        lastRemovedNow = emptyMap()
         _removed.value = null
         if (back.isEmpty() || sources.size + back.size > Sources.MAX) return
         val next = (sources + back).sortedBy { it.addedAt }
@@ -511,7 +555,15 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         val drop = gone.filter { it.repo.lowercase() !in back }
         for (s in drop) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
         // GitHub's last answer about it too (a file, so not on the main thread)
-        viewModelScope.launch(Dispatchers.IO) { drop.forEach { Stores.releases(ctx).forget(it.repo); Stores.forgetSourcePictures(ctx, it.repo) } }
+        val now = lastRemovedNow
+        viewModelScope.launch(Dispatchers.IO) {
+            drop.forEach {
+                Stores.releases(ctx).forget(it.repo)
+                // Its pictures, under the name it was added with and the one it has now
+                Stores.forgetSourcePictures(ctx, it.repo)
+                now[it.repo]?.let { current -> Stores.forgetSourcePictures(ctx, current) }
+            }
+        }
         lastRemoved = emptyList()
         _removed.value = null
     }
