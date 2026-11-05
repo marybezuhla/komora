@@ -18,11 +18,11 @@
 - **Сповіщення про нові версії** й **автоматичні оновлення** (обидва за замовчуванням вимкнено): приблизно раз на день, через Wi-Fi або будь-який інтернет, за бажанням лише на зарядці. Автоматично оновлюються лише застосунки, які встановила Комора, і лише випусками, яким уже дві доби.
 - **Інші джерела** (за замовчуванням вимкнено): після попередження й згоди можна додати будь-який публічний репозиторій GitHub. Комора такі застосунки не перевіряє: перед першим встановленням показує назву, пакет і ключ підпису, далі приймає лише оновлення з тим самим ключем. Додані застосунки — на окремій вкладці з червоною рамкою. Список можна перенести на інший телефон.
 - **Видалення** встановленого застосунку просто зі списку (Android перепитує).
-- **Вигляд:** кольори телефона або світлі й темні теми з рідними назвами — Крейда, Віск, Небо, Глина, Калина; Поділля, Гуцульщина, Чорнозем, Жар, Зоряна ніч. Для телефонів, планшетів і розкладних.
+- **Вигляд:** кольори телефона або світлі й темні теми з рідними назвами — Льон, Віск, Небо, Глина, Калина; Мак, Смерека, Чорнозем, Жар, Зоряна ніч. Для телефонів, планшетів і розкладних.
 
 ## Приватність
 
-Акаунтів, аналітики й реклами немає. Комора зʼєднується лише з GitHub і лише через захищене зʼєднання. GitHub бачить адресу телефона, коли Комора питає про нові версії (під час запуску, а у фоні — якщо ввімкнено сповіщення чи автоматичні оновлення), і коли ви відкриваєте подробиці застосунку (тоді завантажуються його знімки екрана, тож GitHub може бачити, який застосунок ви переглядали). Щоб знати, чи встановлено доданий застосунок, Комора бачить застосунки з іконкою на головному екрані, але нікуди їх не надсилає й не зберігає.
+Акаунтів, аналітики й реклами немає. Комора зʼєднується лише з GitHub і лише через захищене зʼєднання. GitHub бачить адресу телефона, коли Комора питає про нові версії (під час запуску, а у фоні — якщо ввімкнено сповіщення чи автоматичні оновлення), і коли ви відкриваєте подробиці застосунку, знімків якого ще немає на телефоні, наприклад уперше чи після нової версії (тоді GitHub може бачити, який застосунок ви переглядали; інакше знімки беруться з телефона). Щоб знати, чи встановлено доданий застосунок, Комора бачить застосунки з іконкою на головному екрані, але нікуди їх не надсилає й не зберігає.
 
 ## Встановлення
 
@@ -63,7 +63,7 @@ A simple, open and safe collection of apps for Android. Komora installs and upda
 
 ## Privacy
 
-No accounts, analytics or ads. Komora connects only to GitHub, only over HTTPS. GitHub sees the phone's address when Komora asks about new versions (at start, and in the background if notifications or automatic updates are on) and when you open an app's details (its screenshots are fetched then, so GitHub can see which app was looked at). To tell whether an added app is installed, Komora can see apps that have a home-screen icon; it never sends or keeps that list.
+No accounts, analytics or ads. Komora connects only to GitHub, only over HTTPS. GitHub sees the phone's address when Komora asks about new versions (at start, and in the background if notifications or automatic updates are on) and when you open the details of an app whose screenshots are not on the phone yet, for example the first time or after a new version (GitHub can then see which app was looked at; otherwise they come from the phone). To tell whether an added app is installed, Komora can see apps that have a home-screen icon; it never sends or keeps that list.
 
 ## Install
 

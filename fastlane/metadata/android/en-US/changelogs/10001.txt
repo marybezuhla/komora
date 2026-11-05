@@ -1,0 +1,1 @@
+Komora 1.0.1. The author's new GitHub address (marybezuhla). New apps: Hramota, Surma, Shyriai. Renaming an account or repository no longer stops updates. New versions are checked without running out of GitHub's limit. Screenshots are kept on the phone and refreshed only with a new version of the app. Requires Android 12 or newer.

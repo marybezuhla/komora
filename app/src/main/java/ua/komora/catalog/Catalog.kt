@@ -1,6 +1,7 @@
 package ua.komora.catalog
 
 import org.json.JSONObject
+import ua.komora.net.Rules
 
 /** One app in Komora's catalog. The catalog ships inside Komora's own signed APK, so nobody can change it on the way. */
 data class CatalogApp(
@@ -41,7 +42,7 @@ data class CatalogApp(
 
 object Catalog {
     private val PACKAGE = Regex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
-    private val REPO = Regex("^[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}$")
+    private val REPO = Regex("^${Rules.OWNER}/${Rules.REPO_NAME}$")
     private val PREFIX = Regex("^[a-z0-9][a-z0-9_-]{0,40}$")
     private val SHA256 = Regex("^[0-9a-f]{64}$")
     private val BADGE = Regex("^#[0-9A-Fa-f]{6}$")

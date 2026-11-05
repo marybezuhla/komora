@@ -15,6 +15,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ua.komora.Stores
 import ua.komora.catalog.Catalog
 import ua.komora.catalog.CatalogApp
 import ua.komora.catalog.Source
@@ -156,11 +157,16 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     private val apkDir get() = File(ctx.noBackupFilesDir, "apk")
 
     init {
+        // Taken here, on the main thread, where the list is changed
+        val listed = (verified.map { it.repo } + sources.map { it.repo }).toSet()
         viewModelScope.launch {
             // Leftovers from a time Komora was closed mid-install
             withContext(Dispatchers.IO) {
                 runCatching { apkDir.listFiles()?.forEach { it.delete() } }
                 runCatching { Installer.dropUncommitted(ctx) }
+                // Release answers about anything no longer in the list (a source removed while Komora was
+                // closed before its undo ran out) go at the next start
+                Stores.releases(ctx).keepOnly(listed)
             }
         }
         refreshInstalled()
@@ -206,32 +212,48 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun checkUpdates() {
+    /** Pulled down while a check was running: once it ends, everything is asked about again. */
+    private var forceAgain = false
+
+    /** [force]: pulled down by the owner, so GitHub is asked now even if it was asked a moment ago. */
+    fun checkUpdates(force: Boolean = false) {
         // One check at a time: GitHub allows only 60 requests an hour without an account
-        if (checkJob?.isActive == true) return
+        if (checkJob?.isActive == true) {
+            if (force) forceAgain = true
+            return
+        }
         checkJob = viewModelScope.launch {
-            val list = apps()
-            for ((index, app) in list.withIndex()) {
-                // Sources switched off or removed meanwhile: not asked about any more
-                if (apps().none { it.key == app.key }) continue
-                if (!check(app)) {
-                    // Without a connection or after the rate limit, the rest would fail the same way: say so for all
-                    val p = _rows.value.firstOrNull { it.app.key == app.key }?.problem ?: break
-                    for (rest in list.drop(index + 1)) {
-                        set(rest.key) {
-                            if (it.isBusy || (it.problem != null && it.problem !in checkProblems)) it else it.copy(problem = p)
-                        }
+            var forced = force
+            do {
+                forceAgain = false
+                checkAll(forced)
+                forced = true
+            } while (forceAgain)
+        }
+    }
+
+    private suspend fun checkAll(force: Boolean) {
+        val list = apps()
+        for ((index, app) in list.withIndex()) {
+            // Sources switched off or removed meanwhile: not asked about any more
+            if (apps().none { it.key == app.key }) continue
+            if (!check(app, force)) {
+                // Without a connection or after the rate limit, the rest would fail the same way: say so for all
+                val p = _rows.value.firstOrNull { it.app.key == app.key }?.problem ?: return
+                for (rest in list.drop(index + 1)) {
+                    set(rest.key) {
+                        if (it.isBusy || (it.problem != null && it.problem !in checkProblems)) it else it.copy(problem = p)
                     }
-                    break
                 }
+                return
             }
         }
     }
 
     /** Asks GitHub about one app. False when the connection or GitHub's limit stops the whole check. */
-    private suspend fun check(app: CatalogApp): Boolean {
+    private suspend fun check(app: CatalogApp, force: Boolean = false): Boolean {
         set(app.key) { if (it.phase == Phase.Idle) it.copy(phase = Phase.Checking) else it }
-        val result = withContext(Dispatchers.IO) { catching { GitHub.latestRelease(app) } }
+        val result = withContext(Dispatchers.IO) { catching { GitHub.latestRelease(app, Stores.releases(ctx), force) } }
         set(app.key) { row ->
             val phase = if (row.phase == Phase.Checking) Phase.Idle else row.phase
             result.fold(
@@ -264,6 +286,11 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                 for (app in apps().filter { it.added }) {
                     if (apps().none { it.key == app.key }) continue
                     if (!check(app)) break
+                }
+                // Pulled down meanwhile: everything is asked about now, as the pull asked
+                while (forceAgain) {
+                    forceAgain = false
+                    checkAll(force = true)
                 }
             }
         }
@@ -436,9 +463,15 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         rebuildRows()
     }
 
-    /** The chance to undo has passed: nothing about the source is left behind, not even the last version told about. */
+    /** The chance to undo has passed: what Komora kept about the source goes, even the last version told about. */
     fun forgetRemoved() {
-        for (s in lastRemoved) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
+        val gone = lastRemoved
+        // Not what was added again meanwhile
+        val back = sources.map { it.repo.lowercase() }.toSet() + verified.map { it.repo.lowercase() }
+        val drop = gone.filter { it.repo.lowercase() !in back }
+        for (s in drop) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
+        // GitHub's last answer about it too (a file, so not on the main thread)
+        viewModelScope.launch(Dispatchers.IO) { drop.forEach { Stores.releases(ctx).forget(it.repo) } }
         lastRemoved = emptyList()
         _removed.value = null
     }
@@ -541,6 +574,12 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             }
             val id = prepared.getOrElse { e ->
                 if (active === current) finish(current)
+                // The kept answer about this release may be out of date: GitHub is asked anew right away,
+                // so the next tap does not try the same file again
+                if (e is DownloadException) viewModelScope.launch {
+                    withContext(Dispatchers.IO) { Stores.releases(ctx).forget(row.app.repo) }
+                    check(row.app, force = true)
+                }
                 // Saying no to an unknown app is not an error
                 set(current.key) { it.copy(phase = Phase.Idle, problem = if (e is TrustDeclined) null else problemOf(e)) }
                 // One app failing does not stop "Update all"

@@ -3,6 +3,8 @@ package ua.komora.catalog
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import ua.komora.net.Rules
+import ua.komora.net.WholeFile
 import java.io.File
 
 /**
@@ -49,7 +51,7 @@ object Sources {
     private const val FILE = "sources.json"
     private const val PREFS = "sources"
 
-    private val REPO = Regex("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$")
+    private val REPO = Regex("^${Rules.OWNER}/${Rules.REPO_NAME}$")
     private val PACKAGE = Regex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
     private val SHA256 = Regex("^[0-9a-f]{64}$")
 
@@ -85,6 +87,9 @@ object Sources {
 
     /** The list, strictly checked: anything that does not look right is left out, never half-read. */
     fun load(context: Context): List<Source> = try {
+        // What cut-off writes left beside the list (and the fixed name Komora 1.0.0 used for it)
+        WholeFile.dropLeftovers(context.noBackupFilesDir)
+        File(context.noBackupFilesDir, "$FILE.tmp").delete()
         parse(File(context.noBackupFilesDir, FILE).takeIf { it.exists() }?.readText() ?: "[]")
     } catch (_: Exception) {
         emptyList()
@@ -132,17 +137,7 @@ object Sources {
                     .put("name", s.name).put("addedAt", s.addedAt),
             )
         }
-        // Written whole to a new file, then swapped in: never a half-written list
-        val dir = context.noBackupFilesDir
-        val tmp = File(dir, "$FILE.tmp")
-        java.io.FileOutputStream(tmp).use { out ->
-            out.write(array.toString().toByteArray(Charsets.UTF_8))
-            // On the disk before it replaces the old list, so a sudden power cut cannot leave an empty one
-            out.fd.sync()
-        }
-        if (!tmp.renameTo(File(dir, FILE))) {
-            tmp.delete()
-            throw java.io.IOException("Could not save the sources")
-        }
+        // Written whole to a new file, on the disk, then swapped in: never a half-written or empty list
+        WholeFile.write(File(context.noBackupFilesDir, FILE), array.toString().toByteArray(Charsets.UTF_8))
     }
 }

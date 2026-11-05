@@ -34,19 +34,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import ua.komora.R
+import ua.komora.Stores
 import ua.komora.net.GitHub
+import ua.komora.net.ScreenshotStore
 
-/** Screenshots already fetched while Komora is open: asked for once per app, not on every look. */
+/** Screenshots already shown while Komora is open, ready to show again without reading them from storage. */
 private object ScreenshotCache {
     private val map = LinkedHashMap<String, List<ImageBitmap>>()
     @Synchronized fun get(key: String) = map[key]
@@ -77,19 +81,40 @@ private fun decode(bytes: ByteArray): ImageBitmap? = try {
 }
 
 /**
- * The app's screenshots in a row, fetched from its repository only now that the details are open.
- * Nothing is shown while there are none (or no connection). A tap opens them full screen.
+ * The app's screenshots in a row. They are kept on the phone and fetched from the repository again only
+ * for a new release ([tag]), when the details are open; until the release is known, the kept ones show.
+ * Nothing is shown while there are none (or no connection and nothing kept). A tap opens them full screen.
  */
 @Composable
-fun Screenshots(repo: String, lang: String) {
-    val key = "$repo|$lang"
+fun Screenshots(repo: String, tag: String?, lang: String) {
+    val context = LocalContext.current
+    val key = "$repo|$lang|$tag"
     var shots by remember(key) { mutableStateOf(ScreenshotCache.get(key)) }
     LaunchedEffect(key) {
         if (shots != null) return@LaunchedEffect
         val loaded = withContext(Dispatchers.IO) {
-            // Stops between requests once the details are closed; a failure is not remembered, so it is tried again
-            runCatching { GitHub.screenshots(repo, lang) { !isActive } }.getOrNull()?.mapNotNull { decode(it) }
-                ?.also { ScreenshotCache.put(key, it) }
+            try {
+                val store = Stores.screenshots(context)
+                // The pictures for this release, or (until it is known) the ones kept from before
+                val kept = store.get(repo, lang, tag)
+                val result = when {
+                    kept != null -> ScreenshotStore.Result(kept, complete = tag != null)
+                    tag == null -> null
+                    // Stops between requests once the details are closed; what could not be fetched is tried again next time
+                    else -> GitHub.screenshotList(repo, lang) { !isActive }
+                        ?.let { listed -> store.update(repo, lang, tag, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null } }
+                        // No connection: the pictures of an earlier release, if any
+                        ?: store.get(repo, lang, null)?.let { ScreenshotStore.Result(it, complete = false) }
+                }
+                if (result == null) null else result.pictures.mapNotNull { decode(it) }
+                    // Only a whole set is remembered for this visit; a partial one is tried again next time the details open
+                    .also { if (result.complete && isActive) ScreenshotCache.put(key, it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Pictures are only a help: whatever goes wrong, the details show without them
+                null
+            }
         }
         shots = loaded
     }

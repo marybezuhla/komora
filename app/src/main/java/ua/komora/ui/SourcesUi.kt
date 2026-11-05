@@ -245,7 +245,7 @@ internal fun DetailsContent(row: AppRow, lang: String, pinnedKey: String?, onRem
         // How it looks: only for Komora's own list (pictures from unknown sources are not opened)
         if (!row.app.added) {
             Spacer(Modifier.height(12.dp))
-            Screenshots(row.app.repo, lang)
+            Screenshots(row.latest?.repo ?: row.app.repo, row.latest?.tagKey, lang)
         }
         // 2. What is new in the latest version, in the language shown
         val notes = ReleaseNotes.forLanguage(row.latest?.notes.orEmpty(), lang)
@@ -324,12 +324,12 @@ internal fun DetailsContent(row: AppRow, lang: String, pinnedKey: String?, onRem
         val android = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
         val body = stringResource(R.string.report_bug_body, name, version, android)
         OutlinedButton(
-            onClick = { runCatching { uri.openUri("https://github.com/${row.app.repo}") } },
+            onClick = { runCatching { uri.openUri("https://github.com/${row.latest?.repo ?: row.app.repo}") } },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         ) { Text(stringResource(R.string.open_repository), fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
-            onClick = { runCatching { uri.openUri(issueUrl(row.app.repo, name, version, body)) } },
+            onClick = { runCatching { uri.openUri(issueUrl(row.latest?.repo ?: row.app.repo, name, version, body)) } },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         ) { Text(stringResource(R.string.report_bug), fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.height(4.dp))

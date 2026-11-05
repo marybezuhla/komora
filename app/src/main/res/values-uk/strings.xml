@@ -23,7 +23,7 @@
     <string name="allow_button">Дозволити</string>
     <string name="footer">Кожен файл перевіряється перед встановленням: він має бути підписаний ключем, який Комора знає для цього застосунку. Файл із чужим підписом не встановиться.</string>
     <string name="about_title">Про застосунок</string>
-    <string name="about_text">© автори Комори. Вільне програмне забезпечення за ліцензією GNU GPL версії 3 або (на ваш вибір) будь-якої новішої (GPL-3.0-or-later), без жодних гарантій. Код написано за допомогою ШІ (Claude, Anthropic) під керівництвом і з тестуванням автора.\n\nБібліотеки: Jetpack Compose, Material 3 та інші бібліотеки AndroidX (Google, Apache 2.0); Kotlin і kotlinx.coroutines (JetBrains, Apache 2.0). Перелік — у файлі NOTICE.md у коді.\n\nЗастосунки завантажуються з GitHub, який бачить адресу телефона, що звертається. Коли ви відкриваєте подробиці застосунку, Комора просить у GitHub його знімки екрана, тож GitHub може бачити, який застосунок ви переглядали. Щоб знати, чи встановлено доданий вами застосунок, Комора бачить застосунки з іконкою на головному екрані, але нікуди їх не надсилає й не зберігає.</string>
+    <string name="about_text">© автори Комори. Вільне програмне забезпечення за ліцензією GNU GPL версії 3 або (на ваш вибір) будь-якої новішої (GPL-3.0-or-later), без жодних гарантій. Код написано за допомогою ШІ (Claude, Anthropic) під керівництвом і з тестуванням автора.\n\nБібліотеки: Jetpack Compose, Material 3 та інші бібліотеки AndroidX (Google, Apache 2.0); Kotlin і kotlinx.coroutines (JetBrains, Apache 2.0). Перелік — у файлі NOTICE.md у коді.\n\nЗастосунки завантажуються з GitHub, який бачить адресу телефона, що звертається. Коли ви відкриваєте подробиці застосунку, а його знімків ще немає на телефоні (уперше, після нової версії, іншою мовою чи якщо Android очистив тимчасову памʼять), Комора просить у GitHub знімки екрана, тож GitHub може бачити, який застосунок ви переглядали. Знімки й останні відповіді GitHub про випуски зберігаються на телефоні, щоб не питати знову без потреби. Щоб знати, чи встановлено доданий вами застосунок, Комора бачить застосунки з іконкою на головному екрані, але нікуди їх не надсилає й не зберігає.</string>
     <string name="source_code">Вихідний код</string>
     <string name="license">Ліцензія</string>
     <string name="err_network">Немає звʼязку з GitHub. Перевірте інтернет і спробуйте ще раз.</string>
@@ -46,11 +46,11 @@
     <string name="mode_dark">Темна</string>
     <string name="day_theme">Тема вдень</string>
     <string name="night_theme">Тема вночі</string>
-    <string name="theme_kreyda">Крейда</string>
+    <string name="theme_linen">Льон</string>
     <string name="theme_visk">Віск</string>
     <string name="theme_nebo">Небо</string>
-    <string name="theme_podillia">Поділля</string>
-    <string name="theme_hutsulshchyna">Гуцульщина</string>
+    <string name="theme_mak">Мак</string>
+    <string name="theme_smereka">Смерека</string>
     <string name="theme_chornozem">Чорнозем</string>
     <string name="theme_system">Кольори телефона</string>
     <string name="theme_system_dark">Кольори телефона</string>

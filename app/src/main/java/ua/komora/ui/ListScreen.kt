@@ -97,7 +97,7 @@ import ua.komora.install.Confirm
 import ua.komora.ui.theme.CardTitle
 import ua.komora.ui.theme.Ornament
 
-internal const val SOURCE_URL = "https://github.com/Marybezu/komora"
+internal const val SOURCE_URL = "https://github.com/marybezuhla/komora"
 internal const val LICENSE_URL = "$SOURCE_URL/blob/main/LICENSE"
 
 /** The three groups of the list, in the order shown: what needs doing first. */
@@ -402,6 +402,9 @@ private val APP_ICONS = mapOf(
     "ua.sprotyv" to R.drawable.app_icon_sprotyv,
     "ua.pysanka" to R.drawable.app_icon_pysanka,
     "ua.svitlyna" to R.drawable.app_icon_svitlyna,
+    "ua.hramota" to R.drawable.app_icon_hramota,
+    "ua.surma" to R.drawable.app_icon_surma,
+    "ua.shyriai" to R.drawable.app_icon_shyriai,
 )
 
 private val ICON = 48.dp

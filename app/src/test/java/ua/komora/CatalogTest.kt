@@ -55,7 +55,7 @@ class CatalogTest {
 
     @Test
     fun badRepoIsRefused() {
-        val bad = catalogJson.replace("\"Marybezu/tarilka\"", "\"Marybezu/tarilka/../x\"")
+        val bad = catalogJson.replace("\"marybezuhla/tarilka\"", "\"marybezuhla/tarilka/../x\"")
         assertThrows(IllegalArgumentException::class.java) { Catalog.parse(bad) }
     }
 

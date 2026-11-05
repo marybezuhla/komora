@@ -11,7 +11,7 @@ import ua.komora.net.Rules
 import ua.komora.net.Rules.Asset
 
 class RulesTest {
-    private val repo = "Marybezu/tarilka"
+    private val repo = "marybezuhla/tarilka"
     private fun asset(name: String, url: String = "https://github.com/$repo/releases/download/v1/$name", size: Long = 1000) =
         Asset(name, url, size, null)
 
@@ -36,14 +36,14 @@ class RulesTest {
 
     @Test
     fun screenshotsOnlyFromTheRepository() {
-        val ok = "https://raw.githubusercontent.com/Marybezu/sprotyv/main/fastlane/1.png"
-        assertTrue(Rules.isScreenshot("1.png", ok, 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/other/x/main/1.png", 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.svg", ok, 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/Marybezu/sprotyv-evil/main/1.png", 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/Marybezu/sprotyv/../x/1.png", 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("../1.png", ok, 1000, "Marybezu/sprotyv"))
-        assertFalse(Rules.isScreenshot("1.png", ok, Rules.MAX_IMAGE_BYTES + 1L, "Marybezu/sprotyv"))
+        val ok = "https://raw.githubusercontent.com/marybezuhla/sprotyv/main/fastlane/1.png"
+        assertTrue(Rules.isScreenshot("1.png", ok, 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/other/x/main/1.png", 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.svg", ok, 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/marybezuhla/sprotyv-evil/main/1.png", 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", "https://raw.githubusercontent.com/marybezuhla/sprotyv/../x/1.png", 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("../1.png", ok, 1000, "marybezuhla/sprotyv"))
+        assertFalse(Rules.isScreenshot("1.png", ok, Rules.MAX_IMAGE_BYTES + 1L, "marybezuhla/sprotyv"))
         assertEquals("fastlane/metadata/android/uk/images/phoneScreenshots", Rules.screenshotDirs("uk").first())
     }
 
@@ -126,5 +126,58 @@ class RulesTest {
         assertTrue(Rules.oldEnough(now - Rules.AUTO_UPDATE_WAIT_MS, now))
         // A date in the future (a wrong clock) is not old enough either
         assertFalse(Rules.oldEnough(now + 1000, now))
+    }
+
+    @Test
+    fun readsTheTagFromTheLatestPage() {
+        assertEquals("v1.0.1", Rules.tagFromRedirect("https://github.com/marybezuhla/komora/releases/tag/v1.0.1"))
+        assertEquals("1.2", Rules.tagFromRedirect("https://GitHub.com/a/b/releases/tag/1.2"))
+        assertEquals("v1+build", Rules.tagFromRedirect("https://github.com/a/b/releases/tag/v1%2Bbuild"))
+        for (bad in listOf(
+            "https://github.com/a/b/releases", "https://github.com/login?return_to=x",
+            "http://github.com/a/b/releases/tag/v1", "https://github.com.evil.io/a/b/releases/tag/v1",
+            "https://github.com/a/.b/releases/tag/v1", "https://github.com/a/b/releases/tag/v1?x=1",
+            "https://github.com/a/b/releases/tag/", "not a link",
+        )) assertNull(bad, Rules.tagFromRedirect(bad))
+    }
+
+    @Test
+    fun longTagsStayApart() {
+        val a = "v1.0.0-" + "x".repeat(40) + "a"
+        val b = "v1.0.0-" + "x".repeat(40) + "b"
+        assertEquals(Rules.plainTag(a), Rules.plainTag(b))
+        assertFalse(Rules.sameRelease(Rules.tagKey(a), Rules.tagFromRedirect("https://github.com/o/r/releases/tag/$b")))
+    }
+
+    @Test
+    fun aKeptAnswerIsUsedOnlyWhenRecentAndNotPulled() {
+        val now = 10_000_000L
+        assertTrue(Rules.trustKept(now - 60_000, now, forced = false))
+        assertFalse(Rules.trustKept(now - 60_000, now, forced = true))
+        assertFalse(Rules.trustKept(now - Rules.CHECK_FRESH_MS, now, forced = false))
+        // The clock turned back: not trusted
+        assertFalse(Rules.trustKept(now + 60_000, now, forced = false))
+    }
+
+    @Test
+    fun theKeptAnswerHoldsWhileThePageNamesItsTag() {
+        assertTrue(Rules.sameRelease("v1.0.1", "v1.0.1"))
+        assertFalse(Rules.sameRelease("v1.0.1", "v1.0.2"))
+        // GitHub answered oddly: the API is asked
+        assertFalse(Rules.sameRelease("v1.0.1", null))
+    }
+
+    @Test
+    fun gitNamesContentLikeGit() {
+        // `printf 'hello\n' | git hash-object --stdin`
+        assertEquals("ce013625030ba8dba906f756967f9e9ca394464a", Rules.gitBlobSha("hello\n".toByteArray()))
+        assertEquals("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", Rules.gitBlobSha(ByteArray(0)))
+    }
+
+    @Test
+    fun storeNamesAreSafeAndIgnoreCase() {
+        val n = Rules.storeName("Owner/../Repo|uk")
+        assertTrue(Regex("^[0-9a-f]{32}$").matches(n))
+        assertEquals(n, Rules.storeName("owner/../repo|uk"))
     }
 }

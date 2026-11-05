@@ -184,7 +184,7 @@ class StoreScreens {
     // 7. The themes
     private fun s7() = shot("07_themes", Theme.KALYNA) {
         LookSettings(
-            Look(day = Theme.KALYNA, night = Theme.PODILLIA), {}, AppLanguage.Choice.AUTO, {},
+            Look(day = Theme.KALYNA, night = Theme.MAK), {}, AppLanguage.Choice.AUTO, {},
             Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).verticalScroll(rememberScrollState()).padding(16.dp),
         )
     }

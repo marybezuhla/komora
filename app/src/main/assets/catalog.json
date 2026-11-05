@@ -4,7 +4,7 @@
     {
       "packageName": "ua.komora",
       "badge": "#9C4524",
-      "repo": "Marybezu/komora",
+      "repo": "marybezuhla/komora",
       "assetPrefix": "komora",
       "certSha256": "self",
       "minVersion": "0.3.2",
@@ -14,7 +14,7 @@
     {
       "packageName": "ua.tarilka",
       "badge": "#3E7B57",
-      "repo": "Marybezu/tarilka",
+      "repo": "marybezuhla/tarilka",
       "assetPrefix": "tarilka",
       "certSha256": "64eaf973ec74aa88ab62a6b32b9552cc8713042385fa3d749f66698bcdb25c60",
       "minVersion": "1.2.4",
@@ -24,7 +24,7 @@
     {
       "packageName": "ua.mandat",
       "badge": "#3D5A80",
-      "repo": "Marybezu/mandat",
+      "repo": "marybezuhla/mandat",
       "assetPrefix": "mandat",
       "certSha256": "a7065316672ac15bc387a68c2ea296ec8ea279420913d69ec50205bb548d773e",
       "minVersion": "0.1.177",
@@ -34,7 +34,7 @@
     {
       "packageName": "ua.sprotyv",
       "badge": "#4A4744",
-      "repo": "Marybezu/sprotyv",
+      "repo": "marybezuhla/sprotyv",
       "assetPrefix": "sprotyv",
       "certSha256": "d00241499cd44d0859c5762a0b4cc317862358c8df3210fc3a0e9473e038a1ac",
       "minVersion": "1.1.2",
@@ -44,7 +44,7 @@
     {
       "packageName": "ua.pysanka",
       "badge": "#8E3B5E",
-      "repo": "Marybezu/pysanka",
+      "repo": "marybezuhla/pysanka",
       "assetPrefix": "pysanka",
       "certSha256": "ea082ca6d8620c201948d08a9572c0b74a75101eb71b2752ceddcb4807d038ce",
       "minVersion": "0.23.0",
@@ -54,12 +54,42 @@
     {
       "packageName": "ua.svitlyna",
       "badge": "#2F6B6B",
-      "repo": "Marybezu/svitlyna",
+      "repo": "marybezuhla/svitlyna",
       "assetPrefix": "svitlyna",
       "certSha256": "53027b1a87085eb9e40a74820ff2aa067dd3350a0e3010a8f6c559e04a628630",
       "minVersion": "0.6.0",
       "name": { "uk": "Світлина", "en": "Svitlyna" },
       "summary": { "uk": "Приватна офлайн-галерея з локальним ШІ.", "en": "Private offline gallery with on-device AI." }
+    },
+    {
+      "packageName": "ua.hramota",
+      "badge": "#0C3A6B",
+      "repo": "marybezuhla/hramota",
+      "assetPrefix": "hramota",
+      "certSha256": "01ad1974be98adf30f05fb7e820e185fe272e8746d77506465f84f6812877ebd",
+      "minVersion": "0.9.0",
+      "name": { "uk": "Грамота", "en": "Hramota" },
+      "summary": { "uk": "Приватний офлайн-офіс: документи, таблиці, PDF.", "en": "Private offline office: documents, sheets, PDF." }
+    },
+    {
+      "packageName": "ua.surma",
+      "badge": "#98022B",
+      "repo": "marybezuhla/surma",
+      "assetPrefix": "surma",
+      "certSha256": "32108e17719507cfa7fd0a7865b877aae0960f3329053f765ea8521a4b028843",
+      "minVersion": "0.2.0",
+      "name": { "uk": "Сурма", "en": "Surma" },
+      "summary": { "uk": "Додаткові сповіщення про повітряну тривогу; сирену не замінює.", "en": "Extra air-raid alerts; not a replacement for sirens." }
+    },
+    {
+      "packageName": "ua.shyriai",
+      "badge": "#432E5C",
+      "repo": "marybezuhla/shyriai",
+      "assetPrefix": "shyriai",
+      "certSha256": "bf06a3a227bb1032dcb141c89293858072a5a00af2bf70394a449eb325ff2e1f",
+      "minVersion": "0.4.0",
+      "name": { "uk": "Ширяй", "en": "Shyriai" },
+      "summary": { "uk": "Офлайн-тренажер пілотування дронів і наземних роботів.", "en": "Offline trainer for piloting drones and ground robots." }
     }
   ]
 }
