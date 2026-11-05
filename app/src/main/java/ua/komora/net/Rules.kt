@@ -29,10 +29,10 @@ object Rules {
     fun contentRange(from: Long, size: Long): String = "bytes $from-${size - 1}/$size"
 
     /**
-     * The file an interrupted download keeps, named after exactly what it is (link, size, checksum), so
+     * The file an interrupted download keeps, named after exactly what it is (link, size, checksum, upload time), so
      * the next try continues only the same file.
      */
-    fun partialName(asset: Asset): String = "part-" + storeName("${asset.url}|${asset.size}|${asset.sha256 ?: ""}") + ".apk"
+    fun partialName(asset: Asset): String = "part-" + storeName("${asset.url}|${asset.size}|${asset.sha256 ?: ""}|${asset.changed ?: ""}") + ".apk"
 
     /** An interrupted download's start is kept this long at most. */
     const val MAX_PARTIAL_AGE_MS: Long = 48L * 60 * 60 * 1000

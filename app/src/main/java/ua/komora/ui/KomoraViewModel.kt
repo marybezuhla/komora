@@ -660,6 +660,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                         if (dir.usableSpace < release.apk.size * 2) throw NotEnoughSpace()
                         // Named after exactly this file: an interrupted try of it continues where it stopped
                         val f = File(dir, Rules.partialName(release.apk)).also { file = it }
+                        // The start of any other file (an older release, a replaced file) is of no use now
+                        dir.listFiles()?.filter { it.name.startsWith("part-") && it.name != f.name }?.forEach { it.delete() }
                         var shown = -1L
                         GitHub.download(release.apk, f, isCancelled = { !isActive }) { bytes ->
                             // About 200 updates per download, whatever its size

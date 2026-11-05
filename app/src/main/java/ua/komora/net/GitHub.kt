@@ -286,6 +286,8 @@ object GitHub {
                     val declared = conn.contentLengthLong
                     if (declared != -1L && declared != asset.size) throw DownloadException("Size does not match the release")
                 }
+                // Only a break while the bytes come counts as interrupted; anything before is a plain failure
+                try {
                 conn.inputStream.use { input ->
                     java.io.FileOutputStream(target, resumed).use { out ->
                         val buf = ByteArray(64 * 1024)
@@ -303,6 +305,13 @@ object GitHub {
                         out.fd.sync()
                     }
                 }
+                } catch (e: IOException) {
+                    if (e is DownloadException) throw e
+                    // Stopped by the owner while a read was stuck: a cancel, not a break
+                    if (isCancelled()) throw CancellationException("Download stopped")
+                    // What arrived stays, so the next try continues from there
+                    throw InterruptedDownload(e)
+                }
             }
         } catch (e: RateLimitException) {
             throw e
@@ -312,8 +321,8 @@ object GitHub {
         } catch (e: DownloadException) {
             throw e
         } catch (e: IOException) {
-            // What arrived stays, so the next try continues from there
-            throw InterruptedDownload(e)
+            // No connection, a refused host, an odd answer: started anew next time
+            throw DownloadException("Download failed", e)
         }
         if (total != asset.size) throw InterruptedDownload(null)
         val expected = asset.sha256
