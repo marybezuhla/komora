@@ -60,6 +60,36 @@
       "minVersion": "0.6.0",
       "name": { "uk": "Світлина", "en": "Svitlyna" },
       "summary": { "uk": "Приватна офлайн-галерея з локальним ШІ.", "en": "Private offline gallery with on-device AI." }
+    },
+    {
+      "packageName": "ua.hramota",
+      "badge": "#0C3A6B",
+      "repo": "marybezuhla/hramota",
+      "assetPrefix": "hramota",
+      "certSha256": "01ad1974be98adf30f05fb7e820e185fe272e8746d77506465f84f6812877ebd",
+      "minVersion": "0.9.0",
+      "name": { "uk": "Грамота", "en": "Hramota" },
+      "summary": { "uk": "Приватний офлайн-офіс: документи, таблиці, PDF.", "en": "Private offline office: documents, sheets, PDF." }
+    },
+    {
+      "packageName": "ua.surma",
+      "badge": "#98022B",
+      "repo": "marybezuhla/surma",
+      "assetPrefix": "surma",
+      "certSha256": "32108e17719507cfa7fd0a7865b877aae0960f3329053f765ea8521a4b028843",
+      "minVersion": "0.2.0",
+      "name": { "uk": "Сурма", "en": "Surma" },
+      "summary": { "uk": "Додаткові сповіщення про повітряну тривогу; сирену не замінює.", "en": "Extra air-raid alerts; not a replacement for sirens." }
+    },
+    {
+      "packageName": "ua.shyriai",
+      "badge": "#432E5C",
+      "repo": "marybezuhla/shyriai",
+      "assetPrefix": "shyriai",
+      "certSha256": "bf06a3a227bb1032dcb141c89293858072a5a00af2bf70394a449eb325ff2e1f",
+      "minVersion": "0.4.0",
+      "name": { "uk": "Ширяй", "en": "Shyriai" },
+      "summary": { "uk": "Офлайн-тренажер пілотування дронів і наземних роботів.", "en": "Offline trainer for piloting drones and ground robots." }
     }
   ]
 }

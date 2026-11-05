@@ -32,6 +32,9 @@
         <package android:name="ua.sprotyv" />
         <package android:name="ua.pysanka" />
         <package android:name="ua.svitlyna" />
+        <package android:name="ua.hramota" />
+        <package android:name="ua.surma" />
+        <package android:name="ua.shyriai" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

@@ -402,6 +402,9 @@ private val APP_ICONS = mapOf(
     "ua.sprotyv" to R.drawable.app_icon_sprotyv,
     "ua.pysanka" to R.drawable.app_icon_pysanka,
     "ua.svitlyna" to R.drawable.app_icon_svitlyna,
+    "ua.hramota" to R.drawable.app_icon_hramota,
+    "ua.surma" to R.drawable.app_icon_surma,
+    "ua.shyriai" to R.drawable.app_icon_shyriai,
 )
 
 private val ICON = 48.dp
