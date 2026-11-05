@@ -15,6 +15,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ua.komora.R
 import ua.komora.Stores
 import ua.komora.catalog.Catalog
 import ua.komora.catalog.CatalogApp
@@ -229,6 +230,39 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                 checkAll(forced)
                 forced = true
             } while (forceAgain)
+            prefetchScreenshots()
+        }
+    }
+
+    private var prefetchJob: Job? = null
+
+    /**
+     * The screenshots of every app in Komora's own list, for its newest release, fetched ahead (on any
+     * network), so its details open with them at once. Only what is missing: once a release's pictures
+     * are kept, GitHub is not asked again until a new release. Added sources are left out (their pictures
+     * are never opened). Stops at the first failure (no connection, GitHub's limit): tried again next check.
+     */
+    private fun prefetchScreenshots() {
+        if (prefetchJob?.isActive == true) return
+        prefetchJob = viewModelScope.launch(Dispatchers.IO) {
+            val lang = ctx.getString(R.string.catalog_lang)
+            val store = Stores.screenshots(ctx)
+            for (row in _rows.value) {
+                if (row.app.added) continue
+                val latest = row.latest ?: continue
+                val done = try {
+                    if (store.get(latest.repo, lang, latest.tagKey) != null) continue
+                    val listed = GitHub.screenshotList(latest.repo, lang) { !isActive }
+                    if (listed == null) false
+                    else store.update(latest.repo, lang, latest.tagKey, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null }.complete
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Pictures are only a help: never a problem shown for them
+                    false
+                }
+                if (!done) break
+            }
         }
     }
 

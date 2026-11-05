@@ -541,7 +541,19 @@ private fun AppListRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth()
                 .clickable(onClickLabel = details, onClick = onDetails)
-                .padding(start = if (narrow) 16.dp else TEXT_EDGE, end = 16.dp, bottom = 14.dp),
+                .padding(start = if (narrow) 16.dp else TEXT_EDGE, end = 16.dp, bottom = 2.dp),
+        )
+        // Said in words: a tap on the app shows its pictures and what is new (not obvious from the name alone)
+        Text(
+            stringResource(if (row.app.added) R.string.more_about_added else R.string.more_about),
+            style = MaterialTheme.typography.labelLarge,
+            color = scheme.primary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = if (narrow) 4.dp else TEXT_EDGE - 12.dp, bottom = 6.dp)
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .clickable(role = Role.Button, onClick = onDetails)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
         )
         if (hasAction && narrow) {
             MainAction(row, name, canGet, canOpen, problem, onInstall, onOpen,
