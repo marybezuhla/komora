@@ -1,0 +1,1 @@
+Komora 1.0.2. Mandat's new icon in the list. Requires Android 12 or newer.
