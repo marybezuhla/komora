@@ -250,11 +250,13 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             for (row in _rows.value) {
                 if (row.app.added) continue
                 val latest = row.latest ?: continue
+                // As the details ask for them: the release's own repository (after a rename), else the listed one
+                val repo = latest.repo ?: row.app.repo
                 val done = try {
-                    if (store.get(latest.repo, lang, latest.tagKey) != null) continue
-                    val listed = GitHub.screenshotList(latest.repo, lang) { !isActive }
+                    if (store.get(repo, lang, latest.tagKey) != null) continue
+                    val listed = GitHub.screenshotList(repo, lang) { !isActive }
                     if (listed == null) false
-                    else store.update(latest.repo, lang, latest.tagKey, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null }.complete
+                    else store.update(repo, lang, latest.tagKey, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null }.complete
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
