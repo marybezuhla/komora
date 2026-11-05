@@ -23,6 +23,7 @@ android {
         checkReleaseBuilds = true
         textReport = true
         textOutput = file("build/reports/lint-results-release.txt")
+        lintConfig = file("lint.xml")
     }
 
     namespace = "ua.komora"

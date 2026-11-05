@@ -83,13 +83,14 @@ private fun decode(bytes: ByteArray): ImageBitmap? = try {
         // No side larger than a phone screen needs
         // Never more than 1600 px on the long side nor about 2.5 million pixels once decoded
         var sample = 1
-        while (maxOf(w, h) / sample > 1600 || (w.toLong() / sample) * (h.toLong() / sample) > 2_500_000L) sample *= 2
+        while (maxOf(w, h) / sample > Rules.MAX_DECODED_SIDE || (w.toLong() / sample) * (h.toLong() / sample) > Rules.MAX_DECODED_PIXELS) sample *= 2
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply {
             inSampleSize = sample
             inPreferredConfig = Bitmap.Config.ARGB_8888
         })?.asImageBitmap()
     }
 } catch (_: Throwable) {
+    // A broken picture, or one too big for memory (OutOfMemoryError, hence Throwable): not shown, never a crash
     null
 }
 

@@ -45,6 +45,7 @@ object UpdateCheck {
         val p = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         Settings(p.getBoolean("enabled", false), p.getBoolean("wifi_only", false), p.getBoolean("weekly", false))
     } catch (_: Exception) {
+        // Unreadable preferences: everything off, as by default
         Settings()
     }
 
@@ -134,6 +135,7 @@ object UpdateCheck {
                 if (app.added) continue
                 return false
             } catch (_: Exception) {
+                // Anything else about one app (a bad release, say) does not stop the others
                 continue
             }
             // Asked about every app; only those on this phone are reported

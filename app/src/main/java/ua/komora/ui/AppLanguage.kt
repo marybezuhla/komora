@@ -38,6 +38,7 @@ object AppLanguage {
             try {
                 activity.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY, choice.tag).apply()
             } catch (_: Exception) {
+                // Not saved: the language stays as it was
                 return
             }
             activity.recreate()
@@ -57,6 +58,7 @@ object AppLanguage {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY, null)
             ?.takeIf { t -> Choice.entries.any { it.tag == t } }
     } catch (_: Exception) {
+        // Unreadable preferences: as the phone, the default
         null
     }
 }

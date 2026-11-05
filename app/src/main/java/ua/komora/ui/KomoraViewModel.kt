@@ -498,7 +498,7 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** The added sources as links, one per line, to move them to another phone. */
-    fun sourcesAsText(): String = sources.joinToString("\n") { "https://github.com/${it.repo}" }
+    fun sourcesAsText(): String = sources.joinToString("\n") { Rules.repoUrl(it.repo) }
 
     /** Step 2, when there were several APKs: the one to take from now on. */
     fun chooseApk(repo: String, name: String) {

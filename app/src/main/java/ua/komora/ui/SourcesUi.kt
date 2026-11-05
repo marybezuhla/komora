@@ -56,6 +56,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.ui.text.style.Hyphens
 import ua.komora.net.ReleaseNotes
+import ua.komora.net.Rules
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.border
@@ -67,7 +68,7 @@ import java.net.URLEncoder
 /** A new issue in [repo] with a title and the text already there; nothing is sent until the owner does. */
 fun issueUrl(repo: String, name: String, version: String, body: String): String {
     fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
-    return "https://github.com/$repo/issues/new?title=${enc("$name $version: ")}&body=${enc(body)}"
+    return Rules.repoUrl(repo) + "/issues/new?title=${enc("$name $version: ")}&body=${enc(body)}"
 }
 
 /** A signing key, as people compare it: 64 hex digits in groups of four, on four lines. */
@@ -330,7 +331,7 @@ internal fun DetailsContent(row: AppRow, lang: String, pinnedKey: String?, onRem
         val android = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
         val body = stringResource(R.string.report_bug_body, name, version, android)
         OutlinedButton(
-            onClick = { runCatching { uri.openUri("https://github.com/${row.latest?.repo ?: row.app.repo}") } },
+            onClick = { runCatching { uri.openUri(Rules.repoUrl(row.latest?.repo ?: row.app.repo)) } },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         ) { Text(stringResource(R.string.open_repository), fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.height(8.dp))

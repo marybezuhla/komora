@@ -48,6 +48,7 @@ object LookStore {
             // A day theme is never used at night, and the other way round
             .let { if (it.day.dark || !it.night.dark) d else it }
     } catch (_: Exception) {
+        // Unreadable preferences: the default look
         Look()
     }
 

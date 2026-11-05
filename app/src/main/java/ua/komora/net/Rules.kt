@@ -37,6 +37,28 @@ object Rules {
     /** An interrupted download's start is kept this long at most. */
     const val MAX_PARTIAL_AGE_MS: Long = 48L * 60 * 60 * 1000
 
+    /** Each connection to GitHub gives up after this long without an answer. */
+    const val TIMEOUT_MS = 20_000
+
+    /** At most this many redirects, each one checked. */
+    const val MAX_REDIRECTS = 5
+
+    /** "What's new" shown at most this long; at most this much of a release description is read. */
+    const val MAX_NOTES_CHARS = 4000
+    const val MAX_NOTES_INPUT = 12000
+
+    /** At most this many added sources. */
+    const val MAX_SOURCES = 20
+
+    /** Kept pictures of added sources: screenshots and icons, each store at most this big. */
+    const val MAX_SOURCE_SCREENSHOT_BYTES: Long = 25L * 1024 * 1024
+    const val MAX_SOURCE_ICON_BYTES: Long = 5L * 1024 * 1024
+
+    /** A decoded screenshot is at most this long on its long side and this many pixels; an icon at most this big. */
+    const val MAX_DECODED_SIDE = 1600
+    const val MAX_DECODED_PIXELS = 2_500_000L
+    const val MAX_ICON_SIDE = 2048
+
     /** An added source's screenshot is never bigger than this. */
     const val MAX_SOURCE_IMAGE_BYTES: Long = 1024L * 1024
 
@@ -66,6 +88,15 @@ object Rules {
     const val MAX_JSON_BYTES: Int = 2 * 1024 * 1024
 
     val SHA256_HEX = Regex("^[0-9a-f]{64}$")
+
+    /** An Android package name (as in a catalog entry or a source). */
+    val PACKAGE = Regex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
+
+    /** "owner/name" on GitHub. */
+    val REPO = Regex("^$OWNER/$REPO_NAME$")
+
+    /** A repository's page on GitHub. */
+    fun repoUrl(repo: String): String = "https://github.com/$repo"
 
     /** Git's name for a file's content (SHA-1, as GitHub lists it). */
     val GIT_SHA_HEX = Regex("^[0-9a-f]{40}$")
@@ -120,7 +151,7 @@ object Rules {
 
     /** A release file of [repo]; GitHub's names ignore case, so the check does too. */
     fun inRepo(url: String, repo: String): Boolean =
-        url.startsWith("https://github.com/$repo/releases/download/", ignoreCase = true)
+        url.startsWith(repoUrl(repo) + "/releases/download/", ignoreCase = true)
 
     /**
      * "app-1.2.3-universal.apk" -> a pattern that also matches the next versions' names. Numbers that

@@ -47,13 +47,10 @@ data class Source(
 
 /** The added sources, kept only on this phone (no backup), with the switch that shows them. */
 object Sources {
-    const val MAX = 20
+    const val MAX = Rules.MAX_SOURCES
     private const val FILE = "sources.json"
     private const val PREFS = "sources"
 
-    private val REPO = Regex("^${Rules.OWNER}/${Rules.REPO_NAME}$")
-    private val PACKAGE = Regex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
-    private val SHA256 = Regex("^[0-9a-f]{64}$")
 
     /** "owner/name", "github.com/owner/name" or a full link to it (any page in the repository). */
     fun parseRepo(input: String): String? {
@@ -68,12 +65,13 @@ object Sources {
         val parts = path.split('/')
         if (parts.size < 2) return null
         val repo = parts[0] + "/" + parts[1]
-        return repo.takeIf { REPO.matches(it) && !parts[1].startsWith(".") }
+        return repo.takeIf { Rules.REPO.matches(it) && !parts[1].startsWith(".") }
     }
 
     fun enabled(context: Context): Boolean = try {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("enabled", false)
     } catch (_: Exception) {
+        // Unreadable preferences: off, as by default
         false
     }
 
@@ -92,6 +90,7 @@ object Sources {
     fun pictures(context: Context): Boolean = try {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("pictures", false)
     } catch (_: Exception) {
+        // Unreadable preferences: off, as by default
         false
     }
 
@@ -110,6 +109,7 @@ object Sources {
         File(context.noBackupFilesDir, "$FILE.tmp").delete()
         parse(File(context.noBackupFilesDir, FILE).takeIf { it.exists() }?.readText() ?: "[]")
     } catch (_: Exception) {
+        // An unreadable list counts as empty; the file stays, so nothing is lost by reading it
         emptyList()
     }
 
@@ -130,10 +130,10 @@ object Sources {
     }
 
     fun valid(s: Source): Boolean =
-        REPO.matches(s.repo) && !s.repo.substringAfter('/').startsWith(".") &&
+        Rules.REPO.matches(s.repo) && !s.repo.substringAfter('/').startsWith(".") &&
             s.apkPattern.length in 5..300 && s.apkPattern.endsWith("\\.apk") && runCatching { Regex(s.apkPattern) }.isSuccess &&
-            (s.packageName.isEmpty() || PACKAGE.matches(s.packageName)) &&
-            (s.certSha256.isEmpty() || SHA256.matches(s.certSha256)) &&
+            (s.packageName.isEmpty() || Rules.PACKAGE.matches(s.packageName)) &&
+            (s.certSha256.isEmpty() || Rules.SHA256_HEX.matches(s.certSha256)) &&
             // Either both known (trusted) or neither (not installed yet)
             (s.packageName.isEmpty() == s.certSha256.isEmpty())
 
@@ -142,6 +142,7 @@ object Sources {
         write(context, list)
         true
     } catch (_: Exception) {
+        // Not saved: the caller keeps the old list and says so
         false
     }
 

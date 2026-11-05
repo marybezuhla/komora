@@ -34,8 +34,6 @@ open class DownloadException(message: String, cause: Throwable? = null) : IOExce
 
 /** Talks only to GitHub, only over HTTPS, and follows redirects by hand so it can refuse any other host. */
 object GitHub {
-    private const val TIMEOUT_MS = 20_000
-    private const val MAX_REDIRECTS = 5
 
     /**
      * The newest release of an app: for Komora's own list by the APK's name, for added sources by its pattern.
@@ -120,8 +118,8 @@ object GitHub {
      * then the API is asked, as before. Only a lost connection is an error.
      */
     private fun latestTag(repo: String): String? {
-        var url = "https://github.com/$repo/releases/latest"
-        repeat(MAX_REDIRECTS + 1) {
+        var url = Rules.repoUrl(repo) + "/releases/latest"
+        repeat(Rules.MAX_REDIRECTS + 1) {
             val uri = Rules.allowedUri(url, Rules.RELEASE_PAGE_HOSTS) ?: return null
             val conn = connect(uri, api = false)
             try {
@@ -330,8 +328,8 @@ object GitHub {
     private fun connect(uri: URI, api: Boolean, from: Long = 0): HttpsURLConnection {
         val conn = uri.toURL().openConnection() as HttpsURLConnection
         conn.instanceFollowRedirects = false
-        conn.connectTimeout = TIMEOUT_MS
-        conn.readTimeout = TIMEOUT_MS
+        conn.connectTimeout = Rules.TIMEOUT_MS
+        conn.readTimeout = Rules.TIMEOUT_MS
         conn.useCaches = false
         // A neutral name: nothing about the phone or its owner
         conn.setRequestProperty("User-Agent", "Komora")
@@ -347,7 +345,7 @@ object GitHub {
     /** An open connection after any redirects, each one checked against the allowed hosts. */
     private fun open(start: String, api: Boolean, hosts: Set<String> = Rules.APP_HOSTS, from: Long = 0): Connection {
         var url = start
-        repeat(MAX_REDIRECTS + 1) {
+        repeat(Rules.MAX_REDIRECTS + 1) {
             val uri = Rules.allowedUri(url, hosts) ?: throw IOException("Refused to connect outside GitHub")
             val conn = connect(uri, api, from)
             try {

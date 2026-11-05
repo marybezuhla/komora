@@ -29,12 +29,12 @@ object Stores {
     @Synchronized
     fun sourceScreenshots(context: Context): ScreenshotStore = sourceScreenshots
         ?: ScreenshotStore(File(context.applicationContext.cacheDir, "source-screenshots"),
-            maxBytes = 25L * 1024 * 1024, allowed = { ua.komora.catalog.Sources.pictures(context.applicationContext) }).also { sourceScreenshots = it }
+            maxBytes = ua.komora.net.Rules.MAX_SOURCE_SCREENSHOT_BYTES, allowed = { ua.komora.catalog.Sources.pictures(context.applicationContext) }).also { sourceScreenshots = it }
 
     @Synchronized
     fun sourceIcons(context: Context): ScreenshotStore = sourceIcons
         ?: ScreenshotStore(File(context.applicationContext.cacheDir, "source-icons"),
-            maxBytes = 5L * 1024 * 1024, allowed = { ua.komora.catalog.Sources.pictures(context.applicationContext) }).also { sourceIcons = it }
+            maxBytes = ua.komora.net.Rules.MAX_SOURCE_ICON_BYTES, allowed = { ua.komora.catalog.Sources.pictures(context.applicationContext) }).also { sourceIcons = it }
 
     /** Every added source's picture gone from the phone (under each store's own lock, after any write in progress). */
     fun forgetSourcePictures(context: Context) {

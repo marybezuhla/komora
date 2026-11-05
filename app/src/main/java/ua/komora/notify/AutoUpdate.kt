@@ -50,6 +50,7 @@ object AutoUpdate {
         val p = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         Settings(p.getBoolean("enabled", false), p.getBoolean("wifi_only", true), p.getBoolean("charging", false))
     } catch (_: Exception) {
+        // Unreadable preferences: everything off, as by default
         Settings()
     }
 
@@ -108,6 +109,7 @@ object AutoUpdate {
     private fun installedByKomora(context: Context, pkg: String): Boolean = try {
         context.packageManager.getInstallSourceInfo(pkg).installingPackageName == context.packageName
     } catch (_: Exception) {
+        // Unknown: treated as not installed by Komora, so nothing is updated unasked
         false
     }
 
@@ -150,6 +152,7 @@ object AutoUpdate {
                 if (app.added) continue
                 return false
             } catch (_: Exception) {
+                // Anything else about one app (a bad release, say) does not stop the others
                 continue
             }
             val latest = Rules.normalizeVersion(release.tag)
@@ -185,6 +188,7 @@ object AutoUpdate {
                 try {
                     ApkVerifier.verify(context, file, app)
                 } catch (_: Exception) {
+                    // Refused by the checks: never installed; the owner sees it on the next manual try
                     continue
                 }
                 if (stopped() || Installer.foregroundBusy) return true
@@ -197,6 +201,7 @@ object AutoUpdate {
                     }
                     Installer.commitInBackground(context, id, "${app.name(lang)} $latest", app.packageName, latest)
                 } catch (_: Exception) {
+                    // Android would not take it now: left for the next run or the owner
                     continue
                 } finally {
                     Installer.backgroundSessions -= id
