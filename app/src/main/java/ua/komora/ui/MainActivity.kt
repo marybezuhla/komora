@@ -560,12 +560,18 @@ internal fun SourcesSettings(
     Spacer(Modifier.height(8.dp))
     SectionTitle(stringResource(R.string.sources_title))
     Group {
-        // Turning it on only after the warning is read and agreed to; turning it off needs nothing
-        SwitchRow(stringResource(R.string.sources_switch), stringResource(R.string.sources_summary), enabled) { on ->
-            if (on) asking = true else onChange(false)
+        // One under the other (a group lays its content on top of itself)
+        Column {
+            // Turning it on only after the warning is read and agreed to; turning it off needs nothing
+            SwitchRow(stringResource(R.string.sources_switch), stringResource(R.string.sources_summary), enabled) { on ->
+                if (on) asking = true else onChange(false)
+            }
         }
-        // Added apps' screenshots and icons: only with added sources on, and again only after a warning
-        if (enabled) {
+    }
+    // Added apps' screenshots and icons: only with added sources on, and again only after a warning
+    if (enabled) {
+        Spacer(Modifier.height(12.dp))
+        Group {
             SwitchRow(stringResource(R.string.source_pictures_switch), stringResource(R.string.source_pictures_summary), pictures) { on ->
                 if (on) askingPictures = true else onPictures(false)
             }
