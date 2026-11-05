@@ -30,6 +30,7 @@ import ua.komora.install.Installer
 import ua.komora.net.BadReleaseException
 import ua.komora.net.DownloadException
 import ua.komora.net.GitHub
+import ua.komora.net.InterruptedDownload
 import ua.komora.net.NoReleaseException
 import ua.komora.net.RateLimitException
 import ua.komora.net.Release
@@ -169,7 +170,13 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             // Leftovers from a time Komora was closed mid-install
             withContext(Dispatchers.IO) {
-                runCatching { apkDir.listFiles()?.forEach { it.delete() } }
+                // (except the start of an interrupted download, for a while, so it can still continue)
+                runCatching {
+                    val now = System.currentTimeMillis()
+                    apkDir.listFiles()?.filter { f ->
+                        !f.name.startsWith("part-") || now - f.lastModified() !in 0..Rules.MAX_PARTIAL_AGE_MS
+                    }?.forEach { it.delete() }
+                }
                 runCatching { Installer.dropUncommitted(ctx) }
                 // Release answers about anything no longer in the list (a source removed while Komora was
                 // closed before its undo ran out) go at the next start
@@ -645,13 +652,14 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             set(current.key) { it.copy(phase = Phase.Downloading(0, release.apk.size), problem = null) }
             val prepared = withContext(Dispatchers.IO) {
                 var file: File? = null
+                var keep = false
                 try {
                     catching {
                         val dir = apkDir.apply { mkdirs() }
                         // The APK, plus Android's own copy while installing
                         if (dir.usableSpace < release.apk.size * 2) throw NotEnoughSpace()
-                        // A new file each time, so two attempts can never share bytes
-                        val f = File.createTempFile("apk", ".apk", dir).also { file = it }
+                        // Named after exactly this file: an interrupted try of it continues where it stopped
+                        val f = File(dir, Rules.partialName(release.apk)).also { file = it }
                         var shown = -1L
                         GitHub.download(release.apk, f, isCancelled = { !isActive }) { bytes ->
                             // About 200 updates per download, whatever its size
@@ -677,17 +685,17 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                             throw CancellationException("Cancelled")
                         }
                         id
-                    }
+                    }.also { result -> keep = result.exceptionOrNull() is InterruptedDownload }
                 } finally {
-                    // The session holds its own copy now
-                    file?.delete()
+                    // The session holds its own copy now. Only a broken connection keeps what arrived, for the next try
+                    if (!keep) file?.delete()
                 }
             }
             val id = prepared.getOrElse { e ->
                 if (active === current) finish(current)
                 // The kept answer about this release may be out of date: GitHub is asked anew right away,
                 // so the next tap does not try the same file again
-                if (e is DownloadException) viewModelScope.launch {
+                if (e is DownloadException && e !is InterruptedDownload) viewModelScope.launch {
                     withContext(Dispatchers.IO) { Stores.releases(ctx).forget(row.app.repo) }
                     check(row.app, force = true)
                 }

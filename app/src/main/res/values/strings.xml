@@ -31,7 +31,7 @@
     <string name="err_rate_limit">GitHub asks to wait (too many checks). Try again later (up to an hour).</string>
     <string name="err_no_release">No release published yet.</string>
     <string name="err_bad_release">The latest release has no suitable app file.</string>
-    <string name="err_download">The download stopped. Check the internet and tap the button again: the file downloads from the start.</string>
+    <string name="err_download">The download did not finish. Check the internet and tap the button again. If the connection just broke, it continues from where it stopped.</string>
     <string name="err_no_space">Not enough free space on the phone.</string>
     <string name="err_unreadable">The file could not be read as an app. Nothing was installed.</string>
     <string name="err_wrong_package">The file holds a different app than expected. Nothing was installed.</string>

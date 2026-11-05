@@ -23,11 +23,14 @@ data class Release(val tag: String, val apk: Rules.Asset, val notes: String = ""
 /** GitHub allows 60 requests an hour without an account. */
 class RateLimitException : IOException("GitHub rate limit")
 
+/** The connection broke mid-download: what arrived is kept, and the next try continues from there. */
+class InterruptedDownload(cause: Throwable?) : DownloadException("Download interrupted", cause)
+
 /** The repository has no published release yet. */
 class NoReleaseException : IOException("No release yet")
 
 /** The file could not be fully downloaded (connection dropped, or it did not match the release). */
-class DownloadException(message: String, cause: Throwable? = null) : IOException(message, cause)
+open class DownloadException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 /** Talks only to GitHub, only over HTTPS, and follows redirects by hand so it can refuse any other host. */
 object GitHub {
@@ -267,14 +270,28 @@ object GitHub {
      */
     fun download(asset: Rules.Asset, target: File, isCancelled: () -> Boolean, onProgress: (Long) -> Unit) {
         val sha = MessageDigest.getInstance("SHA-256")
+        // What an earlier, interrupted attempt already saved: only the rest is fetched
+        val have = target.length().takeIf { target.isFile && it in 1 until asset.size } ?: 0L
         var total = 0L
         try {
-            open(asset.url, api = false).use { conn ->
-                val declared = conn.contentLengthLong
-                if (declared != -1L && declared != asset.size) throw DownloadException("Size does not match the release")
-                conn.inputStream.use { input ->
-                    target.outputStream().use { out ->
+            open(asset.url, api = false, from = have).use { conn ->
+                val resumed = have > 0 && conn.partial
+                if (resumed) {
+                    // Exactly the rest of this very file, or nothing
+                    if (conn.contentRange != Rules.contentRange(have, asset.size)) throw DownloadException("Not the rest of the file")
+                    target.inputStream().use { old ->
                         val buf = ByteArray(64 * 1024)
+                        while (true) { val n = old.read(buf); if (n < 0) break; sha.update(buf, 0, n) }
+                    }
+                    total = have
+                } else {
+                    val declared = conn.contentLengthLong
+                    if (declared != -1L && declared != asset.size) throw DownloadException("Size does not match the release")
+                }
+                conn.inputStream.use { input ->
+                    java.io.FileOutputStream(target, resumed).use { out ->
+                        val buf = ByteArray(64 * 1024)
+                        onProgress(total)
                         while (true) {
                             if (isCancelled()) throw CancellationException("Download stopped")
                             val n = input.read(buf)
@@ -297,9 +314,10 @@ object GitHub {
         } catch (e: DownloadException) {
             throw e
         } catch (e: IOException) {
-            throw DownloadException("Download interrupted", e)
+            // What arrived stays, so the next try continues from there
+            throw InterruptedDownload(e)
         }
-        if (total != asset.size) throw DownloadException("Download incomplete")
+        if (total != asset.size) throw InterruptedDownload(null)
         val expected = asset.sha256
         if (expected != null && Rules.toHex(sha.digest()) != expected) {
             throw DownloadException("Checksum does not match the release")
@@ -309,7 +327,7 @@ object GitHub {
     private val REDIRECTS = setOf(301, 302, 303, 307, 308)
 
     /** One request, redirects not followed: each next address is checked by the caller first. */
-    private fun connect(uri: URI, api: Boolean): HttpsURLConnection {
+    private fun connect(uri: URI, api: Boolean, from: Long = 0): HttpsURLConnection {
         val conn = uri.toURL().openConnection() as HttpsURLConnection
         conn.instanceFollowRedirects = false
         conn.connectTimeout = TIMEOUT_MS
@@ -317,6 +335,8 @@ object GitHub {
         conn.useCaches = false
         // A neutral name: nothing about the phone or its owner
         conn.setRequestProperty("User-Agent", "Komora")
+        // The rest of a file whose start is already here
+        if (from > 0) conn.setRequestProperty("Range", "bytes=$from-")
         if (api) {
             conn.setRequestProperty("Accept", "application/vnd.github+json")
             conn.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
@@ -325,14 +345,16 @@ object GitHub {
     }
 
     /** An open connection after any redirects, each one checked against the allowed hosts. */
-    private fun open(start: String, api: Boolean, hosts: Set<String> = Rules.APP_HOSTS): Connection {
+    private fun open(start: String, api: Boolean, hosts: Set<String> = Rules.APP_HOSTS, from: Long = 0): Connection {
         var url = start
         repeat(MAX_REDIRECTS + 1) {
             val uri = Rules.allowedUri(url, hosts) ?: throw IOException("Refused to connect outside GitHub")
-            val conn = connect(uri, api)
+            val conn = connect(uri, api, from)
             try {
                 when (val code = conn.responseCode) {
                     HttpURLConnection.HTTP_OK -> return Connection(conn)
+                    // Only when the rest of a file was asked for
+                    HttpURLConnection.HTTP_PARTIAL -> if (from > 0) return Connection(conn) else throw IOException("GitHub answered $code")
                     in REDIRECTS -> url = nextUrl(conn, url) ?: throw IOException("Bad redirect")
                     // Only the API's own "rate limit" answers count as such
                     403, 429 -> if (api && (code == 429 || conn.getHeaderField("X-RateLimit-Remaining") == "0")) {
@@ -367,6 +389,8 @@ object GitHub {
     private class Connection(private val conn: HttpsURLConnection) : AutoCloseable {
         val inputStream: InputStream get() = conn.inputStream
         val contentLengthLong: Long get() = conn.contentLengthLong
+        val partial: Boolean get() = conn.responseCode == HttpURLConnection.HTTP_PARTIAL
+        val contentRange: String? get() = conn.getHeaderField("Content-Range")
         override fun close() = conn.disconnect()
     }
 }

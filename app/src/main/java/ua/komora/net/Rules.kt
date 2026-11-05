@@ -25,6 +25,18 @@ object Rules {
     /** A screenshot is never bigger than this; a larger file is left out. */
     const val MAX_IMAGE_BYTES: Int = 3 * 1024 * 1024
 
+    /** The Content-Range a server must answer when asked for the rest of a file from byte [from] of [size]. */
+    fun contentRange(from: Long, size: Long): String = "bytes $from-${size - 1}/$size"
+
+    /**
+     * The file an interrupted download keeps, named after exactly what it is (link, size, checksum), so
+     * the next try continues only the same file.
+     */
+    fun partialName(asset: Asset): String = "part-" + storeName("${asset.url}|${asset.size}|${asset.sha256 ?: ""}") + ".apk"
+
+    /** An interrupted download's start is kept this long at most. */
+    const val MAX_PARTIAL_AGE_MS: Long = 48L * 60 * 60 * 1000
+
     /** An added source's screenshot is never bigger than this. */
     const val MAX_SOURCE_IMAGE_BYTES: Long = 1024L * 1024
 
