@@ -13,7 +13,6 @@ Please do not report a vulnerability in public issues. Use a private report: **S
 
 - Встановлюється лише той застосунок, що в її списку, підписаний закріпленим ключем, і не старіший за встановлений та за найнижчу дозволену версію. · Only the app in its list is installed, signed with the pinned key, and never older than the installed one or the lowest allowed version.
 - Автоматичні оновлення беруть лише випуски, яким уже дві доби. · Automatic updates only take releases that have been out for two days.
-- Ключ підпису Комори ніколи не буває на GitHub: CI збирає непідписаний файл, а авторка підписує його на власному компʼютері (`scripts/sign-release.sh`), перевіривши, що це саме той файл. · Komora's signing key is never on GitHub: CI builds an unsigned file, and the author signs it on her own computer (`scripts/sign-release.sh`) after checking it is exactly that file.
 - Мережа — лише GitHub через HTTPS; кожне перенаправлення перевіряється. · Network: GitHub only, over HTTPS; every redirect is checked.
 - Застосунки з інших джерел Комора не перевіряє: вона лише стежить, щоб оновлення мали той самий ключ, що й перше встановлення. · Apps from other sources are not checked: Komora only makes sure updates carry the same key as the first install.
 
