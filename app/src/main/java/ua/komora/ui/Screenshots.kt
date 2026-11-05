@@ -63,6 +63,8 @@ private object ScreenshotCache {
 
 /** Decodes an image no larger than a phone screen needs; anything odd (too big, unreadable) is left out. */
 private fun decode(bytes: ByteArray): ImageBitmap? = try {
+    // Only what it says it is: PNG, JPEG or WebP by its first bytes, nothing else handed to the decoder
+    if (!looksLikeImage(bytes)) return null
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     val w = bounds.outWidth; val h = bounds.outHeight
@@ -80,21 +82,30 @@ private fun decode(bytes: ByteArray): ImageBitmap? = try {
     null
 }
 
+/** PNG, JPEG or WebP by its first bytes (the decoder never sees anything else). */
+internal fun looksLikeImage(b: ByteArray): Boolean {
+    fun at(i: Int, vararg v: Int) = b.size >= i + v.size && v.withIndex().all { (k, x) -> (b[i + k].toInt() and 0xFF) == x }
+    return at(0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A) ||
+        at(0, 0xFF, 0xD8, 0xFF) ||
+        (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50))
+}
+
 /**
  * The app's screenshots in a row. They are kept on the phone and fetched from the repository again only
  * for a new release ([tag]), when the details are open; until the release is known, the kept ones show.
  * Nothing is shown while there are none (or no connection and nothing kept). A tap opens them full screen.
  */
 @Composable
-fun Screenshots(repo: String, tag: String?, lang: String) {
+fun Screenshots(repo: String, tag: String?, lang: String, added: Boolean = false) {
     val context = LocalContext.current
-    val key = "$repo|$lang|$tag"
+    val key = "$repo|$lang|$tag|$added"
     var shots by remember(key) { mutableStateOf(ScreenshotCache.get(key)) }
     LaunchedEffect(key) {
         if (shots != null) return@LaunchedEffect
         val loaded = withContext(Dispatchers.IO) {
             try {
-                val store = Stores.screenshots(context)
+                // An added app's pictures: their own store, removed at once when turned off
+                val store = if (added) Stores.sourceScreenshots(context) else Stores.screenshots(context)
                 // The pictures for this release, or (until it is known) the ones kept from before
                 val kept = store.get(repo, lang, tag)
                 val result = when {

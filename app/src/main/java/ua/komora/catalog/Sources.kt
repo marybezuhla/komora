@@ -85,6 +85,24 @@ object Sources {
         }
     }
 
+    /**
+     * Screenshots and icons of added apps: off unless the owner turns it on after a warning, as their
+     * pictures come from repositories Komora never checked.
+     */
+    fun pictures(context: Context): Boolean = try {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("pictures", false)
+    } catch (_: Exception) {
+        false
+    }
+
+    fun setPictures(context: Context, on: Boolean) {
+        try {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("pictures", on).apply()
+        } catch (_: Exception) {
+            // Only a preference
+        }
+    }
+
     /** The list, strictly checked: anything that does not look right is left out, never half-read. */
     fun load(context: Context): List<Source> = try {
         // What cut-off writes left beside the list (and the fixed name Komora 1.0.0 used for it)

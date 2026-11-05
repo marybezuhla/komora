@@ -207,6 +207,37 @@ object GitHub {
         }
     }
 
+    /**
+     * The app's icon as it keeps it for F-Droid (fastlane/metadata/android/<language>/images/icon.png),
+     * in the language shown first: GitHub's API is asked for each folder until one has it. Null when
+     * GitHub could not be asked; an empty list when there is none.
+     */
+    fun iconList(repo: String, lang: String, isCancelled: () -> Boolean): List<Rules.Shot>? = try {
+        var found = emptyList<Rules.Shot>()
+        for (dir in Rules.screenshotDirs(lang).map { it.substringBeforeLast('/') }) {
+            if (isCancelled()) return null
+            val body = try {
+                open("https://api.github.com/repos/$repo/contents/$dir", api = true, hosts = Rules.SCREENSHOT_HOSTS)
+                    .use { readLimited(it.inputStream, Rules.MAX_JSON_BYTES) }
+            } catch (_: NoReleaseException) {
+                // 404: no such folder
+                continue
+            }
+            val a = try { org.json.JSONArray(String(body, Charsets.UTF_8)) } catch (_: JSONException) { continue } catch (_: StackOverflowError) { continue }
+            found = (0 until a.length()).mapNotNull { i ->
+                val o = a.optJSONObject(i) ?: return@mapNotNull null
+                val name = o.optString("name"); val url = o.optString("download_url"); val size = o.optLong("size")
+                val sha = o.optString("sha").lowercase()
+                if (o.optString("type") == "file" && name.equals("icon.png", ignoreCase = true) && size <= Rules.MAX_ICON_BYTES &&
+                    Rules.isScreenshot(name, url, size, repo) && Rules.GIT_SHA_HEX.matches(sha)) Rules.Shot(name, url, size, sha) else null
+            }.take(1)
+            if (found.isNotEmpty()) break
+        }
+        found
+    } catch (_: IOException) {
+        null
+    }
+
     /** One screenshot's bytes, only if they are exactly the file GitHub listed; null otherwise. */
     fun screenshot(shot: Rules.Shot): ByteArray? = try {
         open(shot.url, api = false, hosts = Rules.SCREENSHOT_HOSTS).use { readLimited(it.inputStream, shot.size.toInt()) }

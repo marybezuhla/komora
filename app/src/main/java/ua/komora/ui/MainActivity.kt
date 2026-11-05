@@ -242,6 +242,8 @@ class MainActivity : ComponentActivity() {
                         },
                         sourcesEnabled = vm.sourcesEnabled.collectAsStateWithLifecycle().value,
                         onSources = vm::setSourcesEnabled,
+                        sourcePictures = vm.sourcePictures.collectAsStateWithLifecycle().value,
+                        onSourcePictures = vm::setSourcePictures,
                         onAbout = { showAbout = true },
                     ) { changed ->
                         look.value = changed
@@ -418,6 +420,8 @@ internal fun LookPage(
     onNotifySettings: () -> Unit = {},
     sourcesEnabled: Boolean = false,
     onSources: (Boolean) -> Unit = {},
+    sourcePictures: Boolean = false,
+    onSourcePictures: (Boolean) -> Unit = {},
     onAbout: () -> Unit = {},
     onChange: (Look) -> Unit,
 ) {
@@ -449,7 +453,7 @@ internal fun LookPage(
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
             ) {
                 UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings, auto, onAuto)
-                SourcesSettings(sourcesEnabled, onSources)
+                SourcesSettings(sourcesEnabled, onSources, pictures = sourcePictures, onPictures = onSourcePictures)
                 AboutRow(onAbout)
             }
         }
@@ -543,8 +547,16 @@ private fun SwitchRow(title: String, summary: String?, checked: Boolean, onChang
 
 /** "Other sources": off by default; turning it on shows the second tab, with a plain warning. */
 @Composable
-internal fun SourcesSettings(enabled: Boolean, onChange: (Boolean) -> Unit, startAsking: Boolean = false) {
+internal fun SourcesSettings(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+    startAsking: Boolean = false,
+    pictures: Boolean = false,
+    onPictures: (Boolean) -> Unit = {},
+    startAskingPictures: Boolean = false,
+) {
     var asking by rememberSaveable { mutableStateOf(startAsking) }
+    var askingPictures by rememberSaveable { mutableStateOf(startAskingPictures) }
     Spacer(Modifier.height(8.dp))
     SectionTitle(stringResource(R.string.sources_title))
     Group {
@@ -552,8 +564,46 @@ internal fun SourcesSettings(enabled: Boolean, onChange: (Boolean) -> Unit, star
         SwitchRow(stringResource(R.string.sources_switch), stringResource(R.string.sources_summary), enabled) { on ->
             if (on) asking = true else onChange(false)
         }
+        // Added apps' screenshots and icons: only with added sources on, and again only after a warning
+        if (enabled) {
+            SwitchRow(stringResource(R.string.source_pictures_switch), stringResource(R.string.source_pictures_summary), pictures) { on ->
+                if (on) askingPictures = true else onPictures(false)
+            }
+        }
     }
     if (asking) SourcesWarning(onAgree = { asking = false; onChange(true) }, onDismiss = { asking = false })
+    if (askingPictures) PicturesWarning(onAgree = { askingPictures = false; onPictures(true) }, onDismiss = { askingPictures = false })
+}
+
+/** Why pictures from added sources are off unless asked for, and a plain yes or no. */
+@Composable
+internal fun PicturesWarning(onAgree: () -> Unit, onDismiss: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = scheme.errorContainer,
+        iconContentColor = scheme.error,
+        titleContentColor = scheme.onErrorContainer,
+        textContentColor = scheme.onErrorContainer,
+        icon = { Icon(painterResource(R.drawable.ic_warning), contentDescription = null, modifier = Modifier.size(32.dp)) },
+        title = { Text(stringResource(R.string.source_pictures_switch)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(stringResource(R.string.source_pictures_warn), style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onAgree,
+                colors = ButtonDefaults.buttonColors(containerColor = scheme.error, contentColor = scheme.onError),
+            ) { Text(stringResource(R.string.source_pictures_yes)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = scheme.onErrorContainer)) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
 }
 
 /** The way to "About Komora", last in Settings. */

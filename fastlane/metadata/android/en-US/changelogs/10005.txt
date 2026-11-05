@@ -1,0 +1,1 @@
+Komora 1.0.5. Pictures from added sources: optional, after a warning. Screenshots are fetched ahead and open at once. Cards show "Screenshots and details". Requires Android 12 or newer.

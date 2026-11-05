@@ -186,4 +186,8 @@
     <string name="source_removed">Removed from the list: %1$s</string>
     <string name="undo">Undo</string>
     <string name="err_too_old">This release is older than Komora allows for this app. Nothing was installed.</string>
+    <string name="source_pictures_switch">Pictures from added sources</string>
+    <string name="source_pictures_summary">Show screenshots and icons of the apps you added yourself</string>
+    <string name="source_pictures_warn">These pictures come from repositories Komora never checked. A maliciously made picture could try to exploit a flaw in the phone. Komora only takes ordinary PNG, JPEG and WebP files of limited size, but it cannot fully protect against such a flaw. Turn this on only if you trust these sources. Turning it off removes all of these pictures from the phone at once.</string>
+    <string name="source_pictures_yes">Turn on</string>
 </resources>

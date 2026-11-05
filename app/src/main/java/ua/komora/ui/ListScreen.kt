@@ -14,6 +14,10 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.border
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.clickable
+import ua.komora.Stores
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -411,11 +415,12 @@ private val ICON = 48.dp
 
 /**
  * The app's icon. Once installed, it comes from the app itself on this phone, so a new icon shows as
- * soon as the app is updated; before that, the copy bundled in Komora. An app with neither gets a
- * small square with its first letters. Decoration only.
+ * soon as the app is updated; before that, the copy bundled in Komora, or for an added app
+ * ([addedRepo]) the icon from its repository if the owner turned added apps' pictures on. An app with
+ * none of these gets a small circle with its first letters. Decoration only.
  */
 @Composable
-private fun AppIcon(packageName: String, name: String, color: Long, installedVersion: String?) {
+private fun AppIcon(packageName: String, name: String, color: Long, installedVersion: String?, addedRepo: String? = null, tag: String? = null) {
     val context = LocalContext.current
     val px = with(LocalDensity.current) { ICON.roundToPx() }
     // Read again whenever the installed version changes (an update may bring a new icon)
@@ -425,6 +430,19 @@ private fun AppIcon(packageName: String, name: String, color: Long, installedVer
     if (installed != null) {
         Image(installed, contentDescription = null, modifier = Modifier.size(ICON).clearAndSetSemantics { })
         return
+    }
+    if (addedRepo != null) {
+        val version by SourcePictures.version.collectAsState()
+        val fetched by androidx.compose.runtime.produceState<ImageBitmap?>(null, addedRepo, tag, version) {
+            value = withContext(Dispatchers.IO) {
+                if (!ua.komora.catalog.Sources.pictures(context)) null
+                else Stores.sourceIcons(context).get(addedRepo, SourcePictures.ICON, null)?.firstOrNull()?.let { smallIcon(it, px) }
+            }
+        }
+        fetched?.let {
+            Image(it, contentDescription = null, modifier = Modifier.size(ICON).clip(CircleShape).clearAndSetSemantics { })
+            return
+        }
     }
     val icon = APP_ICONS[packageName]
     if (icon != null) {
@@ -510,7 +528,8 @@ private fun AppListRow(
                 .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion)
+            AppIcon(row.app.packageName, name, row.app.badge, row.installedVersion,
+                addedRepo = if (row.app.added) row.latest?.repo ?: row.app.repo else null, tag = row.latest?.tagKey)
             Spacer(Modifier.width(TEXT_EDGE - 16.dp - ICON))
             // One swipe reads the app: name, what it is, where it stands
             Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -795,4 +814,21 @@ private fun AddedIntro(onAdd: () -> Unit, onShare: (() -> Unit)?) {
             }
         }
     }
+}
+
+/** An added app's icon, decoded small: only a real PNG of sane size, never larger than [px] on screen. */
+private fun smallIcon(bytes: ByteArray, px: Int): ImageBitmap? = try {
+    if (!looksLikeImage(bytes)) null else {
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val w = bounds.outWidth; val h = bounds.outHeight
+        if (w <= 0 || h <= 0 || w > 2048 || h > 2048) null else {
+            var sample = 1
+            while (maxOf(w, h) / (sample * 2) >= px) sample *= 2
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+                ?.asImageBitmap()
+        }
+    }
+} catch (_: Throwable) {
+    null
 }

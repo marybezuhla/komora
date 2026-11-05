@@ -8,6 +8,7 @@
 
 **Що бачить GitHub.** Адресу (IP) телефона, коли Комора питає:
 - про нові версії застосунків — коли ви відкриваєте Комору й, якщо ввімкнено, раз на день у фоні (сповіщення чи автоматичні оновлення). У фоні про застосунки з інших джерел Комора питає лише тоді, коли вони встановлені, тож GitHub може бачити, які з доданих вами застосунків є на телефоні;
+- про знімки екрана й іконки застосунків, які ви додали самі: лише якщо ви ввімкнули «Знімки й іконки сторонніх джерел» (за замовчуванням вимкнено), так само наперед і лише раз на версію. Вимкнете, і всі ці картинки одразу зникнуть з телефона;
 - про знімки екрана застосунків зі списку Комори: одразу після перевірки нових версій, наперед для всіх, коли знімків останньої версії ще немає на телефоні (уперше, після нової версії, іншою мовою чи після того, як Android очистив тимчасову памʼять). Через те, що вони завантажуються для всіх разом, GitHub не бачить, який застосунок ви переглядали;
 - коли ви завантажуєте файл застосунку.
 
@@ -27,6 +28,7 @@ Komora has no accounts, analytics, ads or crash reports. It sends nothing about 
 
 **What GitHub sees.** The phone's address (IP) when Komora asks:
 - about new versions — when you open Komora and, if turned on, once a day in the background (notifications or automatic updates). In the background Komora asks about apps from other sources only if they are installed, so GitHub can see which of the apps you added are on the phone;
+- for the screenshots and icons of the apps you added yourself: only if you turned on "Pictures from added sources" (off by default), likewise ahead and once per version. Turning it off removes all of these pictures from the phone at once;
 - for the screenshots of the apps in Komora's list: right after checking for new versions, ahead for all of them, when the screenshots of the latest version are not on the phone yet (the first time, after a new version, in another language, or after Android cleared temporary storage). As they come for all apps together, GitHub cannot see which app was looked at;
 - when you download an app's file.
 

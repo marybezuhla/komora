@@ -11,6 +11,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -120,6 +121,10 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     }
     private val _sourcesEnabled = MutableStateFlow(Sources.enabled(app))
     val sourcesEnabled: StateFlow<Boolean> = _sourcesEnabled
+
+    private val _sourcePictures = MutableStateFlow(Sources.pictures(app))
+    /** Added apps' screenshots and icons shown (the owner turned them on after a warning). */
+    val sourcePictures: StateFlow<Boolean> = _sourcePictures
 
     /**
      * Komora's own list, then the added sources. A source whose pinned package is (now) in Komora's own
@@ -247,16 +252,24 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         prefetchJob = viewModelScope.launch(Dispatchers.IO) {
             val lang = ctx.getString(R.string.catalog_lang)
             val store = Stores.screenshots(ctx)
+            val withSources = _sourcePictures.value
             for (row in _rows.value) {
-                if (row.app.added) continue
+                if (row.app.added && !withSources) continue
                 val latest = row.latest ?: continue
                 // As the details ask for them: the release's own repository (after a rename), else the listed one
                 val repo = latest.repo ?: row.app.repo
+                // An added app's pictures go to their own store, removed at once when turned off
+                val shots = if (row.app.added) Stores.sourceScreenshots(ctx) else store
                 val done = try {
-                    if (store.get(repo, lang, latest.tagKey) != null) continue
+                    if (row.app.added && Stores.sourceIcons(ctx).get(repo, SourcePictures.ICON, latest.tagKey) == null) {
+                        val icon = GitHub.iconList(repo, lang) { !isActive } ?: break
+                        Stores.sourceIcons(ctx).update(repo, SourcePictures.ICON, latest.tagKey, icon) { shot -> if (isActive) GitHub.screenshot(shot) else null }
+                        SourcePictures.changed()
+                    }
+                    if (shots.get(repo, lang, latest.tagKey) != null) continue
                     val listed = GitHub.screenshotList(repo, lang) { !isActive }
                     if (listed == null) false
-                    else store.update(repo, lang, latest.tagKey, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null }.complete
+                    else shots.update(repo, lang, latest.tagKey, listed) { shot -> if (isActive) GitHub.screenshot(shot) else null }.complete
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
@@ -310,7 +323,28 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Added sources ----
 
+    /** Added apps' pictures on (after the warning) or off: off removes every one of them from the phone. */
+    fun setSourcePictures(on: Boolean) {
+        Sources.setPictures(ctx, on)
+        _sourcePictures.value = on
+        if (on) {
+            // After one already running (which left the added apps out)
+            val running = prefetchJob
+            viewModelScope.launch { running?.join(); prefetchScreenshots() }
+        } else {
+            val running = prefetchJob
+            viewModelScope.launch(Dispatchers.IO) {
+                // Anything being fetched now finishes first, so nothing is written back after the removal
+                running?.cancelAndJoin()
+                Stores.forgetSourcePictures(ctx)
+                SourcePictures.changed()
+            }
+        }
+    }
+
     fun setSourcesEnabled(on: Boolean) {
+        // Without added sources, their pictures go too (and stay off until asked for again)
+        if (!on && _sourcePictures.value) setSourcePictures(false)
         Sources.setEnabled(ctx, on)
         _sourcesEnabled.value = on
         rebuildRows()

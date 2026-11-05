@@ -242,10 +242,11 @@ internal fun DetailsContent(row: AppRow, lang: String, pinnedKey: String?, onRem
         Spacer(Modifier.height(12.dp))
         Text(row.app.summary(lang), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface,
             modifier = Modifier.fillMaxWidth())
-        // How it looks: only for Komora's own list (pictures from unknown sources are not opened)
-        if (!row.app.added) {
+        // How it looks: Komora's own list, and added apps only if the owner turned their pictures on
+        val context = androidx.compose.ui.platform.LocalContext.current
+        if (!row.app.added || ua.komora.catalog.Sources.pictures(context)) {
             Spacer(Modifier.height(12.dp))
-            Screenshots(row.latest?.repo ?: row.app.repo, row.latest?.tagKey, lang)
+            Screenshots(row.latest?.repo ?: row.app.repo, row.latest?.tagKey, lang, added = row.app.added)
         }
         // 2. What is new in the latest version, in the language shown
         val notes = ReleaseNotes.forLanguage(row.latest?.notes.orEmpty(), lang)

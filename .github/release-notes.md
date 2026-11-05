@@ -1,5 +1,6 @@
-**Комора 1.0.4**
+**Комора 1.0.5**
 
+- Нове в налаштуваннях: «Знімки й іконки сторонніх джерел». Вимкнено за замовчуванням і вмикається лише після попередження; тоді застосунки, які ви додали самі, показують свої знімки й іконку.
 - Знімки екрана застосунків зі списку Комори завантажуються наперед, тож відкриваються одразу.
 - На кожній картці видно «Знімки й опис ›»: що дотик відкриває подробиці.
 
@@ -9,8 +10,9 @@
 
 ---
 
-**Komora 1.0.4**
+**Komora 1.0.5**
 
+- New in Settings: "Pictures from added sources". Off by default and turned on only after a warning; then the apps you added yourself show their screenshots and icon.
 - Screenshots of the apps in Komora's list are fetched ahead, so they open at once.
 - Every card shows "Screenshots and details ›": a tap opens the details.
 

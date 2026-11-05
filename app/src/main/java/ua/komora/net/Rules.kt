@@ -25,6 +25,9 @@ object Rules {
     /** A screenshot is never bigger than this; a larger file is left out. */
     const val MAX_IMAGE_BYTES: Int = 3 * 1024 * 1024
 
+    /** An added app's icon is never bigger than this (a 512 px icon is far smaller). */
+    const val MAX_ICON_BYTES: Long = 512L * 1024
+
     /** At most this many screenshots per app. */
     const val MAX_SCREENSHOTS = 8
 
