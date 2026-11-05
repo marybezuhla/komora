@@ -140,10 +140,10 @@ class ScreensTest {
     @Test fun listPhone() = list("01-list-phone-colours", Theme.SYSTEM)
     @Config(qualifiers = "+night")
     @Test fun listPhoneDark() = list("02-list-phone-colours-dark", Theme.SYSTEM_DARK)
-    @Test fun listKreyda() = list("03-list-kreyda", Theme.KREYDA)
+    @Test fun listLon() = list("03-list-lon", Theme.LON)
     @Test fun listGlyna() = list("04-list-glyna", Theme.GLYNA)
     @Config(qualifiers = "+night")
-    @Test fun listPodillia() = list("05-list-podillia", Theme.PODILLIA)
+    @Test fun listMak() = list("05-list-mak", Theme.MAK)
     @Config(qualifiers = "+night")
     @Test fun listZhar() = list("06-list-zhar", Theme.ZHAR)
     @Test fun firstStart() = list("07-first-start-allow", Theme.SYSTEM, canInstall = false)
@@ -157,8 +157,8 @@ class ScreensTest {
 
     @Test fun look() = shot("09-look", Theme.SYSTEM) { LookPage(Look(), onBack = {}) {} }
     @Config(qualifiers = "+night")
-    @Test fun lookDark() = shot("10-look-dark", Theme.HUTSULSHCHYNA) {
-        LookPage(Look(day = Theme.GLYNA, night = Theme.HUTSULSHCHYNA), onBack = {}) {}
+    @Test fun lookDark() = shot("10-look-dark", Theme.SMEREKA) {
+        LookPage(Look(day = Theme.GLYNA, night = Theme.SMEREKA), onBack = {}) {}
     }
 
     @Config(qualifiers = "en-w400dp-h1600dp-xhdpi")
@@ -193,7 +193,7 @@ class ScreensTest {
     @Test fun tabletSettings() = shot("18-tablet-settings", Theme.SYSTEM) { LookPage(Look(), onBack = {}) {} }
 
     @Config(qualifiers = "uk-w800dp-h1280dp-mdpi")
-    @Test fun tabletUpright() = list("19-tablet-upright", Theme.PODILLIA)
+    @Test fun tabletUpright() = list("19-tablet-upright", Theme.MAK)
 
     /** A calm day: two updates waiting, nothing downloading, the rest up to date or available. */
     @Test fun calmWithUpdates() {
@@ -217,7 +217,7 @@ class ScreensTest {
             AppRow(by.getValue("ua.tarilka"), installedVersion = "1.3.0", latest = release("tarilka", "1.3.0", 48)),
             AppRow(by.getValue("ua.sprotyv"), latest = release("sprotyv", "1.0.4", 9)),
         )
-        list("21-calm-dark-podillia", Theme.PODILLIA, rows = calm)
+        list("21-calm-dark-mak", Theme.MAK, rows = calm)
     }
 
     // Other sources: two added apps, one trusted and installed, one not installed yet
@@ -259,7 +259,7 @@ class ScreensTest {
         DetailsSheet(addedRows[0], "uk", key, onRemove = {}, onDismiss = {})
     }
 
-    @Test fun detailsVerified() = shot("29-details-verified", Theme.PODILLIA) {
+    @Test fun detailsVerified() = shot("29-details-verified", Theme.MAK) {
         DetailsSheet(rows[1], "uk", rows[1].app.certSha256, onRemove = null, onDismiss = {})
     }
 
@@ -282,7 +282,7 @@ class ScreensTest {
     @Test fun about() = shot("33-about", Theme.SYSTEM) { AboutPage(onBack = {}) }
 
     @Config(qualifiers = "en-w400dp-h3600dp-xhdpi")
-    @Test fun aboutEnglish() = shot("34-about-english", Theme.PODILLIA) { AboutPage(onBack = {}) }
+    @Test fun aboutEnglish() = shot("34-about-english", Theme.MAK) { AboutPage(onBack = {}) }
 
     @Config(qualifiers = "uk-w400dp-h1200dp-xhdpi")
     @Test fun detailsWithReport() = shot("35-details-report", Theme.SYSTEM) {

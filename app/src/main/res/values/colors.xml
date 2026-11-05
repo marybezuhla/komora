@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The window behind the screen at start, as the default day theme (Chalk) -->
+    <!-- The window behind the screen at start, as the default day theme (Linen) -->
     <color name="background">#E6DFD5</color>
     <!-- The icon: deep blue, cream, gold -->
     <color name="icon_bg">#013B88</color>
