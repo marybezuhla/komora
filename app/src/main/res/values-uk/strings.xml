@@ -10,6 +10,7 @@
     <string name="retry">Спробувати ще раз</string>
     <string name="continue_install">Продовжити</string>
     <string name="app_settings">Налаштування застосунку</string>
+    <string name="app_info">Відомості про застосунок</string>
     <string name="checking">Перевіряю…</string>
     <string name="downloading">Завантажую… %1$d%% (%2$s з %3$s)</string>
     <string name="downloading_short">Завантаження, %1$d%%</string>
