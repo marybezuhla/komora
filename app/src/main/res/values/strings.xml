@@ -10,6 +10,7 @@
     <string name="retry">Try again</string>
     <string name="continue_install">Continue</string>
     <string name="app_settings">App settings</string>
+    <string name="app_info">App info</string>
     <string name="checking">Checking…</string>
     <string name="downloading">Downloading… %1$d%% (%2$s of %3$s)</string>
     <string name="downloading_short">Downloading, %1$d%%</string>

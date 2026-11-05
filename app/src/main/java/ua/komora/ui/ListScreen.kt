@@ -502,6 +502,7 @@ private fun AppListRow(
     val details = stringResource(R.string.details)
     val ctxOpen = stringResource(R.string.open)
     val ctxUninstall = stringResource(R.string.uninstall)
+    val ctxInfo = stringResource(R.string.app_info)
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth()
@@ -564,6 +565,12 @@ private fun AppListRow(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = scheme.error),
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp).semantics { contentDescription = "$ctxUninstall: $name" },
                 ) { Text(stringResource(R.string.uninstall), fontWeight = FontWeight.SemiBold, maxLines = 1) }
+                // Android's own page for the app (permissions, storage, notifications, force stop): small, round, last
+                OutlinedIconButton(
+                    onClick = onAppSettings,
+                    border = BorderStroke(1.dp, scheme.outline),
+                    modifier = Modifier.size(48.dp),
+                ) { Icon(painterResource(R.drawable.ic_info), contentDescription = "$ctxInfo: $name", tint = scheme.primary) }
             }
         }
 
