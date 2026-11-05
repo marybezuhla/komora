@@ -157,14 +157,16 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     private val apkDir get() = File(ctx.noBackupFilesDir, "apk")
 
     init {
+        // Taken here, on the main thread, where the list is changed
+        val listed = (verified.map { it.repo } + sources.map { it.repo }).toSet()
         viewModelScope.launch {
             // Leftovers from a time Komora was closed mid-install
             withContext(Dispatchers.IO) {
                 runCatching { apkDir.listFiles()?.forEach { it.delete() } }
                 runCatching { Installer.dropUncommitted(ctx) }
-                // Answers about anything no longer in the list (a source removed while Komora was closed
-                // before its undo ran out) go, so nothing about a removed source outlives the next start
-                Stores.releases(ctx).keepOnly((verified.map { it.repo } + sources.map { it.repo }).toSet())
+                // Release answers about anything no longer in the list (a source removed while Komora was
+                // closed before its undo ran out) go at the next start
+                Stores.releases(ctx).keepOnly(listed)
             }
         }
         refreshInstalled()
@@ -464,11 +466,11 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     /** The chance to undo has passed: what Komora kept about the source goes, even the last version told about. */
     fun forgetRemoved() {
         val gone = lastRemoved
-        for (s in gone) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
-        // GitHub's last answer about it too (a file, so not on the main thread)
-        // Not if the same repository was added again meanwhile
+        // Not what was added again meanwhile
         val back = sources.map { it.repo.lowercase() }.toSet() + verified.map { it.repo.lowercase() }
         val drop = gone.filter { it.repo.lowercase() !in back }
+        for (s in drop) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
+        // GitHub's last answer about it too (a file, so not on the main thread)
         viewModelScope.launch(Dispatchers.IO) { drop.forEach { Stores.releases(ctx).forget(it.repo) } }
         lastRemoved = emptyList()
         _removed.value = null
