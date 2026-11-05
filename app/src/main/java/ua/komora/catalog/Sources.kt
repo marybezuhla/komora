@@ -87,6 +87,9 @@ object Sources {
 
     /** The list, strictly checked: anything that does not look right is left out, never half-read. */
     fun load(context: Context): List<Source> = try {
+        // What cut-off writes left beside the list (and the fixed name Komora 1.0.0 used for it)
+        WholeFile.dropLeftovers(context.noBackupFilesDir)
+        File(context.noBackupFilesDir, "$FILE.tmp").delete()
         parse(File(context.noBackupFilesDir, FILE).takeIf { it.exists() }?.readText() ?: "[]")
     } catch (_: Exception) {
         emptyList()

@@ -56,7 +56,8 @@ class ScreenshotStore(
                 val new = here[s.sha] ?: fetched[s.sha]
                 if (new != null) {
                     pictures += new
-                    if (s.sha in here || s.sha in saved) files += s.name to s.sha else complete = false
+                    // Still on disk: another look may have cleared this folder in between
+                    if (s.sha in saved || (s.sha in here && File(dir, s.sha).isFile)) files += s.name to s.sha else complete = false
                     continue
                 }
                 complete = false
@@ -65,7 +66,7 @@ class ScreenshotStore(
                 pictures += old.second
                 files += s.name to old.first
             }
-            write(dir, Kept(if (complete) tag else "", files))
+            write(dir, Kept(if (complete) tag else INCOMPLETE, files))
             val keep = files.map { it.second }.toSet() + INDEX
             dir.listFiles()?.filter { it.name !in keep }?.forEach { it.delete() }
             trim(except = dir)
@@ -140,5 +141,8 @@ class ScreenshotStore(
 
     private companion object {
         const val INDEX = "index.json"
+
+        /** Marks a set not yet complete; no tag can be this, as tags never hold control characters. */
+        const val INCOMPLETE = "\u0000"
     }
 }

@@ -114,7 +114,11 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         // Komora's own key always wins, and a hidden source would hold a place nobody could free
         val taken = verified.map { it.packageName }.toSet() + app.packageName
         val kept = all.filter { it.packageName !in taken }
-        if (kept.size != all.size) Sources.save(app, kept)
+        if (kept.size != all.size) {
+            Sources.save(app, kept)
+            // Komora's own list now asks about these under their own key, so the source's answer goes
+            all.filter { it.packageName in taken }.forEach { Stores.releases(app).forget(it.repo) }
+        }
         kept
     }
     private val _sourcesEnabled = MutableStateFlow(Sources.enabled(app))
@@ -281,6 +285,11 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                 for (app in apps().filter { it.added }) {
                     if (apps().none { it.key == app.key }) continue
                     if (!check(app)) break
+                }
+                // Pulled down meanwhile: everything is asked about now, as the pull asked
+                while (forceAgain) {
+                    forceAgain = false
+                    checkAll(force = true)
                 }
             }
         }
@@ -453,13 +462,12 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         rebuildRows()
     }
 
-    /** The chance to undo has passed: nothing about the source is left behind, not even the last version told about. */
+    /** The chance to undo has passed: what Komora kept about the source goes, even the last version told about. */
     fun forgetRemoved() {
-        for (s in lastRemoved) {
-            if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
-            // GitHub's last answer about it too: nothing of a removed source stays on the phone
-            Stores.releases(ctx).forget(s.repo)
-        }
+        val gone = lastRemoved
+        for (s in gone) if (s.packageName.isNotEmpty()) UpdateCheck.forget(ctx, s.packageName)
+        // GitHub's last answer about it too (a file, so not on the main thread)
+        viewModelScope.launch(Dispatchers.IO) { gone.forEach { Stores.releases(ctx).forget(it.repo) } }
         lastRemoved = emptyList()
         _removed.value = null
     }

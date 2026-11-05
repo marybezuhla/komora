@@ -16,9 +16,9 @@ import ua.komora.catalog.CatalogApp
 /**
  * A published release: its tag, its one APK, its description made plain ("What's new"), and when it was
  * published (milliseconds; null if GitHub did not say), so automatic updates can wait before taking it.
- * [repo] is the repository as GitHub spells it now (after any rename).
+ * [repo] is the repository as GitHub spells it now (after any rename); [tagKey] is the whole tag, to tell releases apart.
  */
-data class Release(val tag: String, val apk: Rules.Asset, val notes: String = "", val published: Long? = null, val repo: String? = null)
+data class Release(val tag: String, val apk: Rules.Asset, val notes: String = "", val published: Long? = null, val repo: String? = null, val tagKey: String = tag)
 
 /** GitHub allows 60 requests an hour without an account. */
 class RateLimitException : IOException("GitHub rate limit")
@@ -89,7 +89,7 @@ object GitHub {
         val repo = r.repo ?: app.repo
         val apk = app.apkPattern?.let { Rules.pickByPattern(r.assets, it, repo) }
             ?: Rules.pickApk(r.assets, app.assetPrefix, repo)
-        return Release(tag = r.tag, apk = apk, notes = r.notes, published = r.published, repo = repo)
+        return Release(tag = r.tag, apk = apk, notes = r.notes, published = r.published, repo = repo, tagKey = r.tagKey)
     }
 
     /**

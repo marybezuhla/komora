@@ -158,6 +158,7 @@ object AutoUpdate {
             if (!Rules.oldEnough(release.published, System.currentTimeMillis())) continue
             // Android already refused this very version without the owner: left for the owner, not fetched again
             if (refused(context, app.packageName) == latest) continue
+            if (dir.usableSpace < release.apk.size * 2) continue
             // Asked again straight from GitHub's API before installing anything unattended: a release pulled
             // or replaced under the same tag is never installed from an older kept answer
             val confirmed = try {
@@ -170,7 +171,6 @@ object AutoUpdate {
             }
             if (confirmed.tag != release.tag || confirmed.apk != release.apk) continue
             if (!Rules.oldEnough(confirmed.published, System.currentTimeMillis())) continue
-            if (dir.usableSpace < release.apk.size * 2) continue
             val file = File.createTempFile("apk", ".apk", dir)
             try {
                 try {
