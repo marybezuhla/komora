@@ -140,7 +140,7 @@ class ScreensTest {
     @Test fun listPhone() = list("01-list-phone-colours", Theme.SYSTEM)
     @Config(qualifiers = "+night")
     @Test fun listPhoneDark() = list("02-list-phone-colours-dark", Theme.SYSTEM_DARK)
-    @Test fun listLon() = list("03-list-lon", Theme.LON)
+    @Test fun listLinen() = list("03-list-linen", Theme.LINEN)
     @Test fun listGlyna() = list("04-list-glyna", Theme.GLYNA)
     @Config(qualifiers = "+night")
     @Test fun listMak() = list("05-list-mak", Theme.MAK)

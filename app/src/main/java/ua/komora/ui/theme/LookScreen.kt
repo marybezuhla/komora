@@ -68,7 +68,7 @@ object LookStore {
 @Composable
 fun themeName(theme: Theme): String = stringResource(
     when (theme) {
-        Theme.LON -> R.string.theme_lon
+        Theme.LINEN -> R.string.theme_linen
         Theme.VISK -> R.string.theme_visk
         Theme.NEBO -> R.string.theme_nebo
         Theme.GLYNA -> R.string.theme_glyna

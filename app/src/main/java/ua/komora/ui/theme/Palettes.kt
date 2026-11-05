@@ -23,7 +23,7 @@ class Palette(
 
 enum class Theme(val key: String, val dark: Boolean, val palette: Palette?) {
     // By day
-    LON("lon", false, Palette(
+    LINEN("linen", false, Palette(
         primary = 0xFFA3392C, onPrimary = 0xFFFFF8F0, secondary = 0xFF7D5A12,
         background = 0xFFE6DFD5, surface = 0xFFF8F3EB, surfaceVariant = 0xFFEBE3D8,
         onSurface = 0xFF2B2420, onSurfaceVariant = 0xFF5A5048, error = 0xFF8C1D18,
@@ -87,7 +87,7 @@ enum class Theme(val key: String, val dark: Boolean, val palette: Palette?) {
     companion object {
         // The phone's own colours come first: they are the default
         // In pairs: each day theme stands right above its night theme
-        val DAY = listOf(SYSTEM, NEBO, KALYNA, LON, VISK, GLYNA)
+        val DAY = listOf(SYSTEM, NEBO, KALYNA, LINEN, VISK, GLYNA)
         val NIGHT = listOf(SYSTEM_DARK, ZORIANA_NICH, MAK, CHORNOZEM, SMEREKA, ZHAR)
         /** A day theme's night pair (and the other way round): sky and starry night, linen and black earth... */
         fun pairOf(t: Theme): Theme = DAY.indexOf(t).takeIf { it >= 0 }?.let { NIGHT[it] } ?: DAY[NIGHT.indexOf(t).coerceAtLeast(0)]

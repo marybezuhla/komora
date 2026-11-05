@@ -83,7 +83,7 @@ class PaletteTest {
         assertEquals(Theme.ZHAR, look.current(phoneIsDark = true))
         assertEquals(Theme.GLYNA, look.copy(mode = Mode.LIGHT).current(phoneIsDark = true))
         assertEquals(Theme.ZHAR, look.copy(mode = Mode.DARK).current(phoneIsDark = false))
-        assertEquals(Theme.LON, Theme.of("unknown", Theme.LON))
+        assertEquals(Theme.LINEN, Theme.of("unknown", Theme.LINEN))
     }
 
     @Test
