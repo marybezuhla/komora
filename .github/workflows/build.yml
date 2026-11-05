@@ -73,7 +73,10 @@ jobs:
 
       - name: Record the APK checksum
         id: sum
-        run: echo "sha256=$(sha256sum app/build/outputs/apk/release/app-release-unsigned.apk | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "sha256=$(sha256sum app/build/outputs/apk/release/app-release-unsigned.apk | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Prepare build log
         if: always()
@@ -274,7 +277,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+        shell: bash
         run: |
+          set -euo pipefail
           # Checked again right before publishing: two approved runs must not publish out of order
           bash .github/check-version.sh push refs/heads/main "$REPO"
           V="$(tr -d '[:space:]' < version.txt)"

@@ -75,7 +75,8 @@ object Rules {
         return uri.takeIf { ok }
     }
 
-    data class Asset(val name: String, val url: String, val size: Long, val sha256: String?)
+    /** [changed]: when the file was last uploaded or replaced (milliseconds), if GitHub said. */
+    data class Asset(val name: String, val url: String, val size: Long, val sha256: String?, val changed: Long? = null)
 
     /** One screenshot in a repository, as GitHub lists it: [sha] is Git's name for its content. */
     class Shot(val name: String, val url: String, val size: Long, val sha: String)
@@ -197,6 +198,13 @@ object Rules {
     /** True when a release published at [publishedMs] has waited long enough at [nowMs]; unknown is never. */
     fun oldEnough(publishedMs: Long?, nowMs: Long): Boolean =
         publishedMs != null && nowMs - publishedMs >= AUTO_UPDATE_WAIT_MS
+
+    /**
+     * Since when a release's APK has been as it is: the later of the release's publishing and the file's
+     * last upload, so a file replaced in an old release waits again before automatic updates take it.
+     */
+    fun unchangedSince(publishedMs: Long?, assetChangedMs: Long?): Long? =
+        if (publishedMs == null) null else maxOf(publishedMs, assetChangedMs ?: publishedMs)
 
     fun toHex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
 

@@ -448,13 +448,16 @@ internal fun LookPage(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
             contentAlignment = Alignment.TopCenter,
         ) {
-            LookSettings(
-                look, onChange, language, onLanguage,
-                Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
-            ) {
-                UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings, auto, onAuto)
-                SourcesSettings(sourcesEnabled, onSources, pictures = sourcePictures, onPictures = onSourcePictures)
-                AboutRow(onAbout)
+            Column(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
+                LookSettings(
+                    look, onChange, language, onLanguage,
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                ) {
+                    UpdateSettings(updates, notifyDenied, onUpdates, onNotifySettings, auto, onAuto)
+                    SourcesSettings(sourcesEnabled, onSources, pictures = sourcePictures, onPictures = onSourcePictures)
+                }
+                // Last of all, after the look
+                Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) { AboutRow(onAbout) }
             }
         }
     }
@@ -578,7 +581,7 @@ internal fun SourcesSettings(
         }
     }
     if (asking) SourcesWarning(onAgree = { asking = false; onChange(true) }, onDismiss = { asking = false })
-    if (askingPictures) PicturesWarning(onAgree = { askingPictures = false; onPictures(true) }, onDismiss = { askingPictures = false })
+    if (askingPictures && enabled) PicturesWarning(onAgree = { askingPictures = false; onPictures(true) }, onDismiss = { askingPictures = false })
 }
 
 /** Why pictures from added sources are off unless asked for, and a plain yes or no. */

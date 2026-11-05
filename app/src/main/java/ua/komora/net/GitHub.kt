@@ -152,6 +152,10 @@ object GitHub {
                 url = a.getString("browser_download_url"),
                 size = a.getLong("size"),
                 sha256 = Rules.parseDigest(a.optString("digest", "").ifEmpty { null }),
+                // Uploaded or replaced: the later of the two, as automatic updates must wait from then
+                changed = listOf("created_at", "updated_at").mapNotNull { k ->
+                    runCatching { java.time.Instant.parse(a.getString(k)).toEpochMilli() }.getOrNull()
+                }.maxOrNull(),
             )
         }, ReleaseNotes.clean(o.optString("body", "")), canonical,
             runCatching { java.time.Instant.parse(o.getString("published_at")).toEpochMilli() }.getOrNull())
@@ -213,17 +217,28 @@ object GitHub {
      * GitHub could not be asked; an empty list when there is none.
      */
     fun iconList(repo: String, lang: String, isCancelled: () -> Boolean): List<Rules.Shot>? = try {
+        fun list(path: String): org.json.JSONArray? = try {
+            val body = open("https://api.github.com/repos/$repo/contents/$path", api = true, hosts = Rules.SCREENSHOT_HOSTS)
+                .use { readLimited(it.inputStream, Rules.MAX_JSON_BYTES) }
+            org.json.JSONArray(String(body, Charsets.UTF_8))
+        } catch (_: NoReleaseException) {
+            // 404: not there
+            null
+        } catch (_: JSONException) {
+            null
+        } catch (_: StackOverflowError) {
+            null
+        }
+        // Which languages the repository has, asked once, so only folders that exist are asked about
+        val base = "fastlane/metadata/android"
+        val langs = list(base)
+        val have = if (langs == null) emptySet() else (0 until langs.length()).mapNotNull {
+            langs.optJSONObject(it)?.takeIf { o -> o.optString("type") == "dir" }?.optString("name")
+        }.toSet()
         var found = emptyList<Rules.Shot>()
-        for (dir in Rules.screenshotDirs(lang).map { it.substringBeforeLast('/') }) {
+        for (dir in Rules.screenshotDirs(lang).map { it.substringBeforeLast('/') }.filter { it.removePrefix("$base/").substringBefore('/') in have }) {
             if (isCancelled()) return null
-            val body = try {
-                open("https://api.github.com/repos/$repo/contents/$dir", api = true, hosts = Rules.SCREENSHOT_HOSTS)
-                    .use { readLimited(it.inputStream, Rules.MAX_JSON_BYTES) }
-            } catch (_: NoReleaseException) {
-                // 404: no such folder
-                continue
-            }
-            val a = try { org.json.JSONArray(String(body, Charsets.UTF_8)) } catch (_: JSONException) { continue } catch (_: StackOverflowError) { continue }
+            val a = list(dir) ?: continue
             found = (0 until a.length()).mapNotNull { i ->
                 val o = a.optJSONObject(i) ?: return@mapNotNull null
                 val name = o.optString("name"); val url = o.optString("download_url"); val size = o.optLong("size")

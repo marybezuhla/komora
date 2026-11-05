@@ -155,7 +155,7 @@ object AutoUpdate {
             val latest = Rules.normalizeVersion(release.tag)
             if ((Rules.compareVersions(latest, installed.versionName ?: continue) ?: 0) <= 0) continue
             // Only a release that has been out for two days: time to notice and pull a bad one
-            if (!Rules.oldEnough(release.published, System.currentTimeMillis())) continue
+            if (!Rules.oldEnough(Rules.unchangedSince(release.published, release.apk.changed), System.currentTimeMillis())) continue
             // Android already refused this very version without the owner: left for the owner, not fetched again
             if (refused(context, app.packageName) == latest) continue
             if (dir.usableSpace < release.apk.size * 2) continue
@@ -170,7 +170,7 @@ object AutoUpdate {
                 continue
             }
             if (confirmed.tag != release.tag || confirmed.apk != release.apk) continue
-            if (!Rules.oldEnough(confirmed.published, System.currentTimeMillis())) continue
+            if (!Rules.oldEnough(Rules.unchangedSince(confirmed.published, confirmed.apk.changed), System.currentTimeMillis())) continue
             val file = File.createTempFile("apk", ".apk", dir)
             try {
                 try {

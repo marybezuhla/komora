@@ -17,7 +17,7 @@
 
 Комора звертається лише до GitHub. Що саме видно GitHub: [PRIVACY.md](PRIVACY.md).
 
-**Встановлення:** завантажте `.apk` з [останнього випуску](../../releases/latest) на телефоні й відкрийте його. Потрібен Android 12 або новіший.
+**Встановлення:** завантажте `.apk` з [останнього випуску](../../releases/latest) на телефоні й відкрийте його. Android один раз попросить дозволити браузеру встановлювати застосунки. Потрібні Android 12 або новіший та інтернет.
 
 **Перевірка без Комори:** відбиток ключа підпису SHA-256
 
@@ -37,7 +37,7 @@ A simple, open and safe collection of apps for Android. Komora installs and upda
 
 Komora connects only to GitHub. What GitHub can see: [PRIVACY.md](PRIVACY.md).
 
-**Install:** download the `.apk` from the [latest release](../../releases/latest) on your phone and open it. Requires Android 12 or newer.
+**Install:** download the `.apk` from the [latest release](../../releases/latest) on your phone and open it. Android asks once to let the browser install apps. Requires Android 12 or newer and the internet.
 
 **Check it without Komora:** `apksigner verify --print-certs komora-<version>.apk`; the line `Signer #1 certificate SHA-256 digest` must match the fingerprint above.
 

@@ -35,6 +35,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -112,14 +114,17 @@ fun AddSourceDialog(
                     Text(
                         if (state.reason == AddError.SomeFailed) stringResource(R.string.add_err_some, state.repos.joinToString(", "))
                         else addErrorText(state.reason),
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error,
+                        // Read out by TalkBack as soon as it appears
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                 }
                 if (working) {
                     Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.padding(start = 8.dp))
-                        Text(stringResource(R.string.add_source_looking), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.add_source_looking), style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     }
                 }
             }

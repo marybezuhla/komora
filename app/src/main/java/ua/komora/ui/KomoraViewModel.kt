@@ -173,6 +173,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                 // Release answers about anything no longer in the list (a source removed while Komora was
                 // closed before its undo ran out) go at the next start
                 Stores.releases(ctx).keepOnly(listed)
+                // Added apps' pictures with no added source left, or with their pictures off: none kept
+                if (sources.isEmpty() || !Sources.pictures(ctx)) Stores.forgetSourcePictures(ctx)
             }
         }
         refreshInstalled()
@@ -240,6 +242,10 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private var prefetchJob: Job? = null
+    // Asked for while one was running (it may have seen the list before a check finished): one more round
+    private var prefetchAgain = false
+    // Removing added apps' pictures, when they were turned off: turning them on waits for it
+    private var cleanupJob: Job? = null
 
     /**
      * The screenshots of every app in Komora's own list, for its newest release, fetched ahead (on any
@@ -250,7 +256,11 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
      * failure (no connection, GitHub's limit): tried again next check.
      */
     private fun prefetchScreenshots() {
-        if (prefetchJob?.isActive == true) return
+        if (prefetchJob?.isActive == true) {
+            prefetchAgain = true
+            return
+        }
+        prefetchAgain = false
         prefetchJob = viewModelScope.launch(Dispatchers.IO) {
             val lang = ctx.getString(R.string.catalog_lang)
             val store = Stores.screenshots(ctx)
@@ -286,6 +296,11 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 // Icons read again once, when the round is over
                 if (icons > 0) SourcePictures.changed()
+            }
+        }.also { job ->
+            // Another round if one was asked for meanwhile (on the main thread, where it was asked)
+            job.invokeOnCompletion { cause ->
+                if (cause == null) viewModelScope.launch { if (prefetchAgain) prefetchScreenshots() }
             }
         }
     }
@@ -337,14 +352,14 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
         Sources.setPictures(ctx, on)
         _sourcePictures.value = on
         if (on) {
-            // After one already running (which left the added apps out)
-            val running = prefetchJob
-            viewModelScope.launch { running?.join(); prefetchScreenshots() }
+            // After any removal still going on, so it cannot delete what is fetched now
+            val cleaning = cleanupJob
+            viewModelScope.launch { cleaning?.join(); prefetchScreenshots() }
         } else {
             // Gone from the screen at once; from storage once anything being fetched has stopped
             SourcePictures.changed()
             val running = prefetchJob
-            viewModelScope.launch(Dispatchers.IO) {
+            cleanupJob = viewModelScope.launch(Dispatchers.IO) {
                 running?.cancelAndJoin()
                 Stores.forgetSourcePictures(ctx)
                 SourcePictures.changed()
@@ -372,6 +387,8 @@ class KomoraViewModel(app: Application) : AndroidViewModel(app) {
                     forceAgain = false
                     checkAll(force = true)
                 }
+                // The added apps' icons, if their pictures are on
+                prefetchScreenshots()
             }
         }
     }

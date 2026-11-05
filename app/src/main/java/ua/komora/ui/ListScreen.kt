@@ -468,7 +468,8 @@ private fun StatusText(row: AppRow) {
         row.phase == Phase.Checking -> stringResource(R.string.checking) to scheme.onSurfaceVariant
         row.hasUpdate && latest != null && size != null -> stringResource(R.string.pill_update, latest, size) to scheme.primary
         // Up to date only when the versions really compare as equal; anything unclear is just "Installed"
-        row.isInstalled && latest != null && !row.installedVersion.isNullOrEmpty() &&
+        // (not for a copy from another source: Komora cannot vouch for it)
+        row.isInstalled && !row.foreignKey && latest != null && !row.installedVersion.isNullOrEmpty() &&
             Rules.compareVersions(latest, row.installedVersion) == 0 ->
             ("✓ " + stringResource(R.string.pill_current, row.installedVersion)) to scheme.onSurfaceVariant
         row.isInstalled -> (if (row.installedVersion.isNullOrEmpty()) stringResource(R.string.installed)
@@ -476,8 +477,9 @@ private fun StatusText(row: AppRow) {
         size != null -> stringResource(R.string.pill_available, latest.orEmpty(), size) to scheme.onSurfaceVariant
         else -> stringResource(R.string.not_installed) to scheme.onSurfaceVariant
     }
+    // Not a live region: a check would read every row out twice; the banner above says what happens
     Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = color,
-        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        modifier = Modifier.semantics { contentDescription = text.removePrefix("✓ ") })
 }
 
 /** Wider than this, the list stays this wide, in the middle. */
@@ -652,13 +654,12 @@ private fun AppListRow(
                         OutlinedButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.cancel)) }
                     }
                     if (onContinue != null) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = onContinue, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                Text(stringResource(R.string.continue_install), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                                Text(stringResource(R.string.cancel), maxLines = 1)
-                            }
+                        // One under the other, each across the width: "Continue" is never cut short
+                        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.continue_install), textAlign = TextAlign.Center)
+                        }
+                        OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.cancel), textAlign = TextAlign.Center)
                         }
                     }
                 }

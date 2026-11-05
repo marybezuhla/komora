@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -52,13 +53,17 @@ import ua.komora.net.ScreenshotStore
 import ua.komora.net.Rules
 
 /** Screenshots already shown while Komora is open, ready to show again without reading them from storage. */
+/** Decoded pictures kept in memory at most (a screenshot decodes to about 4 bytes a pixel). */
+private const val MAX_CACHE_BYTES = 48L * 1024 * 1024
+
 internal object ScreenshotCache {
     private val map = LinkedHashMap<String, List<ImageBitmap>>()
     @Synchronized fun get(key: String) = map[key]
     @Synchronized fun put(key: String, value: List<ImageBitmap>) {
         map[key] = value
-        // A few apps at most, to keep memory small
-        while (map.size > 4) map.remove(map.keys.first())
+        // A few apps' pictures at most, counted in bytes, so large pictures never fill the memory
+        fun bytes() = map.values.sumOf { list -> list.sumOf { it.width.toLong() * it.height * 4 } }
+        while (map.size > 1 && (map.size > 4 || bytes() > MAX_CACHE_BYTES)) map.remove(map.keys.first())
     }
     /** Added apps' pictures (their keys end in "|true"), dropped when they are turned off. */
     @Synchronized fun clearAdded() {
@@ -76,9 +81,9 @@ private fun decode(bytes: ByteArray): ImageBitmap? = try {
     if (w <= 0 || h <= 0 || w > 8000 || h > 8000) null
     else {
         // No side larger than a phone screen needs
-        // Never more than 1600 px on the long side nor about 4 million pixels once decoded
+        // Never more than 1600 px on the long side nor about 2.5 million pixels once decoded
         var sample = 1
-        while (maxOf(w, h) / sample > 1600 || (w.toLong() / sample) * (h.toLong() / sample) > 4_000_000L) sample *= 2
+        while (maxOf(w, h) / sample > 1600 || (w.toLong() / sample) * (h.toLong() / sample) > 2_500_000L) sample *= 2
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply {
             inSampleSize = sample
             inPreferredConfig = Bitmap.Config.ARGB_8888
@@ -161,11 +166,17 @@ fun Screenshots(repo: String, tag: String?, lang: String, added: Boolean = false
     if (open >= 0) {
         Dialog(onDismissRequest = { open = -1 }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             val pager = rememberPagerState(initialPage = open.coerceIn(0, list.lastIndex)) { list.size }
-            Box(Modifier.fillMaxSize().background(Color.Black).clickable { open = -1 }) {
+            val close = stringResource(R.string.close)
+            Box(Modifier.fillMaxSize().background(Color.Black).clickable(onClickLabel = close) { open = -1 }) {
                 HorizontalPager(pager, modifier = Modifier.fillMaxSize()) { page ->
-                    Image(list[page], contentDescription = "$label ${page + 1}", contentScale = ContentScale.Fit,
+                    Image(list[page], contentDescription = "$label ${page + 1} / ${list.size}", contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize().padding(12.dp))
                 }
+                // A visible way out, besides Back and a tap anywhere
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = { open = -1 },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).heightIn(min = 48.dp),
+                ) { Text(close) }
                 Text(
                     "${pager.currentPage + 1} / ${list.size}",
                     color = Color.White,
