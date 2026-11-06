@@ -87,11 +87,12 @@ class PaletteTest {
     }
 
     @Test
-    fun phoneColoursByDefault() {
+    fun skyAndStarryNightByDefault() {
         val look = Look()
         assertEquals(Mode.AUTO, look.mode)
-        assertEquals(Theme.SYSTEM, look.day)
-        assertEquals(Theme.SYSTEM_DARK, look.night)
+        assertEquals(Theme.NEBO, look.day)
+        assertEquals(Theme.ZORIANA_NICH, look.night)
+        assertEquals(Theme.ZORIANA_NICH, Theme.pairOf(look.day))
         assertEquals(Theme.SYSTEM, Theme.DAY.first())
         assertEquals(Theme.SYSTEM_DARK, Theme.NIGHT.first())
     }

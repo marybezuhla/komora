@@ -85,7 +85,7 @@ enum class Theme(val key: String, val dark: Boolean, val palette: Palette?) {
     SYSTEM_DARK("system_dark", true, null);
 
     companion object {
-        // The phone's own colours come first: they are the default
+        // The phone's own colours come first, then Sky and Starry night, the default pair.
         // In pairs: each day theme stands right above its night theme
         val DAY = listOf(SYSTEM, NEBO, KALYNA, LINEN, VISK, GLYNA)
         val NIGHT = listOf(SYSTEM_DARK, ZORIANA_NICH, MAK, CHORNOZEM, SMEREKA, ZHAR)
@@ -105,8 +105,8 @@ enum class Mode(val key: String) {
     }
 }
 
-/** What the owner chose. Defaults: light or dark as the phone, in the phone's own colours (Material You). */
-data class Look(val mode: Mode = Mode.AUTO, val day: Theme = Theme.SYSTEM, val night: Theme = Theme.SYSTEM_DARK) {
+/** What the owner chose. Defaults: light or dark as the phone, Sky by day and Starry night by night (they suit the icon). */
+data class Look(val mode: Mode = Mode.AUTO, val day: Theme = Theme.NEBO, val night: Theme = Theme.ZORIANA_NICH) {
     fun current(phoneIsDark: Boolean): Theme = when (mode) {
         Mode.AUTO -> if (phoneIsDark) night else day
         Mode.LIGHT -> day

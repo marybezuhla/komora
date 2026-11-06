@@ -190,7 +190,7 @@ class StoreScreens {
     }
 
     // 8. About: the author's word, support for Ukraine, the licence
-    private fun s8() = shot("08_about", Theme.SYSTEM) { AboutPage(onBack = {}) }
+    private fun s8() = shot("08_about", Theme.NEBO) { AboutPage(onBack = {}) }
 
     @Test fun uk1() = s1()
     @Test fun uk2() = s2()
