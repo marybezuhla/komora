@@ -182,6 +182,10 @@ class ScreensTest {
     @Config(qualifiers = "uk-w340dp-h1800dp-xhdpi", fontScale = 1.3f)
     @Test fun listNarrowLargeFont() = list("15-list-narrow-large-font", Theme.SYSTEM)
 
+    // English theme names are longer ("Viburnum"): with a large font none may break inside a word
+    @Config(qualifiers = "en-w340dp-h3000dp-xhdpi", fontScale = 1.3f)
+    @Test fun lookNarrowLargeFontEnglish() = shot("15b-settings-narrow-large-font-en", Theme.NEBO) { LookPage(Look(), onBack = {}) {} }
+
     // An unfolded Galaxy Fold or Pixel Fold, and a tablet held sideways
     @Config(qualifiers = "uk-w673dp-h841dp-xhdpi")
     @Test fun foldableOpen() = list("16-foldable-open", Theme.SYSTEM)
